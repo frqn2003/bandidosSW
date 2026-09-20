@@ -1,0 +1,26 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "skills": {
+    "paths": [".agents/skills", ".opencode/skills"]
+  },
+  "permission": {
+    "bash": {
+      "*": "ask",
+      "git *": "allow",
+      "npm *": "allow",
+      "npx *": "allow",
+      "node *": "allow",
+      "Get-ChildItem*": "allow",
+      "Get-Content*": "allow",
+      "Test-Path*": "allow",
+      "Select-Object*": "allow",
+      "Measure-Object*": "allow",
+      "Remove-Item *": "ask"
+    },
+    "edit": "allow",
+    "webfetch": "allow",
+    "websearch": "allow",
+    "doom_loop": "ask"
+  }
+}
