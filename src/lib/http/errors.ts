@@ -1,0 +1,380 @@
+/**
+ * Errores de dominio.
+ *
+ * Los services lanzan estos; el wrapper withRoute() los traduce a HTTP. Así el
+ * service no sabe nada de status codes y se puede testear sin servidor.
+ *
+ * Shape de respuesta (único para toda la API, porque el front ya tiene estados
+ * de error por CUIT/nombre duplicado):
+ *
+ *   { "error": { "codigo": "CUIT_DUPLICADO", "mensaje": "...", "campo": "cuit" } }
+ */
+
+export abstract class AppError extends Error {
+  abstract readonly status: number;
+
+  /**
+   * Datos extra para el cuerpo de la respuesta, además de codigo/mensaje/campo.
+   *
+   * Las subclases lo sobrescriben cuando el front necesita un valor y no un
+   * texto. `CuentaBloqueadaError` manda la fecha de desbloqueo para que la
+   * pantalla arme el contador sin tener que leer el mensaje.
+   */
+  get datos(): Record<string, unknown> | undefined {
+    return undefined;
+  }
+
+  constructor(
+    readonly codigo: string,
+    mensaje: string,
+    readonly campo?: string,
+  ) {
+    super(mensaje);
+    this.name = new.target.name;
+  }
+}
+
+/** 422 — el input no cumple el schema. */
+export class ValidationError extends AppError {
+  readonly status = 422;
+}
+
+/** 404 — el recurso no existe. */
+export class NotFoundError extends AppError {
+  readonly status = 404;
+
+  constructor(entidad: string, id?: number | string) {
+    super(
+      "NO_ENCONTRADO",
+      id === undefined ? `No se encontró ${entidad}.` : `No se encontró ${entidad} con id ${id}.`,
+    );
+  }
+}
+
+/**
+ * 409 — choca con un único: CUIT o nombre duplicado, código repetido.
+ * Distinto de BusinessRuleError: acá el problema es que el dato YA EXISTE.
+ */
+export class ConflictError extends AppError {
+  readonly status = 409;
+}
+
+/**
+ * 409 — una regla de negocio lo prohíbe. Ejemplos del Sprint 1:
+ *  · egreso que dejaría stock negativo (HU-STK-04)
+ *  · baja de proveedor con órdenes abiertas (HU-PROV-01)
+ *  · editar una orden que ya no está Pendiente (HU-COMP-02)
+ *  · movimiento sobre un artículo sin ficha de stock en ese depósito (HU-STK-02)
+ */
+export class BusinessRuleError extends AppError {
+  readonly status = 409;
+}
+
+/**
+ * 401 — sin sesión válida.
+ *
+ * Desde HU-SIS-04 esta es la respuesta normal para alguien que no inició
+ * sesión, y el front la usa para redirigir a /login. Ya no significa "algo está
+ * mal configurado" como en el Sprint 1.
+ */
+export class UnauthorizedError extends AppError {
+  readonly status = 401;
+
+  constructor(mensaje = "Tu sesión no está activa o venció. Volvé a iniciar sesión.") {
+    super("SIN_SESION", mensaje);
+  }
+}
+
+/**
+ * 401 — credenciales inválidas (HU-SIS-04).
+ *
+ * ⚠️ EL MENSAJE ES GENÉRICO A PROPÓSITO. El criterio de aceptación lo pide
+ *    textual: "si las credenciales son inválidas, muestra un mensaje de error
+ *    genérico (sin indicar cuál de los dos datos falló)".
+ *
+ *    No es una formalidad. Si el sistema contesta "ese email no existe",
+ *    cualquiera puede averiguar quién trabaja en la veterinaria probando
+ *    direcciones, y ya tiene la mitad de la credencial. Distinguir los dos
+ *    casos convierte el login en un buscador de usuarios válidos.
+ *
+ *    Por eso este error NO lleva `campo`: marcar el input de la contraseña en
+ *    rojo diría, de hecho, que el email estaba bien.
+ */
+export class CredencialesInvalidasError extends AppError {
+  readonly status = 401;
+
+  constructor() {
+    super("CREDENCIALES_INVALIDAS", "Email o contraseña incorrectos.");
+  }
+}
+
+/**
+ * 423 Locked — la cuenta está bloqueada por intentos fallidos (HU-SIS-04).
+ *
+ * 423 y no 401: el 401 significa "probá de nuevo con las credenciales
+ * correctas", y acá probar de nuevo no sirve hasta que pase el tiempo. El front
+ * necesita poder distinguirlos para mostrar el contador en vez del formulario.
+ *
+ * `minutosRestantes` viaja en el mensaje porque el criterio pide "se informa al
+ * usuario el tiempo restante", y también aparte para que el front lo use sin
+ * parsear texto.
+ */
+export class CuentaBloqueadaError extends AppError {
+  readonly status = 423;
+
+  get datos(): Record<string, unknown> {
+    return { bloqueadoHasta: this.bloqueadoHasta.toISOString() };
+  }
+
+  constructor(readonly bloqueadoHasta: Date) {
+    const minutos = Math.max(1, Math.ceil((bloqueadoHasta.getTime() - Date.now()) / 60_000));
+    super(
+      "CUENTA_BLOQUEADA",
+      `La cuenta está bloqueada por intentos fallidos. Volvé a intentar en ${minutos} ` +
+        `${minutos === 1 ? "minuto" : "minutos"}.`,
+    );
+  }
+}
+
+/**
+ * 503 — el servicio de autenticación no responde.
+ *
+ * Separado de las credenciales inválidas por una razón concreta: un intento que
+ * falla porque Supabase Auth está caído NO cuenta como intento fallido del
+ * usuario. Si contara, una caída del servicio bloquearía a todo el mundo por 15
+ * minutos.
+ */
+export class ServicioAuthNoDisponibleError extends AppError {
+  readonly status = 503;
+
+  constructor() {
+    super(
+      "AUTH_NO_DISPONIBLE",
+      "No se pudo validar el inicio de sesión en este momento. Intentá de nuevo en unos segundos.",
+    );
+  }
+}
+
+/**
+ * Traduce un error de Postgres a error de dominio.
+ *
+ * Es la red de seguridad de los índices UNIQUE: el service chequea antes para
+ * dar un mensaje lindo, pero bajo concurrencia dos requests pasan los dos el
+ * chequeo y uno choca contra el índice. Ese 23505 se traduce acá.
+ *
+ * IMPORTANTE: nunca devolver el mensaje crudo de Postgres al cliente — filtra
+ * nombres de tablas, columnas y constraints. Al log del server sí.
+ */
+export function traducirErrorPostgres(e: unknown): AppError | null {
+  if (typeof e !== "object" || e === null || !("code" in e)) return null;
+
+  const codigo = (e as { code: string }).code;
+  const constraint = (e as { constraint?: string }).constraint ?? "";
+
+  // 23505 = unique_violation
+  if (codigo === "23505") {
+    if (constraint.includes("proveedor_cuit")) {
+      return new ConflictError("CUIT_DUPLICADO", "Ya existe un proveedor activo con ese CUIT.", "cuit");
+    }
+    if (constraint.includes("articulo_nombre")) {
+      return new ConflictError("NOMBRE_DUPLICADO", "Ya existe un artículo activo con ese nombre.", "nombre");
+    }
+    if (constraint.includes("articulo_codigo")) {
+      return new ConflictError("CODIGO_DUPLICADO", "Ya existe un artículo con ese código.", "codigo");
+    }
+    if (constraint.includes("usuario_email")) {
+      return new ConflictError("EMAIL_DUPLICADO", "Ya existe un usuario activo con ese email.", "email");
+    }
+    if (constraint.includes("usuario_dni")) {
+      return new ConflictError("DNI_DUPLICADO", "Ya existe un usuario activo con ese DNI.", "dni");
+    }
+    if (constraint.includes("ficha_articulo_deposito") || constraint.includes("ficha_stock_articulo")) {
+      return new ConflictError(
+        "FICHA_DUPLICADA",
+        "Ese artículo ya tiene una ficha de stock en ese depósito.",
+      );
+    }
+    if (constraint.includes("pago_numero_comprobante")) {
+      // ⚠️ El UNIQUE es GLOBAL, no por proveedor. El modal de cta. cte. valida
+      // la unicidad contra los pagos de ESE proveedor, así que un número
+      // reusado con otro proveedor pasa el front y llega hasta acá. Sin esta
+      // rama caía en el "El registro ya existe" genérico, que no le dice al
+      // usuario que el problema es el número de recibo que tecleó.
+      return new ConflictError(
+        "NUMERO_PAGO_DUPLICADO",
+        "Ya existe un pago registrado con ese número de comprobante.",
+        "numero_comprobante",
+      );
+    }
+    if (constraint.includes("deposito_nombre")) {
+      return new ConflictError("DEPOSITO_DUPLICADO", "Ya existe un depósito con ese nombre.", "nombre");
+    }
+    return new ConflictError("DUPLICADO", "El registro ya existe.");
+  }
+
+  // 23514 = check_violation
+  if (codigo === "23514") {
+    if (constraint.includes("stock_no_negativo")) {
+      return new BusinessRuleError(
+        "STOCK_NEGATIVO",
+        "La operación dejaría el stock en negativo.",
+      );
+    }
+    if (constraint.includes("mascota_peso_check")) {
+      return new ValidationError(
+        "PESO_INVALIDO",
+        "El peso de la mascota debe ser mayor a 0.",
+        "peso",
+      );
+    }
+    if (constraint.includes("critico_menor")) {
+      return new ValidationError(
+        "UMBRAL_INVALIDO",
+        "El umbral crítico no puede ser mayor que el mínimo.",
+        "stockCritico",
+      );
+    }
+    // ⚠️ Un `RAISE EXCEPTION ... USING ERRCODE = 'check_violation'` desde un
+    //    trigger cae acá SIN nombre de constraint, así que no se puede
+    //    distinguir de qué regla se trata y sale este mensaje genérico.
+    //
+    //    Hoy le pasa a `fn_mascota_validar_fecha_nacimiento` (fecha de
+    //    nacimiento futura). No se nota porque el schema de zod ya la rechaza
+    //    antes con un mensaje que señala el campo — la base es solo la red de
+    //    seguridad. Si algún día ese camino importa, el arreglo es darle al
+    //    trigger un SQLSTATE propio (HF0xx) y mapearlo abajo, como se hizo con
+    //    los de stock e imputaciones.
+    return new ValidationError("DATO_INVALIDO", "Algún valor no cumple las reglas de la base.");
+  }
+
+  // ---------------------------------------------------------
+  // Códigos propios del proyecto (RAISE ... USING ERRCODE)
+  // ---------------------------------------------------------
+  // Los triggers de stock levantan SQLSTATE propios en vez del P0001 por
+  // defecto, para que este mapeo no dependa de matchear texto en castellano.
+  //
+  // ⚠️ SIN ESTO, un egreso sin stock devuelve 500. El service ya no valida el
+  //    stock —lo hace el trigger, que es quien puede hacerlo de forma atómica—,
+  //    así que este mapeo es lo único que convierte esa regla en un 409 con
+  //    mensaje útil. Ver fn_actualizar_stock_det() en db/schema.sql.
+  if (codigo === "HF001") {
+    return new BusinessRuleError(
+      "STOCK_INSUFICIENTE",
+      "No hay stock suficiente para registrar este egreso.",
+    );
+  }
+  if (codigo === "HF002") {
+    return new BusinessRuleError(
+      "FICHA_INEXISTENTE",
+      "No existe la ficha de stock afectada por el movimiento.",
+    );
+  }
+  // ---------------------------------------------------------
+  // HF01x · imputación de pagos (HU-FIN-02)
+  // ---------------------------------------------------------
+  // Los cuatro triggers de `pago_imputacion` levantaban P0001 pelado, y el
+  // catch-all de más abajo los convertía a todos en el mismo
+  // "La operación fue rechazada por una regla de la base de datos".
+  //
+  // O sea que imputar $10.000 a una factura con $5.000 de saldo devolvía esa
+  // frase: sin el número, sin el comprobante, y sin decir cuál de las tres
+  // imputaciones falló. La corrección 17 les puso SQLSTATE propio.
+  if (codigo === "HF010") {
+    return new BusinessRuleError(
+      "IMPUTACION_EXCEDE_PAGO",
+      "Estás imputando más plata de la que suma el pago.",
+      "imputaciones",
+    );
+  }
+  if (codigo === "HF011") {
+    return new BusinessRuleError(
+      "IMPUTACION_EXCEDE_COMPROBANTE",
+      "Ese comprobante ya está cancelado por otros pagos: no admite más imputaciones.",
+      "imputaciones",
+    );
+  }
+  if (codigo === "HF012") {
+    return new BusinessRuleError(
+      "COMPROBANTE_DE_OTRO_PROVEEDOR",
+      "El comprobante no pertenece al proveedor de este pago.",
+      "imputaciones",
+    );
+  }
+  if (codigo === "HF013") {
+    return new BusinessRuleError(
+      "IMPUTACION_A_NOTA_CREDITO",
+      "A una Nota de Crédito no se le imputan pagos: su importe ya descuenta del saldo del proveedor.",
+      "imputaciones",
+    );
+  }
+  if (codigo === "HF014") {
+    return new BusinessRuleError(
+      "COMPROBANTE_ANULADO",
+      "Ese comprobante está anulado y no admite pagos.",
+      "imputaciones",
+    );
+  }
+
+  if (codigo === "HF003") {
+    return new BusinessRuleError(
+      "MOVIMIENTO_INMUTABLE",
+      "Los movimientos de stock no se editan ni se borran: registrá un movimiento inverso.",
+    );
+  }
+
+  // P0001 = raise_exception: viene de un RAISE EXCEPTION dentro de un trigger.
+  // La base de este proyecto tiene reglas de negocio en triggers (fn_actualizar_stock
+  // rechaza los egresos que dejarian stock negativo), asi que sin este mapeo esas
+  // reglas devolverian 500 en vez de un 409 con un mensaje util.
+  //
+  // Se matchea por texto, que es fragil. El arreglo de fondo es que el trigger
+  // declare su propio SQLSTATE (RAISE EXCEPTION ... USING ERRCODE = 'HF001') y/o
+  // que exista un CHECK (stock_actual >= 0), que daria un 23514 con nombre de
+  // constraint estable.
+  if (codigo === "P0001") {
+    const mensaje = (e as { message?: string }).message ?? "";
+    if (/stock insuficiente/i.test(mensaje)) {
+      return new BusinessRuleError(
+        "STOCK_INSUFICIENTE",
+        "No hay stock suficiente para registrar este egreso.",
+      );
+    }
+    return new BusinessRuleError(
+      "REGLA_RECHAZADA",
+      "La operación fue rechazada por una regla de la base de datos.",
+    );
+  }
+
+  // 23502 = not_null_violation
+  //
+  // Sin esta rama era un 500 pelado, y costó una tarde: el alta de artículos
+  // fallaba porque el INSERT omitía `presentacion_id` (NOT NULL sin default) y
+  // el usuario solo veía "Ocurrió un error inesperado".
+  //
+  // Casi siempre significa lo mismo: el front manda un campo, el schema de zod
+  // no lo declara —y un objeto sin `.strict()` lo descarta EN SILENCIO—, así
+  // que nunca llega al INSERT. El nombre de la columna va al log, no al
+  // cliente: filtra el esquema.
+  if (codigo === "23502") {
+    const columna = (e as { column?: string }).column;
+    console.error(
+      `[api] NOT NULL violado en la columna "${columna ?? "?"}". ` +
+        `Revisá que el schema de zod la declare: si no está, el valor que manda ` +
+        `el front se descarta en silencio y nunca llega al INSERT.`,
+    );
+    return new ValidationError(
+      "CAMPO_OBLIGATORIO",
+      "Falta un dato obligatorio del formulario. Revisá que estén completos todos los campos marcados con *.",
+    );
+  }
+
+  // 23503 = foreign_key_violation
+  if (codigo === "23503") {
+    return new ValidationError(
+      "REFERENCIA_INVALIDA",
+      "Se referencia un registro que no existe.",
+    );
+  }
+
+  return null;
+}

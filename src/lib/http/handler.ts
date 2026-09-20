@@ -1,0 +1,119 @@
+import { z } from "zod";
+import { requireSession, type Session } from "@/lib/auth/session";
+import { ValidationError, traducirErrorPostgres } from "./errors";
+import { errorResponse } from "./responses";
+
+/**
+ * Wrapper de todos los route handlers.
+ *
+ * Hace tres cosas que si no habría que repetir en ~25 archivos:
+ *  1. resuelve la sesión (y tira 401 si no hay)
+ *  2. captura cualquier error y lo mapea a HTTP
+ *  3. traduce los errores de Postgres a errores de dominio
+ *
+ * Uso:
+ *
+ *   export const GET = withRoute(async ({ session }) => {
+ *     return ok(await service.listar());
+ *   });
+ *
+ *   export const PUT = withRoute<{ id: string }>(async ({ req, session, params }) => {
+ *     const { id } = await params;
+ *     ...
+ *   });
+ */
+
+type Ctx<P> = {
+  req: Request;
+  session: Session;
+  params: Promise<P>;
+};
+
+export function withRoute<P = Record<string, never>>(
+  fn: (ctx: Ctx<P>) => Promise<Response>,
+) {
+  return async (req: Request, ctx: { params: Promise<P> }): Promise<Response> => {
+    try {
+      const session = await requireSession();
+      return await fn({ req, session, params: ctx.params });
+    } catch (e) {
+      return errorResponse(traducirErrorPostgres(e) ?? e);
+    }
+  };
+}
+
+/**
+ * Wrapper para los endpoints que NO pueden exigir sesión: el login.
+ *
+ * `withRoute` llama a `requireSession()` antes que nada, así que envolver
+ * POST /api/auth/login con él sería pedir estar logueado para poder loguearse.
+ *
+ * Hace lo demás igual: captura errores y los mapea a HTTP. Y nada más — no hay
+ * un tercer wrapper "a veces con sesión": /api/auth/sesion llama a
+ * `getSession()` a mano, que es una línea y deja explícito que ahí el 401 no
+ * es un error sino una respuesta válida ("no hay nadie logueado").
+ */
+export function withPublicRoute<P = Record<string, never>>(
+  fn: (ctx: Omit<Ctx<P>, "session">) => Promise<Response>,
+) {
+  return async (req: Request, ctx: { params: Promise<P> }): Promise<Response> => {
+    try {
+      return await fn({ req, params: ctx.params });
+    } catch (e) {
+      return errorResponse(traducirErrorPostgres(e) ?? e);
+    }
+  };
+}
+
+/**
+ * Valida el body con un schema de zod y lo devuelve tipado.
+ * Un error de zod se convierte en ValidationError, que señala el primer campo
+ * que falló — el front lo usa para marcar el input en rojo.
+ */
+export async function parseBody<T extends z.ZodTypeAny>(
+  req: Request,
+  schema: T,
+): Promise<z.infer<T>> {
+  let json: unknown;
+  try {
+    json = await req.json();
+  } catch {
+    throw new ValidationError("BODY_INVALIDO", "El cuerpo de la petición no es JSON válido.");
+  }
+
+  const resultado = schema.safeParse(json);
+  if (!resultado.success) {
+    const primero = resultado.error.issues[0];
+    const campo = primero?.path.join(".") || undefined;
+
+    // Un campo AUSENTE no usa el mensaje custom del schema: los `.min(1, "...")`
+    // solo corren si el valor llegó. zod emite su default en inglés, "Required",
+    // y así salía tal cual al cartel rojo del formulario — sin decir cuál campo
+    // ni en qué idioma. Un usuario no puede hacer nada con eso, y quien
+    // desarrolla tampoco: es el síntoma típico de que el front manda una clave
+    // con otro nombre (fue exactamente el bug de `razon_social` vs `razonSocial`
+    // en el alta de proveedores).
+    const falta =
+      primero?.code === "invalid_type" &&
+      (primero as { received?: string }).received === "undefined";
+
+    throw new ValidationError(
+      "DATOS_INVALIDOS",
+      falta
+        ? `Falta el campo obligatorio "${campo ?? "desconocido"}".`
+        : (primero?.message ?? "Los datos enviados no son válidos."),
+      campo,
+    );
+  }
+
+  return resultado.data;
+}
+
+/** Lee y valida un id numérico de la URL. */
+export function parseId(valor: string | undefined): number {
+  const n = Number(valor);
+  if (!Number.isInteger(n) || n <= 0) {
+    throw new ValidationError("ID_INVALIDO", "El id debe ser un entero positivo.", "id");
+  }
+  return n;
+}
