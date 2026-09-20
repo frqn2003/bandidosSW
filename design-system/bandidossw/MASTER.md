@@ -1,304 +1,216 @@
-# Design System Master File
+# Design System Master File — Centro Académico
 
-> **LOGIC:** When building a specific page, first check `design-system/huellitas-felices/pages/[page-name].md`.
+> **LOGIC:** When building a specific page, first check `design-system/bandidossw/pages/[page-name].md`.
 > If that file exists, its rules **override** this Master file.
 > If not, strictly follow the rules below.
 >
-> **SOURCE OF TRUTH:** This file is the machine-readable version of `docs/design-system-pet-bliss-style.md` ("Pet Bliss Style"). When in doubt, check the human-readable doc for full rationale (section references noted below). Do NOT pull colors, fonts or radii from the ui-ux-pro-max catalog — the Pet Bliss tokens below replace it.
+> **SOURCE OF TRUTH:** This file is the machine-readable version of the Material Design 3 tokens for Centro Académico.
 
 ---
 
-**Project:** Huellitas Felices
-**Generated:** 2026-08-11 (manual — tokens Pet Bliss, ver `docs/design-system-pet-bliss-style.md`)
-**Category:** Veterinary clinic management (SaaS, warm organic style)
+**Project:** Centro Académico
+**Generated:** 2026-09-20 (Material Design 3 tokens)
+**Category:** Academic management system (institutional, clean professional style)
 
 ---
 
 ## Global Rules
 
-### Color Palette (fuente: doc §5–§6)
+### Color Palette (Material Design 3)
 
+#### Primary
 | Role | Hex | CSS Variable |
 |------|-----|--------------|
-| Primary / Brand | `#114F3C` | `--color-primary` |
-| Primary Light | `#245E4D` | `--color-primary-light` |
-| On Primary | `#FFFFFF` | `--color-on-primary` |
-| Accent / CTA | `#F9A900` | `--color-accent` |
-| Accent Hover | `#E99C00` | `--color-accent-hover` |
-| Background | `#FFF9EB` | `--color-background` |
-| Background Secondary | `#F0ECDF` | `--color-background-secondary` |
-| Surface | `#FFFFFF` | `--color-surface` |
-| Text Primary | `#114F3C` | `--color-text-primary` |
-| Text Secondary | `#547066` | `--color-text-secondary` |
-| Border | `#DDD8C8` | `--color-border` |
-| Destructive | `#DC2626` | `--color-destructive` |
+| primary | `#00236f` | `--color-primary` |
+| on-primary | `#ffffff` | `--color-on-primary` |
+| primary-container | `#1e3a8a` | `--color-primary-container` |
+| on-primary-container | `#90a8ff` | `--color-on-primary-container` |
+| primary-fixed | `#dce1ff` | `--color-primary-fixed` |
+| primary-fixed-dim | `#b6c4ff` | `--color-primary-fixed-dim` |
+| on-primary-fixed | `#00164e` | `--color-on-primary-fixed` |
+| on-primary-fixed-variant | `#264191` | `--color-on-primary-fixed-variant` |
 
-### Status Colors (SOLO etiquetas/badges de estado — doc §5.3)
+#### Secondary
+| Role | Hex | CSS Variable |
+|------|-----|--------------|
+| secondary | `#0058be` | `--color-secondary` |
+| on-secondary | `#ffffff` | `--color-on-secondary` |
+| secondary-container | `#2170e4` | `--color-secondary-container` |
+| on-secondary-container | `#fefcff` | `--color-on-secondary-container` |
+| secondary-fixed | `#d8e2ff` | `--color-secondary-fixed` |
+| secondary-fixed-dim | `#adc6ff` | `--color-secondary-fixed-dim` |
+| on-secondary-fixed | `#001a42` | `--color-on-secondary-fixed` |
+| on-secondary-fixed-variant | `#004395` | `--color-on-secondary-fixed-variant` |
 
-Paleta semántica exclusiva para pills de estado. NUNCA para botones, fondos de
-sección ni CTAs (esos usan brand/accent/destructive). Chip: `bg-status-X/10` +
-texto `-strong` + punto sólido `status-X`. Componente único:
-`src/components/ui/StatusBadge.tsx` (variantes success/warning/danger/info/
-neutral/pink; acepta `icon` de Lucide o punto). Siempre indicador + texto.
+#### Tertiary
+| Role | Hex | CSS Variable |
+|------|-----|--------------|
+| tertiary | `#340081` | `--color-tertiary` |
+| on-tertiary | `#ffffff` | `--color-on-tertiary` |
+| tertiary-container | `#4e03b8` | `--color-tertiary-container` |
+| on-tertiary-container | `#b89cff` | `--color-on-tertiary-container` |
+| tertiary-fixed | `#e9ddff` | `--color-tertiary-fixed` |
+| tertiary-fixed-dim | `#d0bcff` | `--color-tertiary-fixed-dim` |
+| on-tertiary-fixed | `#23005c` | `--color-on-tertiary-fixed` |
+| on-tertiary-fixed-variant | `#5516be` | `--color-on-tertiary-fixed-variant` |
 
-| Variant | Dot | Chip text | Semántica | Estados típicos |
-|---------|-----|-----------|-----------|-----------------|
-| `success` | `#16A34A` | `#15803D` | Positivo / completado | Activo, Normal, Ingreso, Recibida Total, Adjudicada |
-| `warning` | `#F59E0B` | `#B45309` | Pendiente / atención | Pendiente, Bajo, Ajuste, Abierta, Recibida Parcial |
-| `info` | `#2563EB` | `#1D4ED8` | En proceso / tránsito | Enviada, Transferencia |
-| `danger` | `#DC2626` | `#B91C1C` | Negativo / crítico | Crítico, Egreso, Cancelada |
-| `pink` | `#EC4899` | `#BE185D` | Género / femenino | Hembra |
-| `neutral` | text-secondary | text-secondary | Neutro | Inactivo |
+#### Error
+| Role | Hex | CSS Variable |
+|------|-----|--------------|
+| error | `#ba1a1a` | `--color-error` |
+| on-error | `#ffffff` | `--color-on-error` |
+| error-container | `#ffdad6` | `--color-error-container` |
+| on-error-container | `#93000a` | `--color-on-error-container` |
 
-**Nota:** el amarillo de estado (`status-warning #F59E0B`) es distinto del
-amarillo de acción (`accent-500 #F9A900`). No intercambiarlos.
+#### Surface (Backgrounds & Containers)
+| Role | Hex | CSS Variable |
+|------|-----|--------------|
+| background | `#f8f9ff` | `--color-background` |
+| on-background | `#0d1c2e` | `--color-on-background` |
+| surface | `#f8f9ff` | `--color-surface` |
+| on-surface | `#0d1c2e` | `--color-on-surface` |
+| surface-dim | `#ccdbf3` | `--color-surface-dim` |
+| surface-bright | `#f8f9ff` | `--color-surface-bright` |
+| surface-variant | `#d5e3fc` | `--color-surface-variant` |
+| on-surface-variant | `#444651` | `--color-on-surface-variant` |
+| surface-tint | `#4059aa` | `--color-surface-tint` |
+| surface-container-lowest | `#ffffff` | `--color-surface-container-lowest` |
+| surface-container-low | `#eff4ff` | `--color-surface-container-low` |
+| surface-container | `#e6eeff` | `--color-surface-container` |
+| surface-container-high | `#dce9ff` | `--color-surface-container-high` |
+| surface-container-highest | `#d5e3fc` | `--color-surface-container-highest` |
 
-**Color Notes (doc §5.2–§5.3, regla "Yellow is scarce"):**
-- **60%** crema / neutros cálidos — canvas y secciones de descanso.
-- **30%** verde bosque — títulos, nav, footer, botones secundarios, superficies verdes.
-- **10%** amarillo — SOLO CTA principal, promociones, badges. El amarillo gana porque es escaso; nunca usarlo de forma indiscriminada.
-- Blanco solo para cards y superficies internas.
-- Verificar contraste siempre (WCAG 4.5:1 texto, 3:1 elementos grandes).
+#### Inverse
+| Role | Hex | CSS Variable |
+|------|-----|--------------|
+| inverse-surface | `#233144` | `--color-inverse-surface` |
+| inverse-on-surface | `#eaf1ff` | `--color-inverse-on-surface` |
+| inverse-primary | `#b6c4ff` | `--color-inverse-primary` |
 
-### Typography (doc §7)
+#### Outline
+| Role | Hex | CSS Variable |
+|------|-----|--------------|
+| outline | `#757682` | `--color-outline` |
+| outline-variant | `#c5c5d3` | `--color-outline-variant` |
 
-- **Heading Font:** Baloo 2 (700/800) — display redondeada, amable, expresiva
-- **Body Font:** Nunito (400/500/600/700/800) — neutra y legible
-- **Google Fonts:** `https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Nunito:wght@400;500;600;700;800&display=swap`
-- En Next.js usar `next/font/google` (ya configurado en `src/app/layout.tsx` como `--font-baloo` / `--font-nunito`).
-- Tailwind: `font-display` → Baloo 2, `font-sans` → Nunito.
+### Typography
 
-**CSS Import:**
-```css
-@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Nunito:wght@400;500;600;700;800&display=swap');
-```
+- **Font Family:** Inter (sans-serif)
+- **Weights:** 400 (regular), 500 (medium), 600 (semibold), 700 (bold)
+- **Google Fonts:** `https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap`
 
-### Type Scale (doc §7.2)
+### Type Scale
 
 | Level | Size | Weight | Line-height | Notes |
 |-------|------|--------|-------------|-------|
-| Display | 48–64px | 800–900 | 0.90–1.00 | letter-spacing -2% aprox. |
-| H1 | 40–48px | 800 | 0.95–1.05 | |
-| H2 | 28–36px | 800 | 1.00–1.10 | |
-| H3 | 18–22px | 700–800 | 1.10–1.25 | |
+| Display | 48–64px | 700 | 0.90–1.00 | letter-spacing -2% |
+| H1 | 40–48px | 700 | 0.95–1.05 | |
+| H2 | 28–36px | 700 | 1.00–1.10 | |
+| H3 | 18–22px | 600–700 | 1.10–1.25 | |
 | Body | 14–16px | 400–500 | 1.45–1.60 | |
 | Small | 11–13px | 500 | 1.30–1.40 | |
 
-**Heading rules:** headings pesados (bold/extra bold), **predominantemente uppercase**, line-height compacto, color verde bosque, frases cortas.
-
-### Spacing Variables (doc §8)
+### Spacing Variables
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--space-1` | 4px | Micro separación |
-| `--space-2` | 8px | Icono/texto |
-| `--space-3` | 12px | Padding pequeño |
-| `--space-4` | 16px | Padding estándar |
-| `--space-5` | 20px | Gaps compactos |
-| `--space-6` | 24px | Cards / grid |
-| `--space-8` | 32px | Grupos |
-| `--space-10` | 40px | Componentes |
-| `--space-12` | 48px | Separación media |
-| `--space-16` | 64px | Secciones compactas |
-| `--space-20` | 80px | Secciones |
-| `--space-24` | 96px | Grandes bloques |
+| `space-2xs` | 2px | Micro separación |
+| `space-xs` | 4px | Icono/texto |
+| `space-sm` | 8px | Padding pequeño |
+| `space-md` | 12px | Padding estándar |
+| `space-lg` | 16px | Cards / grid |
+| `space-xl` | 24px | Grupos |
+| `space-2xl` | 32px | Componentes |
+| `gutter` | 20px | Gutter estándar |
+| `gutter-compact` | 12px | Gutter compacto |
+| `margin` | 24px | Margin estándar |
+| `margin-wide` | 32px | Margin amplio |
 
-**Responsive:** secciones desktop 80–96px, mobile 48–64px (doc §36.5).
-
-### Radius (doc §10)
+### Border Radius
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--radius-sm` | 8px | Cards, inputs |
-| `--radius-md` | 12px | Cards estándar |
-| `--radius-lg` | 16px | Imágenes grandes, bloques |
-| `--radius-pill` | 999px | Botones, chips, filtros |
+| `DEFAULT` | 2px | Elementos pequeños |
+| `lg` | 4px | Botones, inputs |
+| `xl` | 8px | Cards, modals |
+| `full` | 12px | Badges, pills |
 
-**Regla (doc §10):** NO usar 24px+ en todos los componentes — cambia el carácter hacia SaaS contemporáneo. Cards 8–12px, botones pill.
+### Icons
 
-### Shadows (doc §11)
+- **Library:** Material Symbols Outlined
+- **Default weight:** 400
+- **FILL:** 0..1 (variable)
+- **Usage:** `<span class="material-symbols-outlined">icon_name</span>`
 
-| Level | Value | Usage |
-|-------|-------|-------|
-| `--shadow-card` | `0 4px 16px rgba(17, 79, 60, 0.08)` | Cards |
+### Status Colors
 
-**Regla:** sombras discretas. Evitar sombras negras fuertes, gran blur, glassmorphism, múltiples sombras. La interfaz depende de color, espacio y fotografía, no de sombras.
-
-### Motion (doc §38)
-
-| Duration | Value | Usage |
-|----------|-------|-------|
-| Fast | 120–180ms | Hover/press microinteracciones |
-| Normal | 200–300ms | Transiciones estándar |
-| Slow | 400–600ms | Apariciones, expansión FAQ |
-
-**Easing:** `ease-out` para interacciones directas. Respetar `prefers-reduced-motion`. Evitar animaciones permanentes, parallax excesivo, rebotes constantes, transiciones largas.
+| Variant | Dot | Chip text | Semántica | Estados típicos |
+|---------|-----|-----------|-----------|-----------------|
+| `success` | `#16A34A` | `#15803D` | Positivo / completado | Activo, Confirmado, Presente |
+| `warning` | `#F59E0B` | `#B45309` | Pendiente / atención | Pendiente, Bajo, Inasistente |
+| `info` | `#2563EB` | `#1D4ED8` | En proceso | Enviada, En curso |
+| `danger` | `#DC2626` | `#B91C1C` | Negativo / crítico | Cancelado, Eliminado |
+| `neutral` | `#757682` | `#444651` | Neutro | Inactivo, Suspendido |
 
 ---
 
-## Component Specs (doc §13, §40–§41)
+## Layout Pattern
 
-### Buttons (doc §13)
-
-```css
-/* Primary (solo CTA principal) */
-.btn-primary {
-  background: #F9A900;
-  color: #114F3C;
-  border-radius: 999px;
-  font-weight: 700;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-.btn-primary:hover { background: #E99C00; }
-.btn-primary:active { transform: scale(0.97); }
-.btn-primary:disabled { opacity: 0.45; }
-
-/* Secondary */
-.btn-secondary {
-  background: #114F3C;
-  color: #FFFFFF;
-  border-radius: 999px;
-  font-weight: 700;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-
-/* Outline */
-.btn-outline {
-  background: transparent;
-  border: 1px solid #114F3C;
-  color: #114F3C;
-  border-radius: 999px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-/* Ghost */
-.btn-ghost {
-  background: transparent;
-  color: #114F3C;
-  cursor: pointer;
-}
-```
-
-**Tamaños (doc §13):** Large 48–52px alto / padding-inline 24–32px · Medium 40–44px / 20–24px · Small 32–36px / 14–18px.
-
-### Cards (doc §40)
-
-```css
-.card {
-  background: #FFFFFF;
-  border-radius: 12px;
-  border: 1px solid #DDD8C8;
-  box-shadow: 0 4px 16px rgba(17, 79, 60, 0.08);
-}
-```
-
-**Misma familia para todas las variantes** (product, article, benefit, testimonial, process, category) — no estéticas distintas por card.
-
-**Imágenes por tipo (doc §41):** product 1:1 · article 4:3 · lifestyle 4:3/3:2 · hero editorial. Mismo ratio/recorte/tratamiento dentro de cada grupo.
-
-### Inputs
-
-```css
-.input {
-  padding: 12px 16px;
-  border: 1px solid #DDD8C8;
-  border-radius: 8px;
-  font-size: 16px;
-  background: #FFFFFF;
-  color: #114F3C;
-  transition: border-color 200ms ease;
-}
-.input:focus {
-  border-color: #114F3C;
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(17, 79, 60, 0.2);
-}
-.input::placeholder { color: #547066; }
-```
-
-### Filters / Chips (doc §20)
-
-```css
-.filter-active { background: #114F3C; color: #FFFFFF; border-radius: 999px; }
-.filter-default { background: transparent; border: 1px solid #114F3C; color: #114F3C; border-radius: 999px; }
-```
-
-### Header (doc §12)
-
-Logo pequeño | navegación discreta | CTA amarillo. Background crema, mucho espacio horizontal. Mobile: logo + menú hamburguesa.
-
-### Footer (doc §30)
-
-Fondo verde oscuro `#114F3C`, texto blanco/crema. Logo + columnas de links + contacto + redes + copyright.
-
-### Hero (doc §14)
-
-Headline grande display, eyebrow, descripción corta, CTA amarillo, fotografías recortadas superpuestas (overlap), fondo crema.
+- **Sidebar:** fixed, w-64, bg-surface-container-lowest
+- **Main content:** pl-64, flex-1
+- **Header:** h-16, sticky top-0, bg-surface-container-lowest
+- **Content max-width:** max-w-[1600px] mx-auto
 
 ---
 
-## Style Guidelines
+## Component Patterns
 
-**Style:** Warm organic + rounded + bold uppercase typography (Pet Bliss, no claymorphism)
+### Cards / Modals
+- bg-surface-container-lowest
+- rounded-2xl (xl token)
+- border border-surface-container
+- shadow-xl for modals
 
-**Keywords:** cream background, forest green, warm yellow accent, bold uppercase headings, emotional photography, rounded cards (8–12px), organic shapes, overlapping imagery, generous whitespace, alternating section backgrounds (doc §33: CREAM → WHITE → GREEN → CREAM → YELLOW → CREAM → GREEN)
+### Buttons Primary
+- bg-primary hover:bg-secondary
+- text-on-primary
+- rounded-lg (lg token)
+- font-semibold text-xs
 
-**Best For:** veterinary care, lifestyle commerce, warm service brands (doc §49)
+### Buttons Secondary
+- border border-surface-container
+- hover:bg-surface-container
+- text-on-surface
+- rounded-lg
 
-**Key Effects:** overlaps, cutout subjects, blobs, small decorative stickers (stars, leaves, paw prints — que nunca compitan con headline/producto/CTA, doc §32), microinteracciones suaves (doc §38)
+### Status Badges
+- rounded-full
+- Semantic colors (emerald for active, amber for warning, red for error)
+- Always indicator + text
 
-### Page Pattern (doc §4, §48)
+### Table Headers
+- text-[11px] uppercase tracking-wider
+- font-semibold text-on-surface-variant
+- border-b border-surface-container
 
-**Pattern Name:** Storytelling + Commerce
+### Table Rows
+- text-xs
+- hover:bg-surface-container-low/40
+- divide-y divide-surface-container/60
 
-**Section Order:** HEADER → HERO → CATEGORIES → STORY → BENEFITS → PRODUCT/SERVICE GRID → SOCIAL PROOF → PROMO CTA → PROCESS → TRUST BAR → ARTICLES → FAQ → FINAL CTA → FOOTER (adaptable a gestión: dashboard, turnos, fichas)
+### Form Inputs
+- h-9 px-3
+- bg-surface-container-low
+- border border-surface-container
+- rounded-lg
+- text-xs text-on-surface
+- focus:border-secondary focus:bg-surface-container-lowest
 
-**Layout (doc §9):** container `min(1200px, calc(100% - 48px))`, 12 columnas desktop / 8 tablet / 4 mobile, gap 20–24px.
+### Modal Backdrop
+- bg-slate-900/60 backdrop-blur-sm
 
 ---
 
-## Anti-Patterns (Do NOT Use)
+## Componentes existentes
 
-- ❌ **Amarillo indiscriminado** — solo CTA y highlights (regla "Yellow is scarce", doc §26 regla 2)
-- ❌ **Sin jerarquía dominante** — un solo elemento principal por viewport (headline, producto o CTA)
-- ❌ **Radios 24px+ en todo** — deriva a estilo SaaS contemporáneo (doc §10)
-- ❌ **Emojis como iconos** — usar Lucide (outline, stroke medio, esquinas redondeadas, doc §31)
-- ❌ **Sombras fuertes / glassmorphism** (doc §11)
-- ❌ **Estética corporativa fría, minimalismo tecnológico, lujo sobrio, ilustraciones infantiles dominantes, saturación de color** (doc §2.2)
-- ❌ **Layouts rígidos sin overlaps ni formas orgánicas** (principio 06, doc §16)
-- ❌ **Missing cursor:pointer** — todos los elementos clicables
-- ❌ **Instant state changes** — transiciones 150–300ms
-- ❌ **Invisible focus states** — focus visible para a11y (doc §37)
-- ❌ **Contraste bajo** — verificar verde sobre crema, verde sobre amarillo, blanco sobre verde, texto secundario sobre crema (doc §37)
-
----
-
-## Pre-Delivery Checklist (doc §50)
-
-Antes de entregar cualquier UI, verificar:
-
-- [ ] ¿El crema domina el canvas?
-- [ ] ¿El verde funciona como ancla visual?
-- [ ] ¿El amarillo está reservado para acciones?
-- [ ] ¿Existe suficiente contraste (4.5:1 texto)?
-- [ ] ¿Los headings tienen peso suficiente y son predominantemente uppercase?
-- [ ] ¿Existe jerarquía clara H1–H4?
-- [ ] ¿El body sigue siendo cómodo de leer?
-- [ ] ¿Container consistente y secciones con aire?
-- [ ] ¿Grid coherente y variación densidad (altas: grids; bajas: hero/story/CTA)?
-- [ ] ¿Las imágenes se sienten cálidas y con coherencia de iluminación?
-- [ ] ¿Hay overlaps y formas orgánicas?
-- [ ] ¿Se alternan fondos (crema/blanco/verde/amarillo)?
-- [ ] ¿El CTA principal domina cuando corresponde?
-- [ ] ¿Hero funciona en mobile (sin perder personalidad tipográfica)?
-- [ ] ¿Cards colapsan correctamente (4/3/2/1 columnas)?
-- [ ] ¿Touch targets ≥ 44×44px?
-- [ ] ¿Focus visible?
-- [ ] ¿Imágenes con `alt` cuando corresponde?
-- [ ] ¿La interfaz no depende solo del color?
-- [ ] ¿Se respeta `prefers-reduced-motion`?
-- [ ] ¿Breakpoints: mobile <640 / tablet 640–1024 / desktop 1024–1440 / large >1440?
-- [ ] ¿Estados de componentes definidos (default, hover, focus, active, disabled, loading, error, success)?
+Inventario de componentes reutilizables en `src/components/`. Consultar `design-system/bandidossw/componentes.md` antes de crear nuevos componentes.
