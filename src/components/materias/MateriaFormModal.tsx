@@ -40,10 +40,25 @@ const EMPTY_FORM: MateriaFormData = {
 const MAX_NOMBRE = 80;
 const MAX_DESCRIPCION = 250;
 
-/** "12.500,50" o "12500.50" → 12500.5 · devuelve NaN si no es un número. */
+/** "12.500,50", "12500,50", "12500.50" o "12500" → 12500.5 · devuelve NaN si no es un número. */
 export function parsearValor(texto: string): number {
-  const limpio = texto.trim().replace(/\./g, "").replace(",", ".");
-  if (limpio === "" || !/^\d+(\.\d{1,2})?$/.test(limpio)) return NaN;
+  let limpio = texto.trim();
+  if (limpio === "") return NaN;
+
+  if (limpio.includes(",") && limpio.includes(".")) {
+    if (limpio.lastIndexOf(",") > limpio.lastIndexOf(".")) {
+      // Formato es-AR: 12.500,50
+      limpio = limpio.replace(/\./g, "").replace(",", ".");
+    } else {
+      // Formato en-US: 12,500.50
+      limpio = limpio.replace(/,/g, "");
+    }
+  } else if (limpio.includes(",")) {
+    // Formato solo con coma: 12500,50
+    limpio = limpio.replace(",", ".");
+  }
+
+  if (!/^\d+(\.\d{1,2})?$/.test(limpio)) return NaN;
   return Number(limpio);
 }
 
@@ -301,11 +316,10 @@ export function MateriaFormModal({
               `valor_clase_congelado` al reservar (contrato src/contracts/turno.ts). */}
           {!esLectura && (
             <p
-              className={`flex items-start gap-2 rounded-sm border px-3 py-2 text-xs font-semibold ${
-                cambioDeValor
+              className={`flex items-start gap-2 rounded-sm border px-3 py-2 text-xs font-semibold ${cambioDeValor
                   ? "border-status-warning/40 bg-status-warning/10 text-status-warning-strong"
                   : "border-outline-variant bg-surface-container-low text-on-surface-variant"
-              }`}
+                }`}
             >
               <Icon name="info" size={16} className="mt-px shrink-0" />
               <span>

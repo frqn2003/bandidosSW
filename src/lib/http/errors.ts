@@ -176,6 +176,9 @@ export function traducirErrorPostgres(e: unknown): AppError | null {
     if (constraint.includes("proveedor_cuit")) {
       return new ConflictError("CUIT_DUPLICADO", "Ya existe un proveedor activo con ese CUIT.", "cuit");
     }
+    if (constraint.includes("materia_nombre")) {
+      return new ConflictError("NOMBRE_DUPLICADO", "Ya existe una materia activa con ese nombre.", "nombre");
+    }
     if (constraint.includes("articulo_nombre")) {
       return new ConflictError("NOMBRE_DUPLICADO", "Ya existe un artículo activo con ese nombre.", "nombre");
     }

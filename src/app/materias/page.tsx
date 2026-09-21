@@ -105,8 +105,14 @@ function MateriasContent() {
     return materias.filter((m) => {
       if (filtros.estado && m.estado !== filtros.estado) return false;
       if (filtros.nivel && m.nivel !== filtros.nivel) return false;
-      // Búsqueda por nombre: parcial y sin distinguir mayúsculas/minúsculas.
-      if (q && !m.nombre.toLowerCase().includes(q)) return false;
+      // Búsqueda por nombre o descripción: parcial e insensible a mayúsculas.
+      if (
+        q &&
+        !m.nombre.toLowerCase().includes(q) &&
+        !(m.descripcion && m.descripcion.toLowerCase().includes(q))
+      ) {
+        return false;
+      }
       return true;
     });
   }, [materias, filtros]);
@@ -158,14 +164,18 @@ function MateriasContent() {
     try {
       if (modalForm?.modo === "EDICION" && modalForm.materia) {
         const anterior = modalForm.materia;
-        let actualizada = await editarMateria(anterior.id, body);
+        let actualizada = anterior;
 
-        // El switch Activo/Inactivo no es un campo del body: es la baja lógica
-        // (y su vuelta atrás), que van por sus propias rutas.
+        // Si estaba inactiva y se activó en el formulario, primero se reactiva
+        if (anterior.estado === "inactivo" && datos.estado) {
+          actualizada = await reactivarMateria(anterior.id);
+        }
+
+        actualizada = await editarMateria(anterior.id, body);
+
+        // Si estaba activa y se inactivó en el formulario, se inactiva
         if (!datos.estado && actualizada.estado === "activo") {
           actualizada = await inactivarMateria(anterior.id);
-        } else if (datos.estado && actualizada.estado === "inactivo") {
-          actualizada = await reactivarMateria(anterior.id);
         }
 
         setMaterias((prev) => prev.map((m) => (m.id === anterior.id ? actualizada : m)));
@@ -191,6 +201,10 @@ function MateriasContent() {
       } else if (codigo === "MATERIA_CON_TURNOS_FUTUROS") {
         setErrorRemoto({
           mensaje: "No se puede desactivar: hay turnos reservados de esta materia.",
+        });
+      } else if (codigo === "MATERIA_INACTIVA") {
+        setErrorRemoto({
+          mensaje: "No se puede editar una materia inactiva. Reactivala activando el selector de Estado.",
         });
       } else {
         setErrorRemoto({
