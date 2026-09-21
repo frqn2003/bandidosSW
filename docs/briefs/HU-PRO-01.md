@@ -16,8 +16,8 @@ Pantalla única del módulo **Cuerpo Docente**. Layout general con sidebar fija 
 ┌─────────────┬───────────────────────────────────────────────────────────────┐
 │  SIDEBAR    │  Cuerpo Docente                          [+ Nuevo profesor]   │
 │  (Sedes     ├───────────────────────────────────────────────────────────────┤
-│   Buenos    │  [🔍 Buscar por nombre, apellido o título         ] [Materia v]│
-│   Aires)    │  [Día v] [Estado v(Activos|Inactivos|Todos)]                  │
+│   Buenos    │  [🔍 Buscar por nombre, apellido y especialidad  ] [Materia v] │
+│   Aires)    │  [Día v] [Estado v] [Limpiar filtros]                          │
 │  ▸ Turnos   ├───────────────────────────────────────────────────────────────┤
 │  ▸ Alumnos  │  DOCENTE          MATERIAS        ESTADO  ACCIONES            │
 │  ▾ Cuerpo   │  Peralta, Roberto Ap. Matemático  ● Activo  [👁][✏][🗓][⋮]    │
@@ -25,35 +25,55 @@ Pantalla única del módulo **Cuerpo Docente**. Layout general con sidebar fija 
 │  ▸ Cobranzas│  Menéndez, Gabriel Álgebra Lineal    ● Activo  [👁][✏][🗓][⋮] │
 │  ▸ Usuarios │  Arrieta, Silvina Química General    🚫 Inactivo [👁][✏][🗓][⋮]│
 │  ▸ Reportes ├───────────────────────────────────────────────────────────────┤
-│             │  Filtros: Materia Algebra | Día: Lunes            [BORRAR]     │
 │             │  Mostrando 1-4 de 4 · [< Página 1 de N >] [Rows: 10 v]         │
 └─────────────┴───────────────────────────────────────────────────────────────┘
 ```
 
 - Solo activos por defecto; orden alfabético `Apellido, Nombre` A-Z.
-- Buscador parcial case-insensitive (nombre, apellido o título).
-- Filtros combinables: Materia / Día / Estado; los chips activos se pueden borrar.
+- Fila de filtros **única** (desktop): buscador extensible (`flex-1`) + selects **Materia / Día / Estado** + botón **Limpiar filtros** siempre visible a la derecha del Estado.
+  - Buscador parcial case-insensitive por nombre, apellido **o especialidad** (placeholder: "Buscar por nombre, apellido y especialidad").
+  - **Limpiar filtros** resetea solo Materia / Día / Estado (deja el texto de búsqueda como está), sin engranaje de configuración ni chips.
+  - En mobile los controles hacen wrap a todo el ancho.
 - Columna Materias: lista las materias del profesor (badge materias + `+N` si sobran). Badge de estado Activo (verde) / Inactivo (gris).
-- Acciones por fila: Ver, Editar, Ver agenda, Más (menú: copiar disponibilidad, baja).
+- Acciones por fila: Ver, Editar, Ver agenda, Más (menú: baja).
 
 ### 2) Modal Nuevo Profesor
 
 ```
-┌ Nuevo profesor ──────────────────────────────────────────────── ✕ ┐
-│ Usuario asociado*  [Combobox de usuarios rol Profesor sin ficha]  │
-│ Título (opcional) [Ing. en Sistemas              ]                 │
-│ Teléfono*         [11 5555 5555]  (solos dígitos, 10-11)          │
-│ Materias* (1+)    [Combobox materia] [+ Agregar]                  │
-│   Análisis Matemático I   Capacidad [5]  ✕                        │
-│   Física I                Capacidad [3]  ✕                        │
-│ Capacidad máxima alum.*   [3]  ← global (1 a 10)                  │
-│ Estado  [● Activo] (Switch)                                       │
-│ [Cancelar] [Guardar]                                             │
-└───────────────────────────────────────────────────────────────────┘
+┌ 👤 Nuevo profesor   (MODO INSERCIÓN) ─────────────────────────── ✕ ┐
+│ Completá la ficha profesional, materias asignadas y disponibilidad │
+│ semanal.                                                            │
+│ Usuario Asociado del Sistema*   [Combobox usuarios rol Profesor]   │
+│   Nombre, Apellido y Email se vinculan automáticamente            │
+│ Título o Especialidad        Teléfono Contacto*                    │
+│ [Ing. en Sistemas           ] [11 5555 5555          ]              │
+│ Capacidad Máxima de Alumnos*       ┌───────────────────────────┐  │
+│ Capacidad por bloque lectivo       │ 4 alumnos (Por defecto) ▼ │  │
+│ (1 = Clase individual,             └───────────────────────────┘  │
+│  2-10 = grupal)                                                    │
+│ Materias que Dicta* — elegí al menos 1 materia                     │
+│   ☑ Análisis Matemático I   ☐ Física I                             │
+│   ☐ Álgebra Lineal          ☑ Química General                      │
+│   ☐ Programación I          …                                      │
+│ Gestión de Disponibilidad Horaria Semanal*                         │
+│   Total activo programado: 14.0 h semanales asignables             │
+│ ┌ Lunes ▼ ┌De: 08:30 ▼ ┌A: 12:00 ▼  3.5 h            🗑           │
+│ ┌ Martes ▼┌De: 08:00 ▼ ┌A: 10:00 ▼  2.0 h            🗑           │
+│   [+ Agregar Bloque Horario]                                       │
+│ Estado Inicial del Docente                                         │
+│   Disponible para asignación de turnos        [Switch ● Activo]    │
+│ * Campos obligatorios               [Cancelar] [Guardar y Habilitar│
+└────────────────────────────────────────────────────────────────────┘
 ```
 
-- Formulario único parametrizado por modo (INSERCION / EDICION / LECTURA). En lectura, campos grises y sin botones Guardar.
-- Validación por campo con error en rojo bajo cada input (teléfono 10-11 dígitos, ≥1 materia, capacidad 1-10).
+- Formulario único parametrizado por modo (INSERCION / EDICION). El badge de modo va **en el header del modal** (a la derecha del título), y en EDICION se suma el badge de estado del profesor.
+- Bloque superior: Combobox de "Usuario Asociado del Sistema" (usuarios rol Profesor sin ficha). Al elegirlo, nombre, apellido y email quedan vinculados automáticamente.
+- **Título o Especialidad** opcional (máx. 100) y **Teléfono** obligatorio (solo dígitos, 10-11) en grid de 2 columnas.
+- **Capacidad Máxima de Alumnos**: bloque en una fila — texto descriptivo a la izquierda ("Capacidad por bloque lectivo: 1 = Clase individual, 2-10 = grupal") y select a la derecha con la opción actual etiquetada "(Por defecto)". Rango 1-10.
+- **Materias que Dicta**: lista de checkboxes del catálogo activo (grid 2 columnas), contador "N materias seleccionadas", mínimo 1. No se muestra duración de clase en el checkbox.
+- **Disponibilidad**: franjas en línea — select de **día (Lunes–Sábado)** + "De:" + "A:" con horas de 30 min + duración calculada + botón 🗑 a la derecha (contra la esquina del bloque). Botón "+ Agregar Bloque Horario" y total "X.X h semanales asignables" en vivo.
+- Estado por Switch (Activo/Inactivo), default Activo, con texto contextual.
+- Validación por campo con error en rojo bajo cada input (teléfono, materias ≥1, horarios válidos y sin solapamiento).
 
 ### 3) Modal Lectura (Ver ficha)
 
@@ -75,27 +95,59 @@ Pantalla única del módulo **Cuerpo Docente**. Layout general con sidebar fija 
 
 ### 4) Modal Editar
 
-Igual que Nuevo, con datos precargados y legibilidad idéntica; usuario asociado bloqueado (la identidad es el `usuario_id`, único).
+```
+┌ ✏️ Editar profesor   (MODO EDICIÓN) (● Activo) ──────────────── ✕ ┐
+│ Modificá datos profesionales, materias asignadas o disponibilidad │
+│ horaria de Roberto Peralta.                                        │
+│ Usuario Asociado del Sistema*                                     │
+│ ┌ 🔒 Bloqueado por integridad de identidad ───────────────────┐   │
+│ │ (RP) Lic. en Matemática — Roberto Peralta                    │   │
+│ │      (r.peralta@sistema.edu)                                 │   │
+│ └──────────────────────────────────────────────────────────────┘   │
+│ Título o Especialidad        Teléfono Contacto*                    │
+│ [Lic. en Matemática         ] [11 5555 5555          ]              │
+│ Capacidad Máxima de Alumnos*       ┌───────────────────────────┐  │
+│ Capacidad por bloque lectivo       │ 5 alumnos (Por defecto) ▼ │  │
+│ (1 = Clase individual,             └───────────────────────────┘  │
+│  2-10 = grupal)                                                    │
+│ Materias que Dicta — 2 materias seleccionadas                      │
+│   ☑ Análisis Matemático I   ☐ Física I                             │
+│   ☑ Álgebra Lineal          ☐ Química General                      │
+│   Si retiras materias con turnos asignados, solicitará reasignación│
+│ Gestión de Disponibilidad Horaria Semanal*                         │
+│   Total activo programado: 14.0 h semanales asignables             │
+│ ┌ Lunes ▼ ┌De: 08:30 ▼ ┌A: 12:00 ▼  3.5 h            🗑           │
+│ ┌ Martes ▼┌De: 08:00 ▼ ┌A: 10:00 ▼  2.0 h            🗑           │
+│   [+ Agregar Bloque Horario]                                       │
+│ Estado del Profesor                                                │
+│   Habilitado para Turnos                          [Switch ● Activo]│
+│ [Dar de Baja Profesor...]          [Cancelar] [Guardar]            │
+└────────────────────────────────────────────────────────────────────┘
+```
 
-### 5) Modal Matriz semanal (Disponibilidad)
+- Igual que Nuevo, con datos precargados y legibilidad idéntica.
+- **Usuario asociado bloqueado** (icono 🔒 + "Bloqueado por integridad de identidad"): la identidad es el `usuario_id`, único; nombre, apellido y email vienen del usuario vinculado y no se editan aquí.
+- Footer con acción destructiva **"Dar de Baja Profesor..."** a la izquierda + Cancelar + Guardar.
+- Estado con texto contextual según valor: "Habilitado para Turnos" (activo) / equivalente inactivo.
+
+### 5) Modal Modificar Bloques (disponibilidad)
 
 ```
-┌ Disponibilidad semanal — Roberto Peralta ─────────────────────── ✕ ┐
-│ [Copiar día: Lun → a SAS Aplicar]        LUN 08:00-20:00           │
-│ HORA │ LUN        MAR …          SAB                                 │
-│ 08:00│ ██         ██            ██                                  │
-│ 08:30│ ██         ██            ██                                  │
-│ 09:00│ ██                        ██                                  │
-│ ……
-│ 20:00│                                                  Δ Δ          │
-│ Andando: 14 bloques activos                                          │
-│ [Cancelar] [Guardar disponibilidad]                                 │
-└─────────────────────────────────────────────────────────────────────┘
+┌ ✏️ Modificar Bloques de Disponibilidad — Peralta, Roberto ────── ✕ ┐
+│ Edita los bloques horarios ya cargados. La alta de nuevos bloques  │
+│ se hace desde Editar Profesor.                                      │
+│ Total activo programado: 14.0 h semanales asignables                │
+│ ┌ Lunes ▼ ┌De: 08:30 ▼ ┌A: 12:00 ▼  3.5 h            🗑           │
+│ ┌ Martes ▼┌De: 08:00 ▼ ┌A: 10:00 ▼  2.0 h            🗑           │
+│ [Cancelar] [Guardar bloques]                                       │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
-- Grilla lunes a sábado, bloques de 30 minutos, dentro del horario de atención de la sede (08:00-20:00 en el ejemplo).
-- Click en celda = alternar bloque (disponible/no). Click+arrastre = pintar rango. "Copiar a" duplica un día entero.
-- Bloque inválido (fin ≤ inicio o superpuesto) se marca en rojo sobre la celda con tooltip. Mínimo 1 bloque semanal obligatorio.
+- Se abre desde el botón **"Modificar Bloques"** de la agenda semanal. Reemplaza a la matriz de 30 minutos.
+- Edita **solo los bloques ya cargados** del profesor, con la **misma UI de franjas del formulario** (select día Lunes–Sábado + "De:"/"A:" cada 30 min + duración calculada + 🗑 en la esquina).
+- **Sin superposiciones**: si dos franjas del mismo día se pisan o la hora fin no es posterior al inicio, el error en rojo aparece bajo la franja y **no se guarda** (misma regla que el form).
+- **No permite agregar bloques nuevos** aquí: para alta se usa el formulario (Nuevo/Editar Profesor). Si el profesor no tiene bloques, el modal lo avisa.
+- Total "X.X h semanales asignables" en vivo.
 
 ### 6) Modal Agenda semanal (lectura)
 
@@ -108,6 +160,8 @@ Igual que Nuevo, con datos precargados y legibilidad idéntica; usuario asociado
 │ Total activo programado: 14:00 h  │
 └───────────────────────────────────┘
 ```
+
+- Grilla Lun–Sáb por franjas de 1.5 h (08:30 / 10:00 / 14:00 / 16:00), con turnos asignados (alumno, materia, cupos), celdas "＋ Libre" cuando hay disponibilidad sin turno, y **"No asignado"** en las celdas vacías (días sin disponibilidad o fuera de franja).
 
 ### 7) Modal Confirmar baja
 
@@ -126,7 +180,7 @@ Igual que Nuevo, con datos precargados y legibilidad idéntica; usuario asociado
 ## User flow
 
 1. **¿De dónde viene?** Del menú lateral "Cuerpo Docente" (`/profesores`), o de cross-navegación desde Turnos/Agenda al ver a qué profesor queda asignada una materia o un turno.
-2. **¿Qué quiere hacer?** Altas (Nuevo profesor), Editar ficha, Ver disponibilidad/matriz, Ver agenda, Dar de baja.
+2. **¿Qué quiere hacer?** Altas (Nuevo profesor), Editar ficha, Ver disponibilidad/bloques, Ver agenda, Dar de baja.
 3. **¿A dónde quiere llegar?** A una ficha de profesor correcta y actualizada (materias + capacidad + disponibilidad) que Mesa de Entrada use para reservar clases sin superposiciones. El alta termina con toast de éxito y el listado refrescado; la baja lógica vuelve al listado sin el profesor activo.
 
 ## Fuente de datos (BD)
@@ -215,17 +269,20 @@ Turnos futuros (para validar la baja): ejemplo con `turno.fecha >= hoy` y `estad
 ## Criterios de aceptación
 
 ### Obligatorios (HU-PRO-01)
-- [ ] Formulario único parametrizado por modo (INSERCION / EDICION / LECTURA): en lectura los campos están grises y no hay Guardar.
-- [ ] Campo "Usuario asociado" (Combobox) sobre usuarios con rol Profesor **sin ficha de profesor** (activar al crear): al tener ya ficha o estar inactivo, no listar.
+- [ ] Formulario único parametrizado por modo (INSERCION / EDICION). El badge de modo (MODO INSERCIÓN / MODO EDICIÓN) se muestra en el header del modal a la derecha del título; en edición, también el badge de estado del profesor.
+- [ ] Campo "Usuario asociado" (Combobox) sobre usuarios con rol Profesor **sin ficha de profesor** (activar al crear): al tener ya ficha o estar inactivo, no listar. En edición, bloqueado con 🔒 "por integridad de identidad".
 - [ ] Título/Especialidad opcional, máximo 100 caracteres.
 - [ ] Teléfono obligatorio, solo dígitos, 10 a 11 caracteres.
-- [ ] Materias: múltiple desde catálogo activo, mínimo 1 obligatoria; cada materia asignada con capacidad máxima 1-10 (capacidad por materia, `profesor_materia.capacidad_maxima`).
-- [ ] Estado por Switch (Activo/Inactivo), default Activo.
-- [ ] Disponibilidad: grilla lunes a sábado en bloques de 30 min (día 1-6 ISO); el horario cae dentro del rango de atención de la sede.
-- [ ] En disponibilidad: hora fin siempre posterior a hora inicio; bloques sin superposición; ante superposición/inválido, error rojo sobre el bloque. Mínimo 1 bloque semanal activo.
+- [ ] Materias: **checkbox list** del catálogo activo (grid 2 columnas) con contador "N materias seleccionadas", mínimo 1 obligatoria. No se muestra duración por materia en la selección.
+- [ ] Capacidad Máxima de Alumnos: select global (1-10) con opción actual etiquetada "(Por defecto)", en fila con el texto "Capacidad por bloque lectivo (1 = Clase individual, 2-10 = grupal)" a la izquierda y el select a la derecha. Se aplica como capacidad por materia al crear.
+- [ ] Estado por Switch (Activo/Inactivo), default Activo, con texto contextual.
+- [ ] Disponibilidad por **franjas en línea**: select de día (Lunes–Sábado, 1-6 ISO) + hora De/A en bloques de 30 min + duración calculada + botón 🗑 a la derecha; "+ Agregar Bloque Horario" y total en vivo "X.X h semanales asignables". El horario cae dentro del rango de atención de la sede.
+- [ ] En disponibilidad: hora fin siempre posterior a hora inicio; franjas sin superposición en el mismo día; ante inválido, error rojo bajo la franja. Mínimo 1 bloque semanal activo.
+- [ ] "Modificar Bloques" (desde la agenda) abre un editor que **modifica solo los bloques existentes** con la misma UI de franjas del formulario y las mismas validaciones de superposición; no agrega bloques nuevos.
+- [ ] Agenda semanal: celdas sin turno ni disponibilidad muestran **"No asignado"** en vez de quedar vacías.
 - [ ] Baja **lógica**: modal de confirmación → estado inactivo. **Bloqueada si hay turnos futuros no cancelados** (muestra la cantidad); no desaparece del historial.
 - [ ] Listado: solo activos por defecto, orden Apellido + Nombre A-Z.
-- [ ] Filtros combinables: Materia / Día / Estado; buscador parcial case-insensitive (nombre, apellido o título).
+- [ ] Filtros en fila única: buscador case-insensitive por nombre/apellido/especialidad + selects Materia / Día / Estado + botón **Limpiar filtros** (resetea solo Materia/Día/Estado, conserva la búsqueda).
 - [ ] Cada alta/editación/baja registra bitácora (via `auditoria` con valores anteriores/nuevos).
 - [ ] Comentarios `// BACKEND:` en cada integración (fetch a `/api/profesores`, POST/PUT/PATCH/DELETE, catálogos de materia/usuario) según `grep -rn "BACKEND"`.
 
@@ -233,4 +290,3 @@ Turnos futuros (para validar la baja): ejemplo con `turno.fecha >= hoy` y `estad
 - [ ] Vista gráfica semanal (matriz) en la ficha del profesor.
 - [ ] Badge verde/gris de disponibilidad por día.
 - [ ] Exportación a Excel/PDF del listado.
-- [ ] Copiar disponibilidad de un día a otro(s).

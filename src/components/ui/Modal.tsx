@@ -9,6 +9,10 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   icon?: ReactNode;
+  /** Contenido opcional renderizado a la derecha del título (ej. badges de estado). */
+  titleExtra?: ReactNode;
+  /** Subtítulo opcional renderizado debajo del título. */
+  subtitle?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
   maxWidth?: string;
@@ -20,6 +24,8 @@ export function Modal({
   onClose,
   title,
   icon,
+  titleExtra,
+  subtitle,
   children,
   footer,
   maxWidth = "max-w-lg",
@@ -78,12 +84,18 @@ export function Modal({
               <div className="flex items-center justify-between gap-4 border-b border-outline-variant px-6 py-4">
                 <div className="flex items-center gap-3">
                   {icon}
-                  <h2
-                    id={labelledBy}
-                    className="font-display text-lg font-bold text-on-surface"
-                  >
-                    {title}
-                  </h2>
+                  <div className="min-w-0">
+                    <h2
+                      id={labelledBy}
+                      className="font-display text-lg font-bold text-on-surface"
+                    >
+                      {title}
+                    </h2>
+                    {subtitle && (
+                      <p className="text-xs font-medium text-on-surface-variant">{subtitle}</p>
+                    )}
+                  </div>
+                  {titleExtra}
                 </div>
                 <button
                   type="button"

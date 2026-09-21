@@ -11,20 +11,21 @@ import {
 } from "@/data/profesores";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
+import { Pagination } from "@/components/ui/Pagination";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { AgendaSemanalModal } from "@/components/profesores/AgendaSemanalModal";
 import { BajaProfesorModal } from "@/components/profesores/BajaProfesorModal";
 import { FiltrosProfesores, type FiltrosProfesoresState } from "@/components/profesores/FiltrosProfesores";
-import {
-  MatrizDisponibilidadModal,
-  type MatrizSerializable,
-} from "@/components/profesores/MatrizDisponibilidadModal";
-import { OrdenProfesores, ProfesoresTable } from "@/components/profesores/ProfesoresTable";
+import { BloquesDisponibilidadModal } from "@/components/profesores/BloquesDisponibilidadModal";
+import { ProfesorFichaModal } from "@/components/profesores/ProfesorFichaModal";
+import { ProfesoresTable } from "@/components/profesores/ProfesoresTable";
 import {
   ProfesorFormModal,
   type ProfesorFormData,
   type ModoProfesorForm,
 } from "@/components/profesores/ProfesorFormModal";
+import { bloquesDesdeFranjas, capacidadMaxDe, franjasDesdeBloques } from "@/lib/profesores";
 
 const FILTROS_INICIALES: FiltrosProfesoresState = {
   busqueda: "",
@@ -32,93 +33,147 @@ const FILTROS_INICIALES: FiltrosProfesoresState = {
   dia: "",
   estado: "activo",
 };
+const PAGE_SIZE_DEFAULT = 10;
 
 function CuerpoDocenteContent() {
   const { showToast } = useToast();
   const [filtros, setFiltros] = useState(FILTROS_INICIALES);
-  const [orden, setOrden] = useState<OrdenProfesores>("nombre");
+  const [pagina, setPagina] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_DEFAULT);
   const [modalForm, setModalForm] = useState<{
     modo: ModoProfesorForm;
     profesor: Profesor | null;
   } | null>(null);
-  const [matrizDe, setMatrizDe] = useState<Profesor | null>(null);
+  const [fichaDe, setFichaDe] = useState<Profesor | null>(null);
+  const [agendaDe, setAgendaDe] = useState<Profesor | null>(null);
+  const [bloquesDe, setBloquesDe] = useState<Profesor | null>(null);
   const [bajaDe, setBajaDe] = useState<Profesor | null>(null);
 
-  // BACKEND: GET /api/profesores (JOIN usuario + professor_materia + materia).
+  // BACKEND: GET /api/profesores (JOIN usuario + profesor_materia + materia).
   const [profesores, setProfesores] = useState<Profesor[]>(PROFESORES);
 
   const activos = useMemo(() => profesores.filter((p) => p.estado === "activo").length, [profesores]);
 
-  const filtrados = useMemo(() => {
+  // Filtros combinables + orden fijo Apellido, Nombre A-Z (exigencia de la HU).
+  const filas = useMemo(() => {
     const q = filtros.busqueda.trim().toLowerCase();
-    return profesores.filter((p) => {
-      if (filtros.estado && p.estado !== filtros.estado) return false;
-      if (filtros.materiaId && !p.materias.some((m) => String(m.materia.id) === filtros.materiaId))
-        return false;
-      if (filtros.dia && !(p.bloquesPorDia[Number(filtros.dia)]?.length)) return false;
-      if (q) {
-        const busqueda = `${p.nombre} ${p.apellido} ${p.tituloEspecialidad ?? ""}`.toLowerCase();
-        if (!busqueda.includes(q)) return false;
-      }
-      return true;
-    });
+    return profesores
+      .filter((p) => {
+        if (filtros.estado && p.estado !== filtros.estado) return false;
+        if (filtros.materiaId && !p.materias.some((m) => String(m.materia.id) === filtros.materiaId))
+          return false;
+        if (filtros.dia && !(p.bloquesPorDia[Number(filtros.dia)]?.length)) return false;
+        if (q) {
+          const texto = `${p.nombre} ${p.apellido} ${p.tituloEspecialidad ?? ""}`.toLowerCase();
+          if (!texto.includes(q)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => `${a.apellido} ${a.nombre}`.localeCompare(`${b.apellido} ${b.nombre}`));
   }, [profesores, filtros]);
 
+  const totalPages = Math.max(1, Math.ceil(filas.length / pageSize));
+  const pageStart = (pagina - 1) * pageSize + 1;
+  const pageEnd = Math.min(pagina * pageSize, filas.length);
+  const filasPagina = filas.slice(pageStart - 1, pageEnd);
+
+  const cambiarFiltros = (next: FiltrosProfesoresState) => {
+    setFiltros(next);
+    setPagina(1);
+  };
+
   const abrirNuevo = () => setModalForm({ modo: "INSERCION", profesor: null });
-  const abrirLectura = (p: Profesor) => setModalForm({ modo: "LECTURA", profesor: p });
   const abrirEdicion = (p: Profesor) => setModalForm({ modo: "EDICION", profesor: p });
 
   const guardarProfesor = (datos: ProfesorFormData) => {
-    // BACKEND: POST /api/profesores (INSERCION) | PUT /api/profesores/:id (EDICION).
-    // En el front hardcodeado solo se validan y descartan los datos (demo).
-    void datos;
-    showToast("success", modalForm?.modo === "INSERCION" ? "Profesor creado (demo)" : "Ficha actualizada (demo)");
+    // BACKEND: POST /api/profesores (INSERCION) | PUT /api/profesores/:id (EDICION)
+    //         → profesor + profesor_materia + agenda_profesional en una transacción.
+    if (modalForm?.modo === "EDICION" && modalForm.profesor) {
+      const id = modalForm.profesor.id;
+      setProfesores((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                tituloEspecialidad: datos.titulo.trim() === "" ? null : datos.titulo,
+                telefono: datos.telefono,
+                materias: datos.materias.map((m) => ({
+                  materia: m.materia,
+                  capacidadMaxima: Number(m.capacidad),
+                })),
+                capacidadDefault: datos.capacidadDefault,
+                bloquesPorDia: bloquesDesdeFranjas(datos.franjas),
+                estado: datos.estado ? "activo" : "inactivo",
+              }
+            : p,
+        ),
+      );
+      showToast("success", "Ficha actualizada (demo)");
+    } else {
+      const usuario = USUARIOS_SIN_FICHA.find((u) => String(u.id) === datos.usuarioId);
+      if (!usuario) {
+        showToast("error", "Seleccioná un usuario asociado válido");
+        return;
+      }
+      const nuevoId = Math.max(0, ...profesores.map((p) => p.id)) + 1;
+      const nuevoProfesor: Profesor = {
+        id: nuevoId,
+        usuarioId: Number(datos.usuarioId),
+        nombre: usuario.nombre,
+        apellido: usuario.apellido,
+        email: usuario.email,
+        telefono: datos.telefono,
+        tituloEspecialidad: datos.titulo.trim() === "" ? null : datos.titulo,
+        materias: datos.materias.map((m) => ({
+          materia: m.materia,
+          capacidadMaxima: Number(m.capacidad),
+        })),
+        estado: datos.estado ? "activo" : "inactivo",
+        fechaCreacion: new Date().toISOString().slice(0, 10),
+        bloquesPorDia: bloquesDesdeFranjas(datos.franjas),
+        capacidadDefault: datos.capacidadDefault,
+        turnosProgramados: 0,
+        presentismo: 100,
+      };
+      setProfesores((prev) => [...prev, nuevoProfesor]);
+      showToast("success", "Profesor creado (demo)");
+    }
     setModalForm(null);
   };
 
-  const guardarDisponibilidad = (matriz: MatrizSerializable) => {
+  const guardarDisponibilidad = (bloquesPorDia: Record<number, string[]>) => {
     // BACKEND: PUT /api/profesores/:id/disponibilidad
-    if (!matrizDe) return;
-    // Las horas activas son bloques de 30 min; se agrupan en rangos contiguos
-    // para mantener la forma "HH:MM-HH:MM" que consume la tabla y el filtro.
-    const aMin = (h: string) => {
-      const [hh, mm] = h.split(":").map(Number);
-      return hh * 60 + mm;
-    };
-    const bloquesPorDia = Object.fromEntries(
-      Object.entries(matriz).map(([dia, horas]) => {
-        const ordenadas = [...horas].sort();
-        const rangos: string[] = [];
-        let inicio = ordenadas[0];
-        let prev: string | undefined;
-        for (const h of ordenadas) {
-          if (prev && aMin(h) > aMin(prev) + 30) {
-            rangos.push(`${inicio}-${prev}`);
-            inicio = h;
-          }
-          prev = h;
-        }
-        if (inicio) rangos.push(`${inicio}-${prev}`);
-        return [Number(dia), rangos];
-      }),
-    );
+    if (!bloquesDe) return;
     setProfesores((prev) =>
-      prev.map((p) =>
-        p.id === matrizDe.id ? { ...p, bloquesPorDia } : p,
-      ),
+      prev.map((p) => (p.id === bloquesDe.id ? { ...p, bloquesPorDia } : p)),
     );
     showToast("success", "Disponibilidad guardada (demo)");
-    setMatrizDe(null);
+    setBloquesDe(null);
   };
 
-  const confirmarBaja = () => {
+  const confirmarBaja = (motivo: string, observaciones: string) => {
     if (!bajaDe) return;
-    // BACKEND: PATCH /api/profesores/:id { "estado": "inactivo" }
+    // BACKEND: PATCH /api/profesores/:id { "estado": "inactivo", motivo, observaciones }
+    //          (auditoría vía trigger sobre profesor).
+    void motivo;
+    void observaciones;
     setProfesores((prev) =>
       prev.map((p) => (p.id === bajaDe.id ? { ...p, estado: "inactivo" } : p)),
     );
+    setModalForm(null); // si la baja se disparó desde el form de edición
     showToast("success", "Profesor dado de baja (demo)");
     setBajaDe(null);
+  };
+
+  const abrirFicha = (p: Profesor) => setFichaDe(p);
+  const abrirAgenda = (p: Profesor) => setAgendaDe(p);
+  const irAEditarDesdeFicha = (p: Profesor) => {
+    setFichaDe(null);
+    abrirEdicion(p);
+  };
+  const modificarBloquesDesdeAgenda = (p: Profesor) => {
+    setAgendaDe(null);
+    setBloquesDe(p);
   };
 
   return (
@@ -126,17 +181,23 @@ function CuerpoDocenteContent() {
       <Sidebar />
       <main className="flex-1 px-6 py-6 lg:px-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-5">
-          <header className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-md bg-primary-container/30">
-                <Icon name="groups" size={24} className="text-primary" />
-              </span>
-              <div>
-                <h1 className="font-display text-2xl font-bold text-on-surface">Cuerpo Docente</h1>
-                <p className="text-sm font-medium text-on-surface-variant">
-                  Registrá profesores, sus materias y disponibilidad para que Mesa de Entrada reserve clases sin superposición.
-                </p>
-              </div>
+          <header className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <nav aria-label="Ruta de navegación" className="mb-1">
+                <ol className="flex items-center gap-1 text-xs font-semibold text-on-surface-variant">
+                  <li>Gestión Académica</li>
+                  <li aria-hidden="true" className="flex items-center">
+                    <Icon name="chevron_right" size={14} />
+                  </li>
+                  <li aria-current="page" className="text-on-surface">
+                    Cuerpo Docente
+                  </li>
+                </ol>
+              </nav>
+              <h1 className="font-display text-2xl font-bold text-on-surface">Cuerpo Docente</h1>
+              <p className="text-sm font-medium text-on-surface-variant">
+                Gestión de profesores, materias asignadas y disponibilidad
+              </p>
             </div>
             <Button type="button" onClick={abrirNuevo}>
               <Icon name="add" size={16} />
@@ -146,12 +207,12 @@ function CuerpoDocenteContent() {
 
           <FiltrosProfesores
             estado={filtros}
-            onChange={setFiltros}
+            onChange={cambiarFiltros}
             materiasCatalogo={MATERIAS_CATALOGO}
             totalActivos={activos}
           />
 
-          {filtrados.length === 0 ? (
+          {filas.length === 0 ? (
             <section
               role="status"
               className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed border-outline-variant bg-surface-container-lowest px-6 py-16 text-center"
@@ -167,24 +228,51 @@ function CuerpoDocenteContent() {
               </Button>
             </section>
           ) : (
-            <ProfesoresTable
-              profesores={filtrados}
-              orden={orden}
-              onOrdenChange={setOrden}
-              onVer={abrirLectura}
-              onEditar={abrirEdicion}
-              onVerDisponibilidad={setMatrizDe}
-              onBaja={setBajaDe}
-            />
+            <div className="overflow-hidden rounded-md border border-outline-variant bg-surface-container-lowest shadow-card">
+              <ProfesoresTable
+                profesores={filasPagina}
+                onVer={abrirFicha}
+                onEditar={abrirEdicion}
+                onVerAgenda={abrirAgenda}
+                onBaja={setBajaDe}
+              />
+              <Pagination
+                page={pagina}
+                totalPages={totalPages}
+                totalItems={filas.length}
+                pageStart={pageStart}
+                pageEnd={pageEnd}
+                pageSize={pageSize}
+                itemLabel="profesores"
+                onPageChange={setPagina}
+                onPageSizeChange={setPageSize}
+              />
+            </div>
           )}
         </div>
       </main>
 
+      <ProfesorFichaModal
+        open={fichaDe !== null}
+        profesor={fichaDe}
+        onClose={() => setFichaDe(null)}
+        onEditar={irAEditarDesdeFicha}
+      />
+
+      <AgendaSemanalModal
+        open={agendaDe !== null}
+        profesor={agendaDe}
+        onClose={() => setAgendaDe(null)}
+        onModificarBloques={modificarBloquesDesdeAgenda}
+      />
+
       <ProfesorFormModal
         open={modalForm !== null}
-        titulo={modalForm?.modo === "LECTURA" ? "Perfil del docente" : modalForm?.modo === "EDICION" ? "Editar profesor" : "Nuevo profesor"}
         modo={modalForm?.modo ?? "INSERCION"}
+        titulo={modalForm?.modo === "EDICION" ? "Editar Profesor" : "Nuevo Profesor"}
         onClose={() => setModalForm(null)}
+        profesor={modalForm?.profesor ?? null}
+        onBaja={setBajaDe}
         datosIniciales={
           modalForm?.profesor
             ? {
@@ -195,6 +283,9 @@ function CuerpoDocenteContent() {
                   materia: m.materia,
                   capacidad: String(m.capacidadMaxima),
                 })),
+                capacidadDefault:
+                  modalForm.profesor.capacidadDefault ?? capacidadMaxDe(modalForm.profesor),
+                franjas: franjasDesdeBloques(modalForm.profesor.bloquesPorDia),
                 estado: modalForm.profesor.estado === "activo",
               }
             : undefined
@@ -204,10 +295,10 @@ function CuerpoDocenteContent() {
         onGuardar={guardarProfesor}
       />
 
-      <MatrizDisponibilidadModal
-        open={matrizDe !== null}
-        profesor={matrizDe}
-        onClose={() => setMatrizDe(null)}
+      <BloquesDisponibilidadModal
+        open={bloquesDe !== null}
+        profesor={bloquesDe}
+        onClose={() => setBloquesDe(null)}
         onGuardar={guardarDisponibilidad}
       />
 
@@ -218,8 +309,6 @@ function CuerpoDocenteContent() {
         onClose={() => setBajaDe(null)}
         onConfirmar={confirmarBaja}
       />
-
-      {/* Lectura (Ver ficha) muere en el modal ProfesorFormModal en modo LECTURA. */}
     </div>
   );
 }

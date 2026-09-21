@@ -32,6 +32,18 @@ export interface Profesor {
 
   // Resumen semanal calculado desde agenda_profesional (ver agendaProfesional.ts)
   bloquesPorDia: Record<number, string[]>;
+
+  // ── Campos calculados para la ficha / tarjetas de estadísticas ─────────────
+  // BACKEND: GET /api/profesores/:id/turnos?desde=...&hasta=... → total de
+  // turnos programados y presentismo derivado de la tabla `turno`.
+  turnosProgramados?: number;
+  presentismo?: number; // porcentaje (0-100)
+
+  // BACKEND: el CHECK global ck_profesor_capacidad (1-10) no tiene columna en
+  // el dump (inconsistencia detectada en el brief). El front usa
+  // profesor_materia.capacidad_maxima; este campo refleja el máximo de las
+  // capacidades por materia o el valor global elegido en el formulario.
+  capacidadDefault?: number;
 }
 
 export interface UsuarioSinFicha {
@@ -63,10 +75,12 @@ export const PROFESORES: Profesor[] = [
     estado: "activo",
     fechaCreacion: "2024-03-15",
     bloquesPorDia: {
-      1: ["08:00-10:00", "12:00-15:00"],
-      2: ["08:00-12:00"],
-      6: ["09:00-11:00"],
+      1: ["08:00-12:00"],
+      3: ["08:00-13:30"],
+      5: ["14:00-18:30"],
     },
+    turnosProgramados: 38,
+    presentismo: 98.5,
   },
   {
     id: 2,
@@ -89,10 +103,12 @@ export const PROFESORES: Profesor[] = [
     estado: "activo",
     fechaCreacion: "2024-05-02",
     bloquesPorDia: {
-      1: ["08:00-10:00", "12:00-14:30"],
+      1: ["08:00-12:00"],
       2: ["08:00-12:00"],
-      3: ["14:00-16:00"],
+      4: ["14:00-18:00"],
     },
+    turnosProgramados: 22,
+    presentismo: 96,
   },
   {
     id: 3,
@@ -115,6 +131,8 @@ export const PROFESORES: Profesor[] = [
       5: ["08:00-10:00"],
       6: ["10:00-12:00"],
     },
+    turnosProgramados: 15,
+    presentismo: 99,
   },
   {
     id: 4,
@@ -133,6 +151,8 @@ export const PROFESORES: Profesor[] = [
     estado: "inactivo",
     fechaCreacion: "2023-11-09",
     bloquesPorDia: { 3: ["09:00-12:00"], 4: ["09:00-12:00"] },
+    turnosProgramados: 8,
+    presentismo: 100,
   },
 ];
 
@@ -161,6 +181,37 @@ export const TURNOS_FUTUROS_POR_PROFESOR: Record<number, number> = {
   2: 0,
   3: 1,
   4: 0,
+};
+
+// Turnos de la semana demo para la grilla de AgendaSemanalModal.
+// BACKEND: GET /api/profesores/:id/turnos?desde=YYYY-MM-DD&hasta=YYYY-MM-DD
+//   (WHERE estado='Reservado' AND fecha BETWEEN ...) con alumno + materia.
+//   Las horas coinciden con los inicios de franja de la grilla (1.5 h).
+export interface TurnoSemana {
+  id: number; // turno.id
+  profesorId: number; // FK → profesor.id
+  dia: number; // 1-6 (ISO, Lun-Sáb)
+  horaInicio: string; // "HH:MM"
+  alumno: string;
+  materia: string;
+  cuposUsados: number;
+  cuposMax: number;
+}
+
+export const TURNOS_SEMANA: TurnoSemana[] = [
+  { id: 1, profesorId: 1, dia: 1, horaInicio: "08:30", alumno: "Camila Ross", materia: "Análisis Matemático I", cuposUsados: 3, cuposMax: 4 },
+  { id: 2, profesorId: 1, dia: 2, horaInicio: "08:30", alumno: "M. Fernández", materia: "Física II", cuposUsados: 1, cuposMax: 4 },
+  { id: 3, profesorId: 1, dia: 3, horaInicio: "14:00", alumno: "Martina Paz", materia: "Análisis Matemático I", cuposUsados: 2, cuposMax: 4 },
+  { id: 4, profesorId: 1, dia: 4, horaInicio: "08:30", alumno: "Joaquín Soler", materia: "Física I", cuposUsados: 4, cuposMax: 4 },
+  { id: 5, profesorId: 1, dia: 5, horaInicio: "10:00", alumno: "L. Gutiérrez", materia: "Análisis Matemático I", cuposUsados: 3, cuposMax: 4 },
+  { id: 6, profesorId: 1, dia: 5, horaInicio: "16:00", alumno: "Facundo Ortiz", materia: "Física II", cuposUsados: 2, cuposMax: 4 },
+];
+
+// Parámetros de la semana demo de la agenda (fecha fija de los mockups).
+// BACKEND: el rango real sale de `?desde=&hasta=` de la consulta de turnos.
+export const SEMANA_DEMO = {
+  fechas: "21 al 26 de Octubre, 2025",
+  horasDisponibles: 11.5, // horas reservables expuestas por la grilla demo
 };
 
 // Texto de ejemplo para el estado vacío (listado sin profesores).

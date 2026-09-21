@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 
 const DIAS_FILTRO = [
-  { value: "", label: "Todos los días" },
   { value: "1", label: "Lunes" },
   { value: "2", label: "Martes" },
   { value: "3", label: "Miércoles" },
@@ -38,8 +37,9 @@ export function FiltrosProfesores({
 }: FiltrosProfesoresProps) {
   const set = (patch: Partial<FiltrosProfesoresState>) => onChange({ ...estado, ...patch });
 
-  const hayFiltros =
-    estado.busqueda.trim() !== "" || estado.materiaId !== "" || estado.dia !== "";
+  // Limpia los selectores; la búsqueda se mantiene (no depende de este botón).
+  const borrarFiltros = () =>
+    onChange({ ...estado, materiaId: "", dia: "", estado: "activo" });
 
   return (
     <form
@@ -47,13 +47,13 @@ export function FiltrosProfesores({
       onSubmit={(e) => e.preventDefault()}
       aria-label="Filtros del listado"
     >
-      <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-end">
-        <div className="relative w-full md:max-w-xs">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="relative w-full md:min-w-0 md:flex-1">
           {/* BACKEND: búsqueda por nombre, apellido o título contra GET /api/profesores?q= */}
           <Input
             id="busqueda-profesor"
             label="Buscar"
-            placeholder="Nombre, apellido o título…"
+            placeholder="Buscar por nombre, apellido y especialidad"
             value={estado.busqueda}
             onChange={(e) => set({ busqueda: e.target.value })}
             className="pl-10"
@@ -64,16 +64,16 @@ export function FiltrosProfesores({
             className="pointer-events-none absolute left-3 top-[38px] text-on-surface-variant"
           />
         </div>
-
-        <div className="w-full md:w-52">
+        <div className="w-full md:w-40">
           {/* BACKEND: GET /api/materias?estado=activo (catálogo para el filtro) */}
           <Select
             id="filtro-materia"
             label="Materia"
             value={estado.materiaId}
             onChange={(e) => set({ materiaId: e.target.value })}
+            className="text-sm"
           >
-            <option value="">Todas</option>
+            <option value="">Todas las materias</option>
             {materiasCatalogo.map((m) => (
               <option key={m.id} value={String(m.id)}>
                 {m.nombre}
@@ -82,14 +82,16 @@ export function FiltrosProfesores({
           </Select>
         </div>
 
-        <div className="w-full md:w-44">
+        <div className="w-full md:w-36">
           {/* BACKEND: filtro por dia_semana (1-6) de agenda_profesional */}
           <Select
             id="filtro-dia"
-            label="Día disponible"
+            label="Día"
             value={estado.dia}
             onChange={(e) => set({ dia: e.target.value })}
+            className="text-sm"
           >
+            <option value="">Cualquier día</option>
             {DIAS_FILTRO.map((d) => (
               <option key={d.value} value={d.value}>
                 {d.label}
@@ -98,12 +100,14 @@ export function FiltrosProfesores({
           </Select>
         </div>
 
-        <div className="w-full md:w-44">
+        <div className="w-full md:w-36">
+          {/* BACKEND: filtro por profesor.estado (activo/inactivo) */}
           <Select
             id="filtro-estado"
             label="Estado"
             value={estado.estado}
             onChange={(e) => set({ estado: e.target.value as FiltrosProfesoresState["estado"] })}
+            className="text-sm"
           >
             <option value="activo">Solo activos</option>
             <option value="inactivo">Solo inactivos</option>
@@ -111,18 +115,12 @@ export function FiltrosProfesores({
           </Select>
         </div>
 
-        {hayFiltros && (
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => onChange({ busqueda: "", materiaId: "", dia: "", estado: "activo" })}
-            className="self-end"
-          >
-            <Icon name="close" size={16} />
-            Borrar filtros
-          </Button>
-        )}
+        <Button type="button" variant="outline" onClick={borrarFiltros}>
+          <Icon name="filter_alt_off" size={16} />
+          Limpiar filtros
+        </Button>
       </div>
+
       <p className="text-xs font-medium text-on-surface-variant" aria-live="polite">
         {totalActivos} {totalActivos === 1 ? "profesor activo" : "profesores activos"}
       </p>
