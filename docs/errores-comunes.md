@@ -4,6 +4,24 @@ Log del equipo (diseño front). Se alimenta automáticamente durante `/disenar` 
 
 ---
 
+### 2026-09-21 · ui/Modal (HU-MAT-01) — el modal cerrado seguía tapando la pantalla
+
+- **Qué pasó:** al cerrar cualquier modal, `AnimatePresence` deja el nodo en el DOM mientras corre la animación de salida. Ese nodo es un overlay `fixed inset-0`: aunque esté en `opacity: 0`, **sigue capturando los clicks de toda la pantalla**. Si además la pestaña pasa a segundo plano durante el cierre, `requestAnimationFrame` se pausa, la animación nunca termina, el nodo no se desmonta y la app queda inusable hasta recargar.
+- **Cómo se detectó:** en el paso 6b (prueba de renderizado) de HU-MAT-01: después de guardar, `document.elementFromPoint(centro)` devolvía un elemento **dentro** del diálogo ya invisible.
+- **Causa:** el nodo que anima la salida conserva las props del último render con `open: true`; no hay forma de apagarle los eventos desde adentro.
+- **Regla para no repetirlo:** el `AnimatePresence` va envuelto en un `<div className={open ? undefined : "pointer-events-none"}>`. Ese wrapper **sí** se vuelve a renderizar cuando `open` pasa a false, así que corta los eventos al instante sin tocar la animación. Al crear un componente que monta/desmonta un overlay animado, verificar con `elementFromPoint` que después de cerrar no quede capturando clicks.
+
+---
+
+### 2026-09-21 · Materias (HU-MAT-01) — setState síncrono dentro de un efecto
+
+- **Qué pasó:** `npm run lint` falló con `react-hooks/set-state-in-effect` en `src/app/materias/page.tsx`: el efecto de carga inicial llamaba `setEstadoCarga("cargando")` en el cuerpo del efecto, lo que dispara renders en cascada.
+- **Cómo se detectó:** paso 6a de `/disenar` (verificación estática). TypeScript no lo marca: es una regla de lint de React 19.
+- **Causa:** se reusó el mismo handler para la carga inicial (efecto) y para el botón "Reintentar" (evento). Lo que es válido en un handler no lo es dentro de un efecto.
+- **Regla para no repetirlo:** dentro de un `useEffect` el estado se toca **solo en callbacks asíncronos** (`.then`/`.catch`), nunca en el cuerpo. El estado inicial "cargando" se declara como valor inicial del `useState`; el reintento va en un handler aparte.
+
+---
+
 ### 2026-09-21 · Sistema de diseño (HU-PRO-01) — paleta desactualizada
 
 - **Qué pasó:** El `MASTER.md` del repo tenía una paleta MD3 (`#00236f`, `#0058be`, `#340081`, `#f8f9ff`) distinta a la del **documento de diseño** del sistema (Nexo Académico: `#142B6F`, `#2F6FED`, `#14B8A6`, …). Se había implementado la del MASTER.

@@ -30,6 +30,7 @@ Guía de trabajo para agentes de IA en este repositorio. Es el acuerdo del equip
 - `docs/briefs/` (base `_plantilla.md`) — briefs por pantalla (HU + wireframe + datos + criterios de aceptación); son el insumo de `/disenar`.
 - `design-system/bandidossw/MASTER.md` — design system Material Design 3 (tokens de color, tipografía, spacing, radius, motion).
 - `design-system/bandidossw/componentes.md` — inventario de componentes de `src/components/`. Consultarlo **antes de crear componentes** y actualizarlo al crear/extender.
+- `docs/capa-de-datos-front.md` — cómo se conectan las pantallas a los datos (`src/data/<entidad>.ts`) para que el día que existan los endpoints no haya que reescribir la pantalla. Léelo antes de codear una pantalla nueva.
 - `docs/errores-comunes.md` — log de errores/lecciones del equipo.
 
 ## Workflow obligatorio (comando `/disenar`)

@@ -5,8 +5,9 @@ import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 
 // Navegación lateral del sistema. Los módulos no desarrollados navegan con
-// href="#" y quedan marcados como "Próximamente" (la pantalla activa es
-// /profesores, HU-PRO-01). BACKEND: no consume API; los nombres de ruta se
+// href="#" y quedan marcados como "Próximamente" (las pantallas activas son
+// /profesores — HU-PRO-01 — y /materias — HU-MAT-01).
+// BACKEND: no consume API; los nombres de ruta se
 // definen acá y en el layout de cada módulo.
 // Los nombres de `icon` son ligaduras de Material Symbols Outlined.
 const NAV_ITEMS = [
@@ -15,6 +16,7 @@ const NAV_ITEMS = [
   { label: "Turnos y Agenda", href: "#", icon: "calendar_month", disabled: true },
   { label: "Alumnos", href: "#", icon: "group", disabled: true },
   { label: "Cuerpo Docente", href: "/profesores", icon: "groups", disabled: false },
+  { label: "Materias", href: "/materias", icon: "menu_book", disabled: false },
   { label: "Cobranzas", href: "#", icon: "receipt_long", disabled: true },
   { label: "Usuarios", href: "#", icon: "school", disabled: true },
   { label: "Reportes", href: "#", icon: "settings", disabled: true },

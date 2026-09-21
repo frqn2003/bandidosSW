@@ -164,3 +164,28 @@ body {
     "GRAD" 0,
     "opsz" 24;
 }
+/* ── Impresión ─────────────────────────────────────────────────────────── */
+/* La exportación a PDF del listado (HU-MAT-01) usa el diálogo de impresión   */
+/* del navegador: se imprime solo el contenido, sin sidebar ni controles.     */
+/* Los elementos que no van al papel se marcan con la utilidad `print:hidden`.*/
+
+@media print {
+  :root,
+  body {
+    background: #ffffff;
+  }
+
+  main {
+    padding: 0;
+  }
+
+  /* Que la tabla no se corte a la mitad de una fila. */
+  tr,
+  img {
+    break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+}
