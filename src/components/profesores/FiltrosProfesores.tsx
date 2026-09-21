@@ -53,7 +53,7 @@ export function FiltrosProfesores({
           <Input
             id="busqueda-profesor"
             label="Buscar"
-            placeholder="Buscar por nombre, apellido y especialidad"
+            placeholder="Buscar por nombre y apellido"
             value={estado.busqueda}
             onChange={(e) => set({ busqueda: e.target.value })}
             className="pl-10"

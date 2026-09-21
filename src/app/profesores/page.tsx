@@ -64,7 +64,7 @@ function CuerpoDocenteContent() {
           return false;
         if (filtros.dia && !(p.bloquesPorDia[Number(filtros.dia)]?.length)) return false;
         if (q) {
-          const texto = `${p.nombre} ${p.apellido} ${p.tituloEspecialidad ?? ""}`.toLowerCase();
+          const texto = `${p.nombre} ${p.apellido}`.toLowerCase();
           if (!texto.includes(q)) return false;
         }
         return true;
