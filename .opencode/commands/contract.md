@@ -1,82 +1,83 @@
-# /contract — Definir contrato de API
+---
+description: "Crear o revisar contratos de API (contracts). Lee docs/api-contracts.md antes de empezar."
+---
 
-Define el contrato de una entidad: rutas, request/response con Zod, errores, tipos TypeScript. **No codea la ruta ni el service**, solo el contrato. Se ejecuta DESPUÉS de `/disenar`: lee el código generado y extrae los types que el front realmente necesita.
+# /contract — Flujo de Contratos de API
 
-## Uso
+> **Somos el equipo de FRONT-END.** El contrato se comparte con el back, pero los pasos de implementación que nos corresponden son solo los del front.
 
-```
-/contract proveedor
-```
-o con más detalle:
-```
-/contract HU-CEL-01: contrato para alumnos (listar, crear, editar, inactivar)
-```
+## Paso 0: Leer la guía de contratos
 
-## Qué hace (pasos en orden)
+Antes de hacer CUALQUIER cosa, leer el archivo `docs/api-contracts.md` completo.
+Ese archivo define las reglas, la estructura y los ejemplos que se deben seguir al pie de la letra.
 
-1. **Paso 1 — Entidad**: identifica la entidad y sus operaciones (listar, crear, editar, inactivar, etc.).
-2. **Paso 2 — Rutas**: define las rutas REST y helpers de construcción.
-3. **Paso 3 — Request**: schema Zod para filtros del listado + body de alta/edición.
-4. **Paso 4 — Response**: tipos TypeScript de respuesta (uno por operación).
-5. **Paso 5 — Errores**: enum de errores de dominio con sus códigos HTTP.
-6. **Paso 6 — Stub**: genera fixture de prueba que cumple el contrato.
-7. **Paso 7 — Guarda**: crea `src/contracts/<entidad>.ts` con todo lo anterior.
+Si el archivo no existe, informar al usuario y detenerse.
 
-## Estructura del contrato
+## Paso 1: Entender el contexto
+
+Preguntar al usuario (si no lo especificó):
+1. **Entidad**: ¿qué entidad/RESOURCE se contractual? (ej: proveedor, alumno, docente)
+2. **Operaciones**: ¿qué CRUD se necesita? (listar, crear, editar, inactivar, etc.)
+3. **Campos**: ¿qué campos tiene el request y el response?
+4. **Errores de dominio**: ¿qué errores específicos puede devolver?
+
+## Paso 2: Generar el contrato
+
+Crear el archivo `src/contracts/{entidad}.ts` siguiendo EXACTAMENTE la estructura de `docs/api-contracts.md`:
+
+1. **Rutas** — constantes y funciones helper
+2. **Request: filtros del listado** — schema Zod con `.strict()`
+3. **Request: alta y edición** — schema Zod con `.strict()`, types `Body` e `Input`
+4. **Response** — tipo con todos los campos (incluyendo `id`, `estado`)
+5. **Errores de dominio** — union type con códigos y status HTTP
+
+Este archivo es **compartido**: lo escriben ambos equipos antes de que exista la pantalla o el service.
+
+## Paso 3: Generar los stubs del front (si se pide)
+
+Si el usuario quiere probar la pantalla sin backend, crear la ruta stub en `src/app/api/{entidad}/route.ts`:
 
 ```ts
-// src/contracts/<entidad>.ts
-import { z } from "zod";
+// STUB — datos de prueba hasta que el back conecte la ruta real
+import { withRoute } from "@/lib/http/handler";
+import { ok } from "@/lib/http/responses";
+import type { {Entidad}Response } from "@/contracts/{entidad}";
 
-// ─── Rutas ───────────────────────────────────────────────────────────────
-export const RUTA = "/api/<entidades>";
-export const rutaEntidad = (id: number) => `${RUTA}/${id}`;
-export const rutaInactivar = (id: number) => `${RUTA}/${id}/inactivar`;
+const FIXTURE: {Entidad}Response[] = [
+  {
+    // datos de prueba con la misma forma del Response del contrato
+  },
+];
 
-// ─── Request: filtros del listado ────────────────────────────────────────
-export const listarEntidadQuery = z.object({ ... }).strict();
-
-// ─── Request: alta y edición ─────────────────────────────────────────────
-export const crearEntidadBody = z.object({ ... }).strict();
-export const editarEntidadBody = crearEntidadBody;
-
-export type CrearEntidadBody = z.input<typeof crearEntidadBody>;
-export type CrearEntidadInput = z.output<typeof crearEntidadBody>;
-
-// ─── Response ────────────────────────────────────────────────────────────
-export type EstadoEntidad = "activo" | "inactivo";
-export type EntidadResponse = { ... };
-
-// ─── Errores de dominio ──────────────────────────────────────────────────
-export type ErrorEntidad = "ERROR_1" | "ERROR_2"; // con código HTTP
+export const GET = withRoute(async () => ok(FIXTURE));
 ```
 
-## Reglas
+> Esto es **solo front**. El equipo de back crea sus propias rutas reales, mapper y service aparte.
 
-- **Ruta**: RESTful, plural (`/api/alumnos`, no `/api/alumno`).
-- **Request**: usar `.strict()` en todos los schemas Zod para rechazar campos extra.
-- **Response**: tipo completo con `id: number` (la PK que manda la base).
-- **Errores**: cada error indica su código HTTP (404, 409, 422).
-- **Tipos**: exportar `CrearXBody` (input del form) y `CrearXInput` (output del schema, después de defaults).
-- **No incluir**: SQL, reglas de negocio, componentes UI, lógica de service.
+## Paso 4: Verificar reglas clave
 
-## Ejemplo de uso
+Confirmar que se cumple:
+- [ ] El contrato va ANTES de la pantalla o el service
+- [ ] Solo va: ruta, request, response, errores
+- [ ] No va: SQL, reglas de negocio, componentes
+- [ ] El front importa tipos del contrato, nunca tipea URLs ni bodies manualmente
+- [ ] El stub (si se crea) usa el tipo Response del contrato
+- [ ] El stub es temporal — se reemplaza cuando el back conecte la ruta real
 
-```
-/contract alumno
-```
+## Paso 5: Reportar
 
-El agente genera `src/contracts/alumno.ts` con:
-- Rutas: `/api/alumnos`, `rutaAlumno(id)`, `rutaInactivar(id)`
-- Filtros: `listarAlumnosQuery` (busqueda, estado, carreraId)
-- Body: `crearAlumnoBody` (nombre, apellido, dni, email, carreraId, etc.)
-- Response: `AlumnoResponse` (id, nombre, apellido, dni, email, carrera, estado)
-- Errores: `DNI_DUPLICADO` (409), `NO_ENCONTRADO` (404), `DATOS_INVALIDOS` (422)
-- Stub: `FIXTURE` con 1 alumno de ejemplo
+Entregar al usuario:
+- Ruta del contrato creado
+- Resumen de operaciones y campos
+- Errores de dominio definidos
+- Si se creó stub: ruta del stub y recordatorio de que es temporal
+- Próximos pasos del front: importar contrato → armar body tipado → llamar con `apiSend` → manejar errores del contrato
 
-## Después del contrato
+## Flujo del front al usar el contrato
 
-Una vez creado el contrato (que ya fue diseñado con `/disenar`):
-1. Probar con `npm run dev`
-2. `/subir` — publicar los cambios en GitHub
-3. El back implementa service + route.ts usando los mismos tipos del contrato
+Estos son los pasos que NOSOTROS seguimos al implementar la pantalla:
+
+1. **Importar del contrato** — `RUTA`, tipos `Body`, `Response`, `Error`
+2. **Armar el body tipado** — declarar el tipo en una variable, no en el `apiSend`
+3. **Llamar y tipar la respuesta** — `apiSend<Response>("POST", RUTA, body)`
+4. **Manejar los errores del contrato** — catch con `codigoDeError` y el union type de errores
