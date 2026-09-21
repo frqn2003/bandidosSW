@@ -42,6 +42,7 @@ export const listarProfesoresQuery = z
     busqueda: z.string().trim().optional(),          // nombre, apellido o dni del usuario
     materiaId: z.coerce.number().int().positive().optional(),
     academiaId: z.coerce.number().int().positive().optional(),
+    diaSemana: z.coerce.number().int().min(1).max(6).optional(), // 1 = lunes ... 6 = sábado
     estado: z.enum(["activo", "inactivo"]).optional(),
   })
   .strict();

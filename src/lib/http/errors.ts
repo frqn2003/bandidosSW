@@ -209,11 +209,38 @@ export function traducirErrorPostgres(e: unknown): AppError | null {
     if (constraint.includes("deposito_nombre")) {
       return new ConflictError("DEPOSITO_DUPLICADO", "Ya existe un depósito con ese nombre.", "nombre");
     }
+    if (constraint.includes("profesor_usuario_id")) {
+      return new ConflictError("USUARIO_YA_ES_PROFESOR", "Ese usuario ya tiene ficha de profesor.", "usuarioId");
+    }
+    if (constraint.includes("uq_profesor_materia")) {
+      return new ValidationError("MATERIA_DUPLICADA", "Hay una materia repetida en la lista.", "materias");
+    }
     return new ConflictError("DUPLICADO", "El registro ya existe.");
+  }
+
+  // 23P01 = exclusion_violation
+  if (codigo === "23P01") {
+    if (constraint.includes("agenda_profesional") || constraint.includes("superposicion")) {
+      return new ConflictError(
+        "BLOQUE_SUPERPUESTO",
+        "El profesor ya tiene un bloque que se superpone con ese horario.",
+        "horaInicio",
+      );
+    }
+    return new ConflictError("SUPERPOSICION", "El horario se superpone con otro existente.");
   }
 
   // 23514 = check_violation
   if (codigo === "23514") {
+    if (constraint.includes("profesor_telefono")) {
+      return new ValidationError("TELEFONO_INVALIDO", "El teléfono debe tener 10 u 11 dígitos, sin guiones.", "telefono");
+    }
+    if (constraint.includes("agenda_profesional_30min")) {
+      return new ValidationError("HORA_NO_PERMITIDA", "La hora debe ser HH:00 o HH:30.", "horaInicio");
+    }
+    if (constraint.includes("agenda_profesional_rango")) {
+      return new ValidationError("RANGO_HORARIO_INVALIDO", "La hora de fin tiene que ser posterior a la de inicio.", "horaFin");
+    }
     if (constraint.includes("stock_no_negativo")) {
       return new BusinessRuleError(
         "STOCK_NEGATIVO",
@@ -338,6 +365,24 @@ export function traducirErrorPostgres(e: unknown): AppError | null {
         "STOCK_INSUFICIENTE",
         "No hay stock suficiente para registrar este egreso.",
       );
+    }
+    if (/no tiene rol Profesor/i.test(mensaje) || /no puede tener ficha de profesor/i.test(mensaje)) {
+      return new ValidationError("USUARIO_NO_ES_PROFESOR", "El usuario no tiene rol Profesor.", "usuarioId");
+    }
+    if (/está inactivo/i.test(mensaje) && /usuario/i.test(mensaje)) {
+      return new ValidationError("USUARIO_INACTIVO", "El usuario está inactivo.", "usuarioId");
+    }
+    if (/no tiene academia asignada/i.test(mensaje)) {
+      return new ValidationError("USUARIO_SIN_ACADEMIA", "El usuario no tiene academia asignada.", "usuarioId");
+    }
+    if (/está dentro del horario de atención/i.test(mensaje) || /debe estar dentro del horario de atención/i.test(mensaje)) {
+      return new ValidationError("FUERA_DE_HORARIO_ATENCION", mensaje, "horaInicio");
+    }
+    if (/no pertenece a la academia/i.test(mensaje)) {
+      return new ValidationError("PROFESOR_DE_OTRA_ACADEMIA", mensaje);
+    }
+    if (/está inactiva y no puede asignarse/i.test(mensaje)) {
+      return new ValidationError("MATERIA_INACTIVA", mensaje, "materias");
     }
     return new BusinessRuleError(
       "REGLA_RECHAZADA",
