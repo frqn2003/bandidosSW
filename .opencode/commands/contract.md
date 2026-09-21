@@ -1,17 +1,31 @@
 ---
-description: "Crear o revisar contratos de API (contracts). Lee docs/api-contracts.md antes de empezar."
+description: "Crear o revisar contratos de API (contracts). Lee docs/api-contracts.md y revisa docs/contratos/ + src/contracts/ antes de empezar."
 ---
 
 # /contract — Flujo de Contratos de API
 
 > **Somos el equipo de FRONT-END.** El contrato se comparte con el back, pero los pasos de implementación que nos corresponden son solo los del front.
 
-## Paso 0: Leer la guía de contratos
+## Paso 0: Leer la guía y revisar los contratos existentes
 
-Antes de hacer CUALQUIER cosa, leer el archivo `docs/api-contracts.md` completo.
-Ese archivo define las reglas, la estructura y los ejemplos que se deben seguir al pie de la letra.
+Antes de hacer CUALQUIER cosa:
 
-Si el archivo no existe, informar al usuario y detenerse.
+1. **Leer la guía de contratos**: el archivo `docs/api-contracts.md` completo.
+   Ese archivo define las reglas, la estructura y los ejemplos que se deben seguir al pie de la letra.
+   Si el archivo no existe, informar al usuario y detenerse.
+
+2. **Revisar los contratos que YA existen** (siempre, en cada uso del comando):
+   - Guías de uso: `docs/contratos/*.md` — leer la de la entidad que se está contratando
+     y, si corresponde, las que comparten tipos (ej. `usuario.md` cuando el contrato
+     referencia un `usuarioId`).
+   - Contratos tipados: `src/contracts/*.ts` — revisar estructura, convenciones,
+     errores de dominio y tipos ya definidos.
+
+   Esto sirve para:
+   - **No duplicar** un contrato que ya existe (si existe, NO se regenera: se revisa/ajusta).
+   - **Reutilizar** tipos, rutas y campos ya acordados (ej. `usuarioId`, `estado`)
+     en vez de inventar nombres nuevos.
+   - **Imitar** exactamente el estilo y la estructura de los contratos existentes.
 
 ## Paso 1: Entender el contexto
 
@@ -23,7 +37,11 @@ Preguntar al usuario (si no lo especificó):
 
 ## Paso 2: Generar el contrato
 
-Crear el archivo `src/contracts/{entidad}.ts` siguiendo EXACTAMENTE la estructura de `docs/api-contracts.md`:
+> Si el Paso 0 encontró un contrato ya existente para la entidad, **NO crear uno nuevo**:
+> revisar el existente contra lo que pidió el usuario y reportar qué falta o qué se ajusta.
+
+Crear el archivo `src/contracts/{entidad}.ts` siguiendo EXACTAMENTE la estructura de `docs/api-contracts.md`
+y el estilo de los contratos ya existentes en `src/contracts/` (los revisados en el Paso 0):
 
 1. **Rutas** — constantes y funciones helper
 2. **Request: filtros del listado** — schema Zod con `.strict()`
@@ -57,6 +75,7 @@ export const GET = withRoute(async () => ok(FIXTURE));
 ## Paso 4: Verificar reglas clave
 
 Confirmar que se cumple:
+- [ ] Se revisaron `docs/contratos/` y `src/contracts/` (Paso 0): sin duplicados, sin campos inventados
 - [ ] El contrato va ANTES de la pantalla o el service
 - [ ] Solo va: ruta, request, response, errores
 - [ ] No va: SQL, reglas de negocio, componentes
@@ -67,7 +86,8 @@ Confirmar que se cumple:
 ## Paso 5: Reportar
 
 Entregar al usuario:
-- Ruta del contrato creado
+- Contratos existentes revisados en `docs/contratos/` y `src/contracts/` (qué se encontró y cómo se reusó)
+- Ruta del contrato creado (o del existente revisado)
 - Resumen de operaciones y campos
 - Errores de dominio definidos
 - Si se creó stub: ruta del stub y recordatorio de que es temporal
