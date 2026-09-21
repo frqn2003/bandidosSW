@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import { Icon } from "@/components/ui/Icon";
 
 // Etiqueta de estado del sistema (pill + punto/ícono + texto).
 // Único punto de verdad para los colores de estado (tokens status-*).
@@ -27,25 +27,26 @@ const variantStyles: Record<StatusVariant, { chip: string; accent: string }> = {
     accent: "bg-status-pink",
   },
   neutral: {
-    chip: "bg-cream-100 text-text-secondary",
-    accent: "bg-text-secondary",
+    chip: "bg-surface-container-high text-on-surface-variant",
+    accent: "bg-status-neutral",
   },
 };
 
 interface StatusBadgeProps {
   variant: StatusVariant;
   label: string;
-  icon?: LucideIcon;
+  /** Nombre del símbolo Material Symbols (ej. "check_circle"). Reemplaza al punto. */
+  icon?: string;
 }
 
-export function StatusBadge({ variant, label, icon: Icon }: StatusBadgeProps) {
+export function StatusBadge({ variant, label, icon }: StatusBadgeProps) {
   const style = variantStyles[variant];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-bold ${style.chip}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${style.chip}`}
     >
-      {Icon ? (
-        <Icon className="h-3.5 w-3.5" aria-hidden={true} />
+      {icon ? (
+        <Icon name={icon} size={14} />
       ) : (
         <span className={`h-2 w-2 rounded-full ${style.accent}`} aria-hidden="true" />
       )}
