@@ -69,9 +69,11 @@ export interface DbTables {
     hora_fin: string;
     estado: EstadoActivoInactivo;  // auto (default)
   };
-  alumno: {
-    id: number;  // auto (identity)
-    legajo: string;  // auto (generated stored)
+  articulo: {
+    id: number;  // auto (default)
+    categoria_id: number;
+    unidad_medida_id: number;
+    codigo: string;
     nombre: string;
     apellido: string;
     dni: string;
@@ -87,7 +89,7 @@ export interface DbTables {
     updated_at: Date;  // auto (default)
   };
   auditoria: {
-    id: string;  // auto (identity, bigint)
+    id: string;  // auto (default)
     tabla: string;
     operacion: TipoOperacionAuditoria;
     registro_id: number;
@@ -97,7 +99,7 @@ export interface DbTables {
     valores_nuevos: unknown | null;
   };
   auditoria_sesion: {
-    id: string;  // auto (identity, bigint)
+    id: number;  // auto (identity)
     usuario_id: number | null;
     evento: TipoEventoSesion;
     fecha_hora: Date;  // auto (default)
@@ -131,9 +133,29 @@ export interface DbTables {
   };
   profesor_materia: {
     id: number;  // auto (identity)
-    profesor_id: number;
-    materia_id: number;
-    capacidad_maxima: number;
+    nombre: string;
+    duracion_estimada_minutos: number | null;
+    estado: EstadoActivoInactivo;  // auto (default)
+  };
+  presentacion: {
+    id: number;  // auto (default)
+    nombre: string;
+  };
+  proveedor: {
+    id: number;  // auto (default)
+    razon_social: string;
+    cuit: string;
+    direccion: string | null;
+    telefono: string | null;
+    email: string | null;
+    contacto: string | null;
+    plazo_entrega_dias: number | null;
+    estado: EstadoActivoInactivo;  // auto (default)
+    calificacion: string | null;
+  };
+  proveedor_forma_pago: {
+    proveedor_id: number;
+    forma_pago_id: number;
   };
   rol: {
     id: number;  // auto (identity)
@@ -141,10 +163,12 @@ export interface DbTables {
   };
   turno: {
     id: number;  // auto (identity)
-    codigo: string;  // auto (generated stored)
-    alumno_id: number;
-    profesor_id: number;
-    materia_id: number;
+    cliente_id: number;
+    mascota_id: number;
+    sucursal_id: number;
+    agenda_profesional_id: number;
+    practica_id: number;
+    estado_id: number;  // auto (default)
     fecha: Date;
     hora_inicio: string;
     hora_fin: string;
@@ -163,10 +187,9 @@ export interface DbTables {
     dni: string;
     email: string;
     estado: EstadoActivoInactivo;  // auto (default)
-    auth_id: string | null;
+    fecha_creacion: Date;  // auto (default)
     intentos_fallidos: number;  // auto (default)
     bloqueado_hasta: Date | null;
-    fecha_creacion: Date;  // auto (default)
   };
 }
 

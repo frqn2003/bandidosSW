@@ -13,7 +13,11 @@ export const metadata: Metadata = {
   description: "Sistema de gestión académica — alumnos, docentes, turnos, asistencia y cobranzas",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html
       lang="es"
