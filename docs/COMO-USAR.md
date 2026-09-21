@@ -12,7 +12,7 @@ Los cuatro comandos que se usan a diario. Van siempre precedidos de `/` y se esc
 
 ### `/contract` — Definir contrato de API
 
-Define el contrato de una entidad: rutas, request/response con Zod, errores, tipos TypeScript. **No codea la ruta ni el service**, solo el contrato. Se escribe ANTES de que exista la pantalla o el service.
+Define el contrato de una entidad: rutas, request/response con Zod, errores, tipos TypeScript. **No codea la ruta ni el service**, solo el contrato. Se ejecuta DESPUÉS de `/disenar`: lee el código generado y extrae los types que el front realmente necesita.
 
 ```
 /contract alumno
@@ -134,14 +134,14 @@ Tokens completos en `design-system/bandidossw/MASTER.md`.
 ## Sección 3 — Orden de comandos para una HU
 
 ```
-1. /contract <entidad>              ← define el contrato API (types + Zod)
-2. /brief "HU-XXX: Como <rol>, quiero <acción>, para <beneficio>. Idea: <tu propuesta>"
-3. /disenar HU-XXX                  ← codea usando los tipos del contrato
+1. /brief "HU-XXX: Como <rol>, quiero <acción>, para <beneficio>. Idea: <tu propuesta>"
+2. /disenar HU-XXX                  ← codea la pantalla con datos hardcodeados
+3. /contract HU-XXX                 ← analiza el código generado → genera contrato (types + Zod)
 4. (probar en el navegador con npm run dev)
 5. /subir   (con confirmación)
 ```
 
-> Si la entidad ya tiene contrato, arrancá directo por `/brief`.
+> **Flujo:** el brief define qué se necesita, `/disenar` lo implementa con datos hardcodeados, y `/contract` lee el código resultante para extraer los types reales que el front necesita. El contrato se genera DESPUÉS del diseño, no antes — así los types reflejan lo que el código realmente usa, no lo que se imaginó en papel.
 
 ---
 

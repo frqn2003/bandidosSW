@@ -1,43 +1,85 @@
-# /subir — Publicar cambios en GitHub
+---
+description: Sube los cambios del repo Centro Académico a GitHub con confirmación. Detecta el tipo de cambio (feat/fix/chore/docs), valida el mensaje contra la convención, avisa la rama actual y pushea a origin tras tu OK. Ej: /subir "feat: pantalla asistencia (HU-001)".
+agent: build
+---
 
-Sube los cambios a GitHub **con confirmación explícita**. Detecta el tipo de cambio, valida el mensaje y confirma la rama.
+# Comando /subir — Publicar cambios en GitHub
 
-## Uso
+Publica los cambios del repo **Centro Académico** en GitHub (`origin`). **Nunca commitear ni pushear sin confirmación explícita del usuario.**
 
-```
-/subir
-```
-o con mensaje:
-```
-/subir "feat: tabla de alumnos (HU-CEL-01)"
-```
+> Nota técnica: `git` no está en el PATH de PowerShell. Usá SIEMPRE la ruta completa: `C:\Program Files\Git\cmd\git.exe` (definila una vez al inicio como `$GIT`).
 
-## Qué hace (pasos en orden)
+---
 
-1. **Paso 1 — Inspecciona**: rama actual, status, diff, log.
-2. **Paso 2 — Confirma la rama**: te dice en qué rama estás y a dónde va a pushear. Si hay trabajo a medias de otra tarea, avisa.
-3. **Paso 3 — Detecta el tipo** automáticamente por los archivos que toca:
+## Paso 1 — Inspeccionar el estado
 
-   | Tipo | Toca | Prefijo |
-   |---|---|---|
-   | `feat` | `src/app/**` o `src/components/**` | `feat: <pantalla> (HU-XXX)` |
-   | `fix` | `src/**` (corrección) | `fix: <descripción> (HU-XXX)` |
-   | `docs` | `docs/**`, `*.md` | `docs: <descripción>` |
-   | `chore` | `.opencode/`, config, herramientas | `chore: <descripción>` |
+1. Definí `$GIT = "C:\Program Files\Git\cmd\git.exe"` (si no existe, buscá con `Get-Command git` o `where.exe git`).
+2. Corré en el directorio del proyecto:
+   - `$BRANCH = & $GIT branch --show-current` → rama actual.
+   - `& $GIT status --short` → archivos modificados/nuevos/borrados.
+   - `& $GIT diff --stat` → tamaño de los cambios (y `& $GIT diff --cached --stat` si hay staged).
+   - `& $GIT log --oneline -8` → estilo de mensajes del repo.
+3. Revisá que NO haya archivos sensibles a subir (`.env`, claves, credenciales, `node_modules/`, artefactos de build). Si hay algo dudoso, parar y preguntar.
 
-4. **Paso 4 — Valida el mensaje** contra la convención (debe empezar con `feat:`/`fix:`/`chore:`/`docs:`, referencia HU en feat/fix). Advierte si no cumple.
-5. **Paso 5 — Confirma**: te muestra el resumen y propone el mensaje. **Pregunta antes de commitear y pushear.**
-6. **Paso 6 — Push**: `git push origin <rama>` (explícito) + verifica que quede limpio.
+## Paso 2 — Confirmar la rama
 
-## Regla de oro
+1. Mostrá la rama actual: **"Estás en la rama `$BRANCH`."**
+2. Si hay upstream configurado, avisá a dónde va a pushear (`& $GIT rev-parse --abbrev-ref --symbolic-full-name "@{u}"`). Si NO hay upstream o la rama no coincide con la esperada, preguntá antes de continuar:
+   - **"¿Pusheo a `origin/$BRANCH`?"** → sí / no (indicá otra rama o cancelá).
+3. **Guarda de checkpoint:** si hay archivos sin commitear que NO forman parte del cambio que querés subir, avisá y preguntá si los incluís o si conviene commitearlos aparte primero.
 
-**Nunca commitea ni pushea sin tu confirmación.**
+## Paso 3 — Detectar tipo de cambio y proponer mensaje
 
-## Convención de mensajes
+Detectá el **tipo de cambio automáticamente** a partir de los archivos del diff:
 
-- Formato: `<tipo>: <descripción> (HU-XXX)`
-- Ejemplos:
-  - `feat: tabla de alumnos (HU-CEL-01)`
-  - `fix: corrección de filtros en turnos (HU-TUR-02)`
-  - `docs: actualización de brief HU-CEL-01`
-  - `chore: configuración de eslint`
+| Tipo | Dispara cuando toca | Prefijo |
+|---|---|---|
+| `feat` | `src/app/**` o `src/components/**` (pantalla/feature de HU) | `feat: <pantalla> (HU-XXX)` |
+| `fix` | `src/**` (corrección de algo ya existente) | `fix: <descripción> (HU-XXX)` |
+| `docs` | `docs/**`, `*.md` (documentación) | `docs: <descripción>` |
+| `chore` | `.opencode/`, `.agents/`, config, herramientas, infra | `chore: <descripción>` |
+
+Reglas de clasificación:
+- Si el diff toca **solo** `.opencode/`, `.agents/`, config o herramientas → `chore`.
+- Si toca **solo** `docs/` → `docs`.
+- Si toca `src/**` + otra cosa → clasificar por la parte principal de `src/**`.
+- Si toca varias HUs distintas, proponer el de la acción principal; si es ambiguo, preguntar.
+
+**Mensaje propuesto:**
+- Si el usuario pasó argumento (`/subir "mensaje"`), usarlo, pero **validarlo** (paso 4).
+- Si no, derivar del tipo detectado + resumen del diff.
+
+## Paso 4 — Validar el mensaje
+
+Antes de commitear, validá que el mensaje siga la convención del repo:
+
+- Debe empezar con `feat:` / `fix:` / `chore:` / `docs:`.
+- Las HU (feat/fix) deben referenciar la HU al final entre paréntesis `(HU-XXX)` cuando corresponda.
+- Conciso, en español.
+
+Si el mensaje NO cumple, **advertí y proponé una corrección** antes de commitear. Nunca commitees un mensaje fuera de convención sin avisar.
+
+## Paso 5 — Confirmación y commit
+
+1. Mostrá el **resumen del diff** (archivos + stats), la **rama** y el **mensaje propuesto** (con su tipo detectado).
+2. Preguntá explícitamente: **"¿Confirmás el commit y push en `origin/$BRANCH` con el mensaje: <mensaje>?"**
+   - **Sí** → `& $GIT add -A` + `& $GIT commit -m "<mensaje>"`.
+   - **No / ajustes** → aplicá lo que pida (mensaje distinto, archivos excluidos) y volvé a preguntar.
+   - **Solo commit, sin push** → commitear y avisar que el push queda pendiente.
+   - **Dejarlo local** → no commitear nada; avisar que los cambios quedan en el working tree.
+3. Si el commit falla o un hook lo rechaza, corregí el problema y creá un commit nuevo (no amendar).
+
+## Paso 6 — Push y verificación
+
+1. `& $GIT push origin $BRANCH` (rama explícita, no solo `origin`). Si no hay remote configurado, avisar y preguntar la URL.
+2. Verificá con `& $GIT log --oneline -3` y `& $GIT status --short` (debe quedar limpio).
+3. Avisá al usuario que se subió y mostrá el hash/descripción del commit.
+
+## Recordatorio de reglas
+
+- Nunca pushear sin confirmación explícita (preguntar siempre).
+- Nunca commitear secretos ni archivos fuera del alcance del cambio pedido.
+- Mensajes concisos en español, estilo convencional, referenciando la HU cuando corresponda.
+- **Validar SIEMPRE el mensaje** contra la convención antes de commitear; advertir si no cumple.
+- Detectar el tipo de cambio (feat/fix/docs/chore) por los archivos que toca, no asumir.
+- Confirmar la rama antes de pushear (`git push origin <rama>` explícito).

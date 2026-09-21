@@ -1,6 +1,6 @@
 # /contract — Definir contrato de API
 
-Define el contrato de una entidad: rutas, request/response con Zod, errores, tipos TypeScript. **No codea la ruta ni el service**, solo el contrato. Se escribe ANTES de que exista la pantalla o el service.
+Define el contrato de una entidad: rutas, request/response con Zod, errores, tipos TypeScript. **No codea la ruta ni el service**, solo el contrato. Se ejecuta DESPUÉS de `/disenar`: lee el código generado y extrae los types que el front realmente necesita.
 
 ## Uso
 
@@ -76,7 +76,7 @@ El agente genera `src/contracts/alumno.ts` con:
 
 ## Después del contrato
 
-Una vez creado el contrato, se puede:
-1. `/brief` — usar los tipos del contrato para el brief de la pantalla
-2. `/disenar` — codear con los tipos ya definidos (el front importa del contrato)
-3. El back implementa service + route.ts usando los mismos tipos
+Una vez creado el contrato (que ya fue diseñado con `/disenar`):
+1. Probar con `npm run dev`
+2. `/subir` — publicar los cambios en GitHub
+3. El back implementa service + route.ts usando los mismos tipos del contrato
