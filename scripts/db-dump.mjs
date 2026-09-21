@@ -280,6 +280,8 @@ ${v.definition.trim()}
     partes.push("");
   }
 
+  const { mkdir } = await import("node:fs/promises");
+  await mkdir(dirname(SALIDA), { recursive: true });
   await writeFile(SALIDA, partes.join("\n"), "utf8");
 
   console.log(`✓ db/schema.sql actualizado`);
