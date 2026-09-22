@@ -90,8 +90,18 @@ const camposAlumno = z
     email: z.string().trim().max(120).email().nullable().default(null),
     nivelEducativo: z.enum(["Primario", "Secundario", "Universitario"]),
     responsableNombre: z.string().trim().max(100).nullable().default(null),
-    responsableDni: z.string().trim().regex(DOCUMENTO).nullable().default(null),
-    responsableTelefono: z.string().trim().regex(TELEFONO).nullable().default(null),
+    responsableDni: z
+      .string()
+      .trim()
+      .regex(DOCUMENTO, "El DNI del responsable debe tener 7 u 8 dígitos.")
+      .nullable()
+      .default(null),
+    responsableTelefono: z
+      .string()
+      .trim()
+      .regex(TELEFONO, "El teléfono del responsable debe tener 10 u 11 dígitos, sin guiones.")
+      .nullable()
+      .default(null),
   })
   .strict()
   // ck_alumno_responsable_menor, del lado del front. El `path` hace que el
