@@ -4,18 +4,29 @@
 
 import type { Profesor } from "@/data/profesores";
 
-/** Franja horaria del formulario de disponibilidad. `dia` es 1-6 (ISO, Lun-Sáb). */
+/**
+ * Franja horaria del formulario de disponibilidad. `dia` es 1-6 (ISO, Lun-Sáb).
+ *
+ * `desde` y `hasta` arrancan en "" (sin elegir): el orden de carga es
+ * obligatorio — primero la hora de inicio y recién después la de fin, que solo
+ * ofrece horarios posteriores. Ver `horariosHasta`.
+ */
 export interface FranjaForm {
   id: number;
   dia: string; // "1".."6"
-  desde: string; // "HH:MM"
-  hasta: string; // "HH:MM"
+  desde: string; // "" | "HH:MM"
+  hasta: string; // "" | "HH:MM"
 }
 
 let siguienteIdFranja = 1;
 
 export function nuevoIdFranja(): number {
   return siguienteIdFranja++;
+}
+
+/** Franja vacía para agregar a la lista: el día viene puesto, las horas no. */
+export function nuevaFranja(dia = "1"): FranjaForm {
+  return { id: nuevoIdFranja(), dia, desde: "", hasta: "" };
 }
 
 /** Horarios cada 30 min, de 08:00 a 19:30 (rango de atención de la sede). */
@@ -48,6 +59,22 @@ export const DIAS_SEMANA_SELECT = [
 export function aMin(h: string): number {
   const [hh, mm] = h.split(":").map(Number);
   return hh * 60 + mm;
+}
+
+/**
+ * Horarios válidos para la hora de FIN de una franja: solo los posteriores a la
+ * de inicio. Sin inicio elegido no hay opciones — el select queda deshabilitado.
+ */
+export function horariosHasta(desde: string): string[] {
+  if (!desde) return [];
+  return HORARIOS_OPCIONES.filter((h) => aMin(h) > aMin(desde));
+}
+
+/** Horas de una franja (1 decimal). 0 si está incompleta o al revés. */
+export function horasEntre(desde: string, hasta: string): number {
+  if (!desde || !hasta) return 0;
+  const diff = (aMin(hasta) - aMin(desde)) / 60;
+  return diff > 0 ? Math.round(diff * 10) / 10 : 0;
 }
 
 export function horaMasMin(h: string, minutos: number): string {
@@ -109,20 +136,29 @@ export function franjasDesdeBloques(bloques: Record<number, string[]>): FranjaFo
   return franjas;
 }
 
-/** Validación de franjas: fin posterior a inicio y sin superposición por día. */
+/**
+ * Validación de franjas: horas completas, fin posterior al inicio y sin
+ * superposición por día. Una franja a medias se señala sola y no entra en el
+ * chequeo de superposición (no hay con qué compararla).
+ */
 export function validarFranjas(franjas: FranjaForm[]): Record<string, string> {
   const errores: Record<string, string> = {};
   for (const f of franjas) {
-    if (aMin(f.hasta) <= aMin(f.desde)) {
+    if (!f.desde) {
+      errores[f.id] = "Elegí la hora de inicio";
+    } else if (!f.hasta) {
+      errores[f.id] = "Elegí la hora de fin";
+    } else if (aMin(f.hasta) <= aMin(f.desde)) {
       errores[f.id] = "La hora de fin debe ser posterior al inicio";
     }
   }
-  for (let i = 0; i < franjas.length; i++) {
-    const f = franjas[i];
+  const completas = franjas.filter((f) => f.desde && f.hasta);
+  for (let i = 0; i < completas.length; i++) {
+    const f = completas[i];
     if (errores[f.id]) continue;
-    for (let j = 0; j < franjas.length; j++) {
+    for (let j = 0; j < completas.length; j++) {
       if (i === j) continue;
-      const g = franjas[j];
+      const g = completas[j];
       if (f.dia === g.dia && aMin(f.desde) < aMin(g.hasta) && aMin(f.hasta) > aMin(g.desde)) {
         errores[f.id] = "Se superpone con otra franja";
         break;
@@ -136,6 +172,7 @@ export function validarFranjas(franjas: FranjaForm[]): Record<string, string> {
 export function bloquesDesdeFranjas(franjas: Array<Omit<FranjaForm, "id">>): Record<number, string[]> {
   const bloques: Record<number, string[]> = {};
   for (const f of franjas) {
+    if (!f.desde || !f.hasta) continue; // franja a medias: la validación ya la frenó
     const dia = Number(f.dia);
     if (!bloques[dia]) bloques[dia] = [];
     bloques[dia].push(`${f.desde}-${f.hasta}`);

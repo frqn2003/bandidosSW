@@ -12,6 +12,8 @@ import {
   aMin,
   bloquesDesdeFranjas,
   franjasDesdeBloques,
+  horariosHasta,
+  horasEntre,
   validarFranjas,
   type FranjaForm,
 } from "@/lib/profesores";
@@ -51,23 +53,32 @@ export function BloquesDisponibilidadModal({
     setFranjas((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
   };
 
+  /**
+   * Cambiar la hora de inicio limpia una hora de fin que ya no sea posterior:
+   * el select de fin solo ofrece horarios mayores, así que dejar el valor viejo
+   * mostraría una opción que ya no está en la lista.
+   */
+  const cambiarDesde = (id: number, desde: string) => {
+    setFranjas((prev) =>
+      prev.map((f) =>
+        f.id === id
+          ? { ...f, desde, hasta: f.hasta && aMin(f.hasta) > aMin(desde) ? f.hasta : "" }
+          : f,
+      ),
+    );
+  };
+
   const quitarFranja = (id: number) => {
     setFranjas((prev) => prev.filter((f) => f.id !== id));
   };
 
   // BACKEND: PUT /api/profesores/:id/disponibilidad (franjas → agenda_profesional)
+  // Las franjas a medias suman 0: la hora de fin todavía no se eligió.
   const totalHoras = useMemo(
     () =>
-      Math.round(
-        franjas.reduce((acc, f) => acc + (aMin(f.hasta) - aMin(f.desde)) / 60, 0) * 10,
-      ) / 10,
+      Math.round(franjas.reduce((acc, f) => acc + horasEntre(f.desde, f.hasta), 0) * 10) / 10,
     [franjas],
   );
-
-  const horasDeFranja = (f: FranjaForm) =>
-    aMin(f.hasta) > aMin(f.desde)
-      ? Math.round(((aMin(f.hasta) - aMin(f.desde)) / 60) * 10) / 10
-      : 0;
 
   const erroresFranjas = useMemo(
     () => (envio ? validarFranjas(franjas) : {}),
@@ -155,9 +166,13 @@ export function BloquesDisponibilidadModal({
                         id={`bloque-desde-${franja.id}`}
                         aria-label={`Hora de inicio del día ${franja.dia}`}
                         value={franja.desde}
-                        onChange={(e) => actualizarFranja(franja.id, { desde: e.target.value })}
+                        onChange={(e) => cambiarDesde(franja.id, e.target.value)}
                         className="h-10 min-h-10 w-full px-2 text-sm"
                       >
+                        {/* Obligatoria y primera: sin ella no se habilita la hora de fin. */}
+                        <option value="" disabled>
+                          Elegí hora
+                        </option>
                         {HORARIOS_OPCIONES.map((h) => (
                           <option key={h} value={h}>
                             {h}
@@ -171,10 +186,16 @@ export function BloquesDisponibilidadModal({
                         id={`bloque-hasta-${franja.id}`}
                         aria-label={`Hora de fin del día ${franja.dia}`}
                         value={franja.hasta}
+                        disabled={!franja.desde}
+                        title={!franja.desde ? "Elegí primero la hora de inicio" : undefined}
                         onChange={(e) => actualizarFranja(franja.id, { hasta: e.target.value })}
                         className="h-10 min-h-10 w-full px-2 text-sm"
                       >
-                        {HORARIOS_OPCIONES.map((h) => (
+                        <option value="" disabled>
+                          {franja.desde ? "Elegí hora" : "Elegí el inicio"}
+                        </option>
+                        {/* Solo horarios posteriores al inicio. */}
+                        {horariosHasta(franja.desde).map((h) => (
                           <option key={h} value={h}>
                             {h}
                           </option>
@@ -182,7 +203,7 @@ export function BloquesDisponibilidadModal({
                       </Select>
                     </div>
                     <span className="w-12 text-right text-xs font-bold text-on-surface-variant">
-                      {horasDeFranja(franja).toFixed(1)} h
+                      {horasEntre(franja.desde, franja.hasta).toFixed(1)} h
                     </span>
                     <Button
                       type="button"

@@ -182,7 +182,9 @@ import {
   RUTA,
   rutaProfesor,
   rutaInactivar,
+  rutaCandidatos,
   type CrearProfesorBody,
+  type CandidatoProfesorResponse,
   type ProfesorResponse,
   type ProfesorOpcion,
   type ErrorProfesor,
@@ -195,14 +197,15 @@ import {
 const profesores = await apiGet<ProfesorResponse[]>(`${RUTA}?estado=activo`);
 
 // Los dos combos del formulario, en un solo efecto (no un useCatalogo por cada uno):
-const [usuarios, materias] = await Promise.all([
-  apiGetOpcional<UsuarioResponse[]>("/api/usuarios?estado=activo", []),
+const [candidatos, materias] = await Promise.all([
+  apiGetOpcional<CandidatoProfesorResponse[]>(rutaCandidatos, []),
   apiGetOpcional<MateriaOpcion[]>("/api/materias?estado=activo", []),
 ]);
-
-// Solo los usuarios con rol Profesor que todavía no tienen ficha:
-const candidatos = usuarios.filter((u) => u.rol.nombre === "Profesor");
 ```
+
+`rutaCandidatos` ya devuelve los usuarios con rol Profesor, activos, con academia y
+**sin ficha**: son los únicos ids que `crearProfesorBody.usuarioId` acepta. Filtrar
+`/api/usuarios` en el front no alcanza — desde ahí no se ve quién ya tiene ficha.
 
 ## 3. Armar el body tipado
 

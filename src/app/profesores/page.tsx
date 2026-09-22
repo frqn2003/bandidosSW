@@ -1,13 +1,27 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type {
+  CrearProfesorBody,
+  EditarProfesorBody,
+  ErrorProfesor,
+} from "@/contracts/profesor";
+import { ApiError, mensajeDeError } from "@/lib/api-client";
 import {
-  MATERIAS_CATALOGO,
-  PROFESORES,
-  TURNOS_FUTUROS_POR_PROFESOR,
-  USUARIOS_SIN_FICHA,
   VACIO_COPY,
+  aProfesor,
+  bloquesPorDiaDesde,
+  crearProfesor,
+  editarProfesor,
+  inactivarProfesor,
+  listarBloquesDe,
+  listarCandidatos,
+  listarMateriasCatalogo,
+  listarProfesores,
+  turnosFuturosDe,
+  type MateriaRef,
   type Profesor,
+  type UsuarioSinFicha,
 } from "@/data/profesores";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -35,6 +49,40 @@ const FILTROS_INICIALES: FiltrosProfesoresState = {
 };
 const PAGE_SIZE_DEFAULT = 10;
 
+type EstadoCarga = "cargando" | "error" | "listo";
+
+/** Traduce un error de la API a lo que muestra la pantalla. */
+function codigoDe(e: unknown): ErrorProfesor | undefined {
+  return (e instanceof ApiError ? e.codigo : undefined) as ErrorProfesor | undefined;
+}
+
+/** Error de la API → { campo, mensaje } para el formulario. */
+function errorDeFormulario(e: unknown): { campo?: string; mensaje: string } {
+  const codigo = codigoDe(e);
+  switch (codigo) {
+    case "USUARIO_YA_ES_PROFESOR":
+      return { campo: "usuarioId", mensaje: "Ese usuario ya tiene ficha de profesor." };
+    case "USUARIO_NO_ES_PROFESOR":
+    case "USUARIO_SIN_ACADEMIA":
+    case "USUARIO_INACTIVO":
+    case "REFERENCIA_INVALIDA":
+      return { campo: "usuarioId", mensaje: mensajeDeError(e) };
+    case "MATERIA_INACTIVA":
+    case "MATERIA_DUPLICADA":
+    case "MATERIAS_REQUERIDAS":
+      return { campo: "materias", mensaje: mensajeDeError(e) };
+    case "MATERIA_CON_TURNOS_FUTUROS":
+      return {
+        campo: "materias",
+        mensaje: "No se puede quitar esa materia: tiene turnos reservados.",
+      };
+    case "PROFESOR_CON_TURNOS_FUTUROS":
+      return { mensaje: "No se puede dar de baja: el profesor tiene turnos reservados." };
+    default:
+      return { campo: e instanceof ApiError ? e.campo : undefined, mensaje: mensajeDeError(e) };
+  }
+}
+
 function CuerpoDocenteContent() {
   const { showToast } = useToast();
   const [filtros, setFiltros] = useState(FILTROS_INICIALES);
@@ -49,120 +97,257 @@ function CuerpoDocenteContent() {
   const [bloquesDe, setBloquesDe] = useState<Profesor | null>(null);
   const [bajaDe, setBajaDe] = useState<Profesor | null>(null);
 
-  // BACKEND: GET /api/profesores (JOIN usuario + profesor_materia + materia).
-  const [profesores, setProfesores] = useState<Profesor[]>(PROFESORES);
+  const [profesores, setProfesores] = useState<Profesor[]>([]);
+  const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>("cargando");
+  const [materiasCatalogo, setMateriasCatalogo] = useState<MateriaRef[]>([]);
+  const [usuariosSinFicha, setUsuariosSinFicha] = useState<UsuarioSinFicha[]>([]);
+  const [errorRemoto, setErrorRemoto] = useState<{ campo?: string; mensaje: string } | null>(null);
+  const [guardando, setGuardando] = useState(false);
+
+  /**
+   * Bloques de disponibilidad ya pedidos, por profesor.
+   * Vive en un ref y no en el estado porque es caché, no algo que se renderice:
+   * sobrevive a los refetch del listado y evita volver a pedir lo mismo.
+   */
+  const cacheBloques = useRef(new Map<number, Record<number, string[]>>());
+
+  // Los filtros estructurales van al servidor (el día sale de agenda_profesional,
+  // que el listado no trae). La búsqueda por texto se resuelve abajo, en memoria.
+  const materiaId = filtros.materiaId;
+  const dia = filtros.dia;
+  const estadoFiltro = filtros.estado;
+
+  // NO toca el estado de forma síncrona: solo dentro de los callbacks de la
+  // promesa (regla react-hooks/set-state-in-effect). Devuelve el cleanup.
+  const traer = useCallback(() => {
+    let cancelado = false;
+    listarProfesores({
+      materiaId: materiaId ? Number(materiaId) : undefined,
+      diaSemana: dia ? Number(dia) : undefined,
+      estado: estadoFiltro || undefined,
+    })
+      .then((lista) => {
+        if (cancelado) return;
+        setProfesores(lista.map((p) => aProfesor(p, cacheBloques.current.get(p.id) ?? {})));
+        setEstadoCarga("listo");
+      })
+      .catch(() => {
+        if (!cancelado) setEstadoCarga("error");
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [materiaId, dia, estadoFiltro]);
+
+  useEffect(traer, [traer]);
+
+  // Reintentar es un handler, no un efecto: acá sí se puede volver a "cargando".
+  const reintentar = () => {
+    setEstadoCarga("cargando");
+    traer();
+  };
+
+  // Catálogos del filtro y del formulario. Van con apiGetOpcional (dentro de
+  // `@/data/profesores`): si fallan, la pantalla sigue mostrando el listado.
+  useEffect(() => {
+    let cancelado = false;
+    Promise.all([listarMateriasCatalogo(), listarCandidatos()])
+      .then(([materias, candidatos]) => {
+        if (cancelado) return;
+        setMateriasCatalogo(materias);
+        setUsuariosSinFicha(candidatos);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelado = true;
+    };
+  }, []);
 
   const activos = useMemo(() => profesores.filter((p) => p.estado === "activo").length, [profesores]);
 
-  // Filtros combinables + orden fijo Apellido, Nombre A-Z (exigencia de la HU).
+  // Búsqueda por nombre y apellido + orden fijo Apellido, Nombre A-Z (HU-PRO-01).
   const filas = useMemo(() => {
     const q = filtros.busqueda.trim().toLowerCase();
     return profesores
-      .filter((p) => {
-        if (filtros.estado && p.estado !== filtros.estado) return false;
-        if (filtros.materiaId && !p.materias.some((m) => String(m.materia.id) === filtros.materiaId))
-          return false;
-        if (filtros.dia && !(p.bloquesPorDia[Number(filtros.dia)]?.length)) return false;
-        if (q) {
-          const texto = `${p.nombre} ${p.apellido}`.toLowerCase();
-          if (!texto.includes(q)) return false;
-        }
-        return true;
-      })
+      .filter((p) => !q || `${p.nombre} ${p.apellido}`.toLowerCase().includes(q))
       .sort((a, b) => `${a.apellido} ${a.nombre}`.localeCompare(`${b.apellido} ${b.nombre}`));
-  }, [profesores, filtros]);
+  }, [profesores, filtros.busqueda]);
 
   const totalPages = Math.max(1, Math.ceil(filas.length / pageSize));
-  const pageStart = (pagina - 1) * pageSize + 1;
-  const pageEnd = Math.min(pagina * pageSize, filas.length);
+  const paginaActual = Math.min(pagina, totalPages);
+  const pageStart = (paginaActual - 1) * pageSize + 1;
+  const pageEnd = Math.min(paginaActual * pageSize, filas.length);
   const filasPagina = filas.slice(pageStart - 1, pageEnd);
+
+  // BACKEND: la disponibilidad es otro contrato (GET /api/disponibilidad exige
+  // profesorId), así que se pide de a un profesor y solo para las filas
+  // visibles. Si algún día el listado devuelve el resumen semanal, este efecto
+  // y la caché desaparecen.
+  const idsVisibles = filasPagina.map((p) => p.id).join(",");
+  useEffect(() => {
+    const ids = idsVisibles === "" ? [] : idsVisibles.split(",").map(Number);
+    const pendientes = ids.filter((id) => !cacheBloques.current.has(id));
+    if (pendientes.length === 0) return;
+
+    let cancelado = false;
+    Promise.all(
+      pendientes.map(async (id) => [id, bloquesPorDiaDesde(await listarBloquesDe(id))] as const),
+    )
+      .then((pares) => {
+        for (const [id, bloques] of pares) cacheBloques.current.set(id, bloques);
+        if (cancelado) return;
+        const porId = new Map(pares);
+        setProfesores((prev) =>
+          prev.map((p) => {
+            const bloques = porId.get(p.id);
+            return bloques ? { ...p, bloquesPorDia: bloques } : p;
+          }),
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelado = true;
+    };
+  }, [idsVisibles]);
+
+  const hayFiltros =
+    filtros.busqueda.trim() !== "" ||
+    filtros.materiaId !== "" ||
+    filtros.dia !== "" ||
+    filtros.estado !== "activo";
 
   const cambiarFiltros = (next: FiltrosProfesoresState) => {
     setFiltros(next);
     setPagina(1);
   };
 
-  const abrirNuevo = () => setModalForm({ modo: "INSERCION", profesor: null });
-  const abrirEdicion = (p: Profesor) => setModalForm({ modo: "EDICION", profesor: p });
-
-  const guardarProfesor = (datos: ProfesorFormData) => {
-    // BACKEND: POST /api/profesores (INSERCION) | PUT /api/profesores/:id (EDICION)
-    //         → profesor + profesor_materia + agenda_profesional en una transacción.
-    if (modalForm?.modo === "EDICION" && modalForm.profesor) {
-      const id = modalForm.profesor.id;
-      setProfesores((prev) =>
-        prev.map((p) =>
-          p.id === id
-            ? {
-                ...p,
-                tituloEspecialidad: datos.titulo.trim() === "" ? null : datos.titulo,
-                telefono: datos.telefono,
-                materias: datos.materias.map((m) => ({
-                  materia: m.materia,
-                  capacidadMaxima: Number(m.capacidad),
-                })),
-                capacidadDefault: datos.capacidadDefault,
-                bloquesPorDia: bloquesDesdeFranjas(datos.franjas),
-                estado: datos.estado ? "activo" : "inactivo",
-              }
-            : p,
-        ),
-      );
-      showToast("success", "Ficha actualizada (demo)");
-    } else {
-      const usuario = USUARIOS_SIN_FICHA.find((u) => String(u.id) === datos.usuarioId);
-      if (!usuario) {
-        showToast("error", "Seleccioná un usuario asociado válido");
-        return;
-      }
-      const nuevoId = Math.max(0, ...profesores.map((p) => p.id)) + 1;
-      const nuevoProfesor: Profesor = {
-        id: nuevoId,
-        usuarioId: Number(datos.usuarioId),
-        nombre: usuario.nombre,
-        apellido: usuario.apellido,
-        email: usuario.email,
-        telefono: datos.telefono,
-        tituloEspecialidad: datos.titulo.trim() === "" ? null : datos.titulo,
-        materias: datos.materias.map((m) => ({
-          materia: m.materia,
-          capacidadMaxima: Number(m.capacidad),
-        })),
-        estado: datos.estado ? "activo" : "inactivo",
-        fechaCreacion: new Date().toISOString().slice(0, 10),
-        bloquesPorDia: bloquesDesdeFranjas(datos.franjas),
-        capacidadDefault: datos.capacidadDefault,
-        turnosProgramados: 0,
-        presentismo: 100,
-      };
-      setProfesores((prev) => [...prev, nuevoProfesor]);
-      showToast("success", "Profesor creado (demo)");
-    }
+  const abrirNuevo = () => {
+    setErrorRemoto(null);
+    setModalForm({ modo: "INSERCION", profesor: null });
+  };
+  const abrirEdicion = (p: Profesor) => {
+    setErrorRemoto(null);
+    setModalForm({ modo: "EDICION", profesor: p });
+  };
+  const cerrarForm = () => {
+    setErrorRemoto(null);
     setModalForm(null);
   };
 
+  const guardarProfesor = async (datos: ProfesorFormData) => {
+    const enEdicion = modalForm?.modo === "EDICION" ? modalForm.profesor : null;
+
+    // No hay endpoint de reactivación (POST /api/profesores/:id/activar no
+    // existe): mejor avisar que guardar la mitad.
+    if (enEdicion && enEdicion.estado === "inactivo" && datos.estado) {
+      setErrorRemoto({
+        mensaje:
+          "La reactivación de un profesor todavía no está disponible en la API. Guardá sin activarlo o pedile al equipo de back el endpoint de alta.",
+      });
+      return;
+    }
+
+    // `materias` viaja completa: reemplaza la lista anterior (alta, baja y
+    // cambio de capacidad en una sola operación). El precio es el que ya tenía
+    // asignado el profesor, o el valor de catálogo si la materia es nueva.
+    const materias = datos.materias.map((m) => ({
+      materiaId: m.materia.id,
+      capacidadMaxima: Number(m.capacidad),
+      precio: m.materia.valorClase,
+    }));
+    const ficha = {
+      tituloEspecialidad: datos.titulo.trim() === "" ? null : datos.titulo.trim(),
+      telefono: datos.telefono,
+      materias,
+    };
+
+    setGuardando(true);
+    setErrorRemoto(null);
+    try {
+      if (enEdicion) {
+        const body: EditarProfesorBody = ficha;
+        let actualizado = await editarProfesor(enEdicion.id, body);
+        // El estado no va en el body: la baja tiene su propio endpoint.
+        if (!datos.estado && actualizado.estado === "activo") {
+          actualizado = await inactivarProfesor(enEdicion.id);
+        }
+        const vista = aProfesor(actualizado, enEdicion.bloquesPorDia);
+        setProfesores((prev) => prev.map((p) => (p.id === vista.id ? vista : p)));
+        showToast("success", `Ficha de ${vista.nombre} ${vista.apellido} actualizada.`);
+      } else {
+        const body: CrearProfesorBody = { usuarioId: Number(datos.usuarioId), ...ficha };
+        let creado = await crearProfesor(body);
+        if (!datos.estado) creado = await inactivarProfesor(creado.id);
+        // Se agrega lo que devolvió la API, no el borrador local: trae el `id`
+        // real y lo que la base completó por default.
+        const vista = aProfesor(creado);
+        setProfesores((prev) => [...prev, vista]);
+        // Ese usuario ya tiene ficha: sale del combo de candidatos.
+        setUsuariosSinFicha((prev) => prev.filter((u) => u.id !== creado.usuario.id));
+        showToast("success", `${vista.nombre} ${vista.apellido} quedó dado de alta.`);
+      }
+
+      // BACKEND: las franjas del formulario son agenda_profesional y van por
+      // POST /api/disponibilidad, que pide `agendaSemanalId` (la franja de
+      // atención de la sede). Ese dato todavía no lo expone ninguna ruta
+      // (/api/agenda no existe), así que la disponibilidad NO se persiste acá.
+      const franjasNuevas = bloquesDesdeFranjas(datos.franjas);
+      const franjasActuales = enEdicion?.bloquesPorDia ?? {};
+      if (JSON.stringify(franjasNuevas) !== JSON.stringify(franjasActuales)) {
+        showToast(
+          "error",
+          "Los datos de la ficha se guardaron, pero la disponibilidad horaria no: falta el endpoint de agenda.",
+        );
+      }
+      cerrarForm();
+    } catch (e) {
+      setErrorRemoto(errorDeFormulario(e));
+    } finally {
+      setGuardando(false);
+    }
+  };
+
   const guardarDisponibilidad = (bloquesPorDia: Record<number, string[]>) => {
-    // BACKEND: PUT /api/profesores/:id/disponibilidad
-    if (!bloquesDe) return;
-    setProfesores((prev) =>
-      prev.map((p) => (p.id === bloquesDe.id ? { ...p, bloquesPorDia } : p)),
+    // BACKEND: POST/PUT /api/disponibilidad necesita `agendaSemanalId` (franja
+    // de atención de la academia) y no hay ruta que las liste todavía. Hasta
+    // entonces no se puede guardar: no se toca el estado para no simular un
+    // guardado que la base no tiene.
+    void bloquesPorDia;
+    showToast(
+      "error",
+      "La disponibilidad todavía no se puede guardar desde acá: falta el endpoint de agenda de la sede.",
     );
-    showToast("success", "Disponibilidad guardada (demo)");
     setBloquesDe(null);
   };
 
-  const confirmarBaja = (motivo: string, observaciones: string) => {
+  const confirmarBaja = async (motivo: string, observaciones: string) => {
     if (!bajaDe) return;
-    // BACKEND: PATCH /api/profesores/:id { "estado": "inactivo", motivo, observaciones }
-    //          (auditoría vía trigger sobre profesor).
+    const profesor = bajaDe;
+    // BACKEND: el motivo y las observaciones todavía no viajan — POST
+    // /api/profesores/:id/inactivar no los recibe y la auditoría la escribe el
+    // trigger con el usuario de la sesión.
     void motivo;
     void observaciones;
-    setProfesores((prev) =>
-      prev.map((p) => (p.id === bajaDe.id ? { ...p, estado: "inactivo" } : p)),
-    );
-    setModalForm(null); // si la baja se disparó desde el form de edición
-    showToast("success", "Profesor dado de baja (demo)");
     setBajaDe(null);
+    try {
+      const baja = await inactivarProfesor(profesor.id);
+      const vista = aProfesor(baja, profesor.bloquesPorDia);
+      setProfesores((prev) => prev.map((p) => (p.id === vista.id ? vista : p)));
+      setModalForm(null); // si la baja se disparó desde el form de edición
+      showToast(
+        "success",
+        filtros.estado === "activo"
+          ? `${vista.nombre} ${vista.apellido} quedó inactivo y salió del listado (filtro: Solo activos).`
+          : `${vista.nombre} ${vista.apellido} quedó inactivo.`,
+      );
+    } catch (e) {
+      showToast(
+        "error",
+        codigoDe(e) === "PROFESOR_CON_TURNOS_FUTUROS"
+          ? "No se puede dar de baja: el profesor tiene turnos futuros reservados."
+          : mensajeDeError(e),
+      );
+    }
   };
 
   const abrirFicha = (p: Profesor) => setFichaDe(p);
@@ -208,47 +393,99 @@ function CuerpoDocenteContent() {
           <FiltrosProfesores
             estado={filtros}
             onChange={cambiarFiltros}
-            materiasCatalogo={MATERIAS_CATALOGO}
+            materiasCatalogo={materiasCatalogo}
             totalActivos={activos}
           />
 
-          {filas.length === 0 ? (
-            <section
+          {estadoCarga === "cargando" && (
+            <div
               role="status"
-              className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed border-outline-variant bg-surface-container-lowest px-6 py-16 text-center"
+              aria-live="polite"
+              className="flex flex-col gap-2 rounded-md border border-outline-variant bg-surface-container-lowest p-4"
             >
-              <Icon name="groups" size={40} className="text-on-surface-variant" />
-              <h2 className="text-lg font-bold text-on-surface">{VACIO_COPY.title}</h2>
-              <p className="max-w-sm text-sm font-medium text-on-surface-variant">
-                {VACIO_COPY.description}
-              </p>
-              <Button type="button" onClick={abrirNuevo}>
-                <Icon name="add" size={16} />
-                {VACIO_COPY.cta}
-              </Button>
-            </section>
-          ) : (
-            <div className="overflow-hidden rounded-md border border-outline-variant bg-surface-container-lowest shadow-card">
-              <ProfesoresTable
-                profesores={filasPagina}
-                onVer={abrirFicha}
-                onEditar={abrirEdicion}
-                onVerAgenda={abrirAgenda}
-                onBaja={setBajaDe}
-              />
-              <Pagination
-                page={pagina}
-                totalPages={totalPages}
-                totalItems={filas.length}
-                pageStart={pageStart}
-                pageEnd={pageEnd}
-                pageSize={pageSize}
-                itemLabel="profesores"
-                onPageChange={setPagina}
-                onPageSizeChange={setPageSize}
-              />
+              <span className="sr-only">Cargando profesores…</span>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <span
+                  key={i}
+                  aria-hidden="true"
+                  className="h-11 animate-pulse rounded-sm bg-surface-container-high"
+                />
+              ))}
             </div>
           )}
+
+          {estadoCarga === "error" && (
+            <section
+              role="alert"
+              className="flex flex-col items-center gap-3 rounded-md border border-error/40 bg-error/5 px-6 py-12 text-center"
+            >
+              <Icon name="error" size={40} className="text-error" />
+              <h2 className="text-lg font-bold text-on-surface">
+                No pudimos cargar el cuerpo docente
+              </h2>
+              <p className="max-w-sm text-sm font-medium text-on-surface-variant">
+                Revisá la conexión y volvé a intentar. Si el problema sigue, avisá al equipo.
+              </p>
+              <Button type="button" variant="outline" onClick={reintentar}>
+                <Icon name="refresh" size={16} />
+                Reintentar
+              </Button>
+            </section>
+          )}
+
+          {estadoCarga === "listo" &&
+            (filas.length === 0 ? (
+              <section
+                role="status"
+                className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed border-outline-variant bg-surface-container-lowest px-6 py-16 text-center"
+              >
+                <Icon name="groups" size={40} className="text-on-surface-variant" />
+                <h2 className="text-lg font-bold text-on-surface">
+                  {hayFiltros ? VACIO_COPY.sinResultados.title : VACIO_COPY.sinDatos.title}
+                </h2>
+                <p className="max-w-sm text-sm font-medium text-on-surface-variant">
+                  {hayFiltros
+                    ? VACIO_COPY.sinResultados.description
+                    : VACIO_COPY.sinDatos.description}
+                </p>
+                {hayFiltros ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => cambiarFiltros(FILTROS_INICIALES)}
+                  >
+                    <Icon name="filter_alt_off" size={16} />
+                    {VACIO_COPY.sinResultados.cta}
+                  </Button>
+                ) : (
+                  <Button type="button" onClick={abrirNuevo}>
+                    <Icon name="add" size={16} />
+                    {VACIO_COPY.sinDatos.cta}
+                  </Button>
+                )}
+              </section>
+            ) : (
+              <div className="overflow-hidden rounded-md border border-outline-variant bg-surface-container-lowest shadow-card">
+                <ProfesoresTable
+                  profesores={filasPagina}
+                  onVer={abrirFicha}
+                  onEditar={abrirEdicion}
+                  onVerAgenda={abrirAgenda}
+                  onBaja={setBajaDe}
+                />
+                <Pagination
+                  page={paginaActual}
+                  totalPages={totalPages}
+                  totalItems={filas.length}
+                  pageStart={pageStart}
+                  pageEnd={pageEnd}
+                  pageSize={pageSize}
+                  itemLabel="profesores"
+                  onPageChange={setPagina}
+                  onPageSizeChange={setPageSize}
+                />
+              </div>
+            ))}
         </div>
       </main>
 
@@ -270,7 +507,7 @@ function CuerpoDocenteContent() {
         open={modalForm !== null}
         modo={modalForm?.modo ?? "INSERCION"}
         titulo={modalForm?.modo === "EDICION" ? "Editar Profesor" : "Nuevo Profesor"}
-        onClose={() => setModalForm(null)}
+        onClose={cerrarForm}
         profesor={modalForm?.profesor ?? null}
         onBaja={setBajaDe}
         datosIniciales={
@@ -290,8 +527,10 @@ function CuerpoDocenteContent() {
               }
             : undefined
         }
-        usuariosSinFicha={USUARIOS_SIN_FICHA}
-        materiasCatalogo={MATERIAS_CATALOGO}
+        usuariosSinFicha={usuariosSinFicha}
+        materiasCatalogo={materiasCatalogo}
+        errorRemoto={errorRemoto}
+        guardando={guardando}
         onGuardar={guardarProfesor}
       />
 
@@ -305,7 +544,9 @@ function CuerpoDocenteContent() {
       <BajaProfesorModal
         open={bajaDe !== null}
         profesor={bajaDe}
-        turnosFuturos={bajaDe ? (TURNOS_FUTUROS_POR_PROFESOR[bajaDe.id] ?? 0) : 0}
+        // Aviso previo: lo que el front sabe hoy (todavía sin endpoint de
+        // turnos). El que decide es el 409 PROFESOR_CON_TURNOS_FUTUROS.
+        turnosFuturos={bajaDe ? turnosFuturosDe(bajaDe.id) : 0}
         onClose={() => setBajaDe(null)}
         onConfirmar={confirmarBaja}
       />

@@ -29,10 +29,12 @@ import { z } from "zod";
 //   GET    rutaProfesor(id)     → detalle (con materias y precios)
 //   PUT    rutaProfesor(id)     → editar ficha + materias (reemplaza la lista)
 //   POST   rutaInactivar(id)    → baja lógica (estado = 'inactivo')
+//   GET    rutaCandidatos       → usuarios que todavía pueden recibir una ficha
 
 export const RUTA = "/api/profesores";
 export const rutaProfesor = (id: number) => `${RUTA}/${id}`;
 export const rutaInactivar = (id: number) => `${RUTA}/${id}/inactivar`;
+export const rutaCandidatos = `${RUTA}/candidatos`;
 
 
 // ─── 2a. Request: filtros del listado ────────────────────────────────────
@@ -42,6 +44,7 @@ export const listarProfesoresQuery = z
     busqueda: z.string().trim().optional(),          // nombre, apellido o dni del usuario
     materiaId: z.coerce.number().int().positive().optional(),
     academiaId: z.coerce.number().int().positive().optional(),
+    diaSemana: z.coerce.number().int().min(1).max(6).optional(), // 1 = lunes ... 6 = sábado
     estado: z.enum(["activo", "inactivo"]).optional(),
   })
   .strict();
@@ -132,6 +135,21 @@ export type ProfesorResponse = {
   fechaCreacion: string;
   /** ISO 8601. */
   fechaActualizacion: string;
+};
+
+/**
+ * Usuario con rol "Profesor", activo, con academia y SIN ficha todavía.
+ * Alimenta el combo "Usuario asociado" del alta: son los únicos ids que
+ * `crearProfesorBody.usuarioId` acepta sin devolver error.
+ */
+export type CandidatoProfesorResponse = {
+  /** usuario.id — es el que viaja como `usuarioId` en el alta. */
+  id: number;
+  nombre: string;
+  apellido: string;
+  dni: string;
+  email: string;
+  academia: { id: number; nombre: string } | null;
 };
 
 /** Lo que devuelve el combo de profesores (turnos, calendario, disponibilidad). */

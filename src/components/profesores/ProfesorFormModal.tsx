@@ -15,8 +15,10 @@ import {
   DIAS_SEMANA_SELECT,
   HORARIOS_OPCIONES,
   aMin,
+  horariosHasta,
+  horasEntre,
   inicialesDe,
-  nuevoIdFranja,
+  nuevaFranja,
   tonoAvatarDe,
   validarFranjas,
   type FranjaForm,
@@ -61,6 +63,15 @@ interface ProfesorFormModalProps {
   /** Profesor en edición: identidad bloqueada + disparador de baja lógica. */
   profesor?: Profesor | null;
   onBaja?: (profesor: Profesor) => void;
+  /**
+   * Error que devolvió la API (código del contrato ya traducido a mensaje).
+   * Si trae `campo`, se pinta debajo de ese input igual que una validación
+   * local; si no, va como banner arriba del formulario. El back es la autoridad:
+   * la validación local es solo feedback temprano.
+   */
+  errorRemoto?: { campo?: string; mensaje: string } | null;
+  /** Mientras se espera a la API: bloquea los botones y evita el doble submit. */
+  guardando?: boolean;
 }
 
 function validar(datos: ProfesorFormData): Partial<Record<"usuarioId" | "telefono" | "materias", string>> {
@@ -84,6 +95,8 @@ export function ProfesorFormModal({
   onGuardar,
   profesor,
   onBaja,
+  errorRemoto,
+  guardando = false,
 }: ProfesorFormModalProps) {
   const [datos, setDatos] = useState<ProfesorFormData>(EMPTY_FORM);
   const [envio, setEnvio] = useState(false);
@@ -102,7 +115,11 @@ export function ProfesorFormModal({
 
   const set = (patch: Partial<ProfesorFormData>) => setDatos((d) => ({ ...d, ...patch }));
 
-  const errores = useMemo(() => (envio ? validar(datos) : {}), [envio, datos]);
+  const erroresLocales = useMemo(() => (envio ? validar(datos) : {}), [envio, datos]);
+  // El error de la API pisa al local: viene del back, que es la autoridad.
+  const errores: ReturnType<typeof validar> = errorRemoto?.campo
+    ? { ...erroresLocales, [errorRemoto.campo]: errorRemoto.mensaje }
+    : erroresLocales;
   const erroresFranjas = useMemo(
     () => (envio ? validarFranjas(datos.franjas) : {}),
     [envio, datos.franjas],
@@ -136,10 +153,10 @@ export function ProfesorFormModal({
     }
   };
 
+  // La franja nace sin horas: primero se elige el inicio y recién ahí se
+  // habilita el fin, que solo ofrece horarios posteriores.
   const agregarFranja = () => {
-    set({
-      franjas: [...datos.franjas, { id: nuevoIdFranja(), dia: "1", desde: "08:00", hasta: "09:00" }],
-    });
+    set({ franjas: [...datos.franjas, nuevaFranja()] });
   };
 
   const actualizarFranja = (id: number, patch: Partial<Omit<FranjaForm, "id">>) => {
@@ -148,23 +165,34 @@ export function ProfesorFormModal({
     });
   };
 
+  /**
+   * Cambiar la hora de inicio limpia una hora de fin que ya no sea posterior:
+   * el select de fin solo ofrece horarios mayores, así que dejar el valor viejo
+   * mostraría una opción que ya no está en la lista.
+   */
+  const cambiarDesde = (id: number, desde: string) => {
+    set({
+      franjas: datos.franjas.map((f) =>
+        f.id === id
+          ? { ...f, desde, hasta: f.hasta && aMin(f.hasta) > aMin(desde) ? f.hasta : "" }
+          : f,
+      ),
+    });
+  };
+
   const quitarFranja = (id: number) => {
     set({ franjas: datos.franjas.filter((f) => f.id !== id) });
   };
 
   // BACKEND: PUT /api/profesores/:id/disponibilidad (franjas → agenda_profesional)
+  // Las franjas a medias suman 0: la hora de fin todavía no se eligió.
   const totalHorasFranjas = useMemo(
     () =>
       Math.round(
-        datos.franjas.reduce((acc, f) => acc + (aMin(f.hasta) - aMin(f.desde)) / 60, 0) * 10,
+        datos.franjas.reduce((acc, f) => acc + horasEntre(f.desde, f.hasta), 0) * 10,
       ) / 10,
     [datos.franjas],
   );
-
-  const horasDeFranja = (f: FranjaForm) =>
-    aMin(f.hasta) > aMin(f.desde)
-      ? Math.round(((aMin(f.hasta) - aMin(f.desde)) / 60) * 10) / 10
-      : 0;
 
   const guardar = () => {
     setEnvio(true);
@@ -220,23 +248,38 @@ export function ProfesorFormModal({
               <span className="text-error">*</span> Campos obligatorios
             </p>
           )}
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={guardando}>
             Cancelar
           </Button>
-          <Button type="button" variant="primary" onClick={guardar}>
-            <Icon name="check" size={16} />
-            {modo === "INSERCION" ? "Guardar y Habilitar Profesor" : "Guardar"}
+          <Button type="button" variant="primary" onClick={guardar} disabled={guardando}>
+            <Icon name={guardando ? "progress_activity" : "check"} size={16} />
+            {guardando
+              ? "Guardando…"
+              : modo === "INSERCION"
+                ? "Guardar y Habilitar Profesor"
+                : "Guardar"}
           </Button>
         </>
       }
     >
       <form className="flex flex-col gap-5" onSubmit={(e) => e.preventDefault()} noValidate>
+        {/* Error de la API que no corresponde a un campo puntual. */}
+        {errorRemoto && !errorRemoto.campo && (
+          <p
+            role="alert"
+            className="flex items-start gap-2 rounded-sm border border-error/40 bg-error/5 px-3 py-2 text-sm font-semibold text-error"
+          >
+            <Icon name="error" size={16} className="mt-px shrink-0" />
+            {errorRemoto.mensaje}
+          </p>
+        )}
+
         {/* BACKEND: usuarios con rol Profesor, activos y sin ficha → GET /api/usuarios?rol=profesor&sin-ficha=true */}
         {modo === "INSERCION" ? (
           <div className="flex flex-col gap-1.5">
             <Combobox
               id="usuario-asociado"
-              label="Usuario Asociado del Sistema"
+              label="Usuario Activo del Sistema"
               requiredMark
               error={errores.usuarioId}
               hint="Nombre, Apellido y Email se vinculan automáticamente"
@@ -250,7 +293,7 @@ export function ProfesorFormModal({
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
               <p className="flex items-center gap-1.5 text-sm font-bold text-on-surface">
                 <Icon name="lock" size={14} className="text-on-surface-variant" />
-                Usuario Asociado del Sistema
+                Usuario Activos del Sistema
                 <span className="text-error"> *</span>
               </p>
               <p className="text-xs font-semibold text-on-surface-variant">
@@ -423,9 +466,13 @@ export function ProfesorFormModal({
                       id={`franja-desde-${franja.id}`}
                       aria-label={`Hora de inicio del día ${franja.dia}`}
                       value={franja.desde}
-                      onChange={(e) => actualizarFranja(franja.id, { desde: e.target.value })}
+                      onChange={(e) => cambiarDesde(franja.id, e.target.value)}
                       className="h-10 min-h-10 w-full px-2 text-sm"
                     >
+                      {/* Obligatoria y primera: sin ella no se habilita la hora de fin. */}
+                      <option value="" disabled>
+                        Elegí hora
+                      </option>
                       {HORARIOS_OPCIONES.map((h) => (
                         <option key={h} value={h}>
                           {h}
@@ -439,10 +486,16 @@ export function ProfesorFormModal({
                       id={`franja-hasta-${franja.id}`}
                       aria-label={`Hora de fin del día ${franja.dia}`}
                       value={franja.hasta}
+                      disabled={!franja.desde}
+                      title={!franja.desde ? "Elegí primero la hora de inicio" : undefined}
                       onChange={(e) => actualizarFranja(franja.id, { hasta: e.target.value })}
                       className="h-10 min-h-10 w-full px-2 text-sm"
                     >
-                      {HORARIOS_OPCIONES.map((h) => (
+                      <option value="" disabled>
+                        {franja.desde ? "Elegí hora" : "Elegí el inicio"}
+                      </option>
+                      {/* Solo horarios posteriores al inicio. */}
+                      {horariosHasta(franja.desde).map((h) => (
                         <option key={h} value={h}>
                           {h}
                         </option>
@@ -450,7 +503,7 @@ export function ProfesorFormModal({
                     </Select>
                   </div>
                   <span className="w-12 text-right text-xs font-bold text-on-surface-variant">
-                    {horasDeFranja(franja).toFixed(1)} h
+                    {horasEntre(franja.desde, franja.hasta).toFixed(1)} h
                   </span>
                   <Button
                     type="button"
