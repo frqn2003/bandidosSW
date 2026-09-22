@@ -4,6 +4,15 @@ Log del equipo (diseño front). Se alimenta automáticamente durante `/disenar` 
 
 ---
 
+### 2026-09-22 · Alumnos (HU-ALU-01) — mensajes de validación en inglés salidos del contrato
+
+- **Qué pasó:** el formulario mostraba `"Invalid"` (en inglés) como error del DNI y del teléfono **del responsable**, mientras que los del alumno sí decían el mensaje en español.
+- **Cómo se detectó:** paso 6b de `/disenar`, guardando un alumno menor sin los datos del responsable: dos de las tres alertas del modal vinieron en inglés.
+- **Causa:** en `src/contracts/alumno.ts`, `responsableDni` y `responsableTelefono` usaban `.regex(...)` **sin segundo argumento**. Zod emite `"Invalid"` por defecto. Los campos `dni` y `telefono` del alumno sí tenían mensaje, por eso la diferencia pasó desapercibida al escribir el contrato.
+- **Regla para no repetirlo:** en los contratos, **todo `.regex()`, `.refine()` y `.superRefine()` lleva su mensaje en español**. Ese texto no es solo del front: el back valida con `parseBody` contra el mismo schema y devuelve ese mismo string al usuario. Al crear un contrato, revisarlo con `grep -n "regex(" src/contracts/*.ts` y confirmar que ninguno quedó sin mensaje.
+
+---
+
 ### 2026-09-21 · ui/Modal (HU-MAT-01) — el modal cerrado seguía tapando la pantalla
 
 - **Qué pasó:** al cerrar cualquier modal, `AnimatePresence` deja el nodo en el DOM mientras corre la animación de salida. Ese nodo es un overlay `fixed inset-0`: aunque esté en `opacity: 0`, **sigue capturando los clicks de toda la pantalla**. Si además la pestaña pasa a segundo plano durante el cierre, `requestAnimationFrame` se pausa, la animación nunca termina, el nodo no se desmonta y la app queda inusable hasta recargar.

@@ -4,6 +4,18 @@
 
 import type { Profesor } from "@/data/profesores";
 
+// Utilidades de presentación genéricas: viven en `src/lib/formato.ts` desde
+// HU-ALU-01 (las usan también Alumnos y las próximas pantallas). Se re-exportan
+// acá para no tocar a los consumidores que ya las importaban desde este módulo.
+export {
+  formatearTelefono,
+  formatearFecha,
+  edadEnAnios,
+  inicialesDe,
+  TONOS_AVATAR,
+  tonoAvatarDe,
+} from "@/lib/formato";
+
 /**
  * Franja horaria del formulario de disponibilidad. `dia` es 1-6 (ISO, Lun-Sáb).
  *
@@ -108,21 +120,6 @@ export function capacidadMaxDe(p: Profesor): number {
   return Math.max(...p.materias.map((m) => m.capacidadMaxima));
 }
 
-/** "1155555555" → "11-5555-5555" (últimos 8 dígitos partidos 4-4). */
-export function formatearTelefono(tel: string): string {
-  if (tel.length < 10) return tel;
-  const cabeza = tel.slice(0, tel.length - 8);
-  const m1 = tel.slice(tel.length - 8, tel.length - 4);
-  const m2 = tel.slice(tel.length - 4);
-  return `${cabeza}-${m1}-${m2}`;
-}
-
-/** "2024-03-15" → "15/03/2024". */
-export function formatearFecha(fechaIso: string): string {
-  const d = new Date(`${fechaIso}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return fechaIso;
-  return d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
 
 /** bloquesPorDia ("HH:MM-HH:MM") → franjas del form. */
 export function franjasDesdeBloques(bloques: Record<number, string[]>): FranjaForm[] {
@@ -180,20 +177,4 @@ export function bloquesDesdeFranjas(franjas: Array<Omit<FranjaForm, "id">>): Rec
   return bloques;
 }
 
-export function inicialesDe(nombre: string, apellido: string): string {
-  return `${nombre.trim().charAt(0)}${apellido.trim().charAt(0)}`.toUpperCase();
-}
 
-// Tonos de avatar: tonalidades del tema (fondo /20 + texto del color fuerte).
-export const TONOS_AVATAR = [
-  "bg-primary/20 text-primary",
-  "bg-secondary/20 text-on-secondary-fixed-variant",
-  "bg-tertiary/20 text-on-tertiary-container",
-  "bg-status-success/20 text-status-success-strong",
-  "bg-status-warning/20 text-status-warning-strong",
-  "bg-status-danger/20 text-status-danger-strong",
-];
-
-export function tonoAvatarDe(id: number): string {
-  return TONOS_AVATAR[(id - 1) % TONOS_AVATAR.length];
-}

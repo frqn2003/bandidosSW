@@ -2,7 +2,14 @@
 
 Cómo se conectan las pantallas hardcodeadas a los datos, para que el día que el back publique los endpoints **no haya que reescribir la pantalla**.
 
-Implementado por primera vez en HU-MAT-01 ([`src/data/materias.ts`](../src/data/materias.ts) + [`src/app/materias/page.tsx`](../src/app/materias/page.tsx)). Este documento es el patrón a repetir en las próximas HUs.
+Este documento es el patrón a repetir en cada HU. Hay un ejemplo de cada etapa:
+
+| Etapa | Ejemplo vivo | Qué mirar |
+|---|---|---|
+| **Con fixture** (la HU recién hecha, el back todavía no conectó) | [`src/data/alumnos.ts`](../src/data/alumnos.ts) — HU-ALU-01 | El fixture, las reglas de negocio simuladas y los `// BACKEND:` con la llamada real que las va a reemplazar |
+| **Ya conectado** (el back publicó los endpoints) | [`src/data/materias.ts`](../src/data/materias.ts) — HU-MAT-01 | Las mismas funciones, con el cuerpo reducido a una línea de `apiGet`/`apiSend` |
+
+**Materias es la prueba de que el patrón funciona:** nació con fixture en HU-MAT-01 y después migró a la API real (`src/app/api/materias/**` + `src/modules/materias/**`). Al migrar se cambió **solo el cuerpo de las funciones** de `src/data/materias.ts`: la pantalla, los componentes y el manejo de errores quedaron intactos.
 
 ---
 
@@ -140,20 +147,45 @@ Se busca con `grep -rn "PENDIENTE CONTRATO" src/` y se lleva a la reunión con e
 
 ## El día del back: qué se toca
 
-Solo el cuerpo de las funciones de `src/data/<entidad>.ts`:
+Solo el cuerpo de las funciones de `src/data/<entidad>.ts`. Esto **ya pasó** con materias, así que el ejemplo no es hipotético:
 
 ```ts
-// Antes                                    // Después
-export async function listarMaterias(f) {   export async function listarMaterias(f) {
-  await demorar();                            const qs = new URLSearchParams(
-  return memoria.filter(...);                   Object.entries(f).map(([k, v]) => [k, String(v)]));
-}                                             return apiGet<MateriaResponse[]>(`${RUTA}?${qs}`);
-                                            }
+// ── Antes (HU-MAT-01, fixture) ────────────────────────────────────────────
+export async function listarMaterias(filtros: ListarMateriasQuery = {}) {
+  await demorar();
+  if (fallaForzada()) throw new ApiError("ERROR_DESCONOCIDO", "No se pudo cargar…", undefined, 500);
+  return memoria.filter(/* los mismos filtros del contrato */).map((m) => ({ ...m }));
+}
+
+// ── Después (hoy, contra /api/materias) ───────────────────────────────────
+export async function listarMaterias(filtros: ListarMateriasQuery = {}) {
+  const params = new URLSearchParams();
+  if (filtros.busqueda) params.set("busqueda", filtros.busqueda);
+  if (filtros.nivel) params.set("nivel", filtros.nivel);
+  if (filtros.estado) params.set("estado", filtros.estado);
+  const qs = params.toString();
+  return apiGet<MateriaResponse[]>(qs ? `${RUTA}?${qs}` : RUTA);
+}
 ```
 
-Y se borran: el `FIXTURE`, `memoria`, `demorar()` y los helpers internos (`exigirNombreLibre`, etc. — eso pasa a ser el `service.ts` del back).
+Se borran: el `FIXTURE`, `memoria`, `demorar()`, el `?demo=error` y los helpers internos (`exigirNombreLibre`, `exigirMateria`… — eso pasa a ser el `service.ts` del back, en `src/modules/<entidad>/`).
 
-**No se toca:** la pantalla, los componentes, los tipos, ni el manejo de errores.
+**No se toca:** la pantalla, los componentes, los tipos, ni el manejo de errores. Los `ApiError` que antes lanzaba el fixture ahora los arma `src/lib/api-client.ts` a partir de la respuesta del servidor — con los **mismos códigos**, porque los dos lados los sacan del contrato.
+
+### Por eso el fixture se escribe "como si fuera el back"
+
+La migración sale gratis solo si el fixture se comportó como el servidor desde el día uno:
+
+| El fixture tiene que… | Porque el back lo hace |
+|---|---|
+| Ser `async` y demorar un poco | La red tarda: si no, la pantalla nunca ejercita el estado "cargando" |
+| Asignar el `id` y los campos generados (`legajo`, `codigo`, fechas) al crear | Los pone la base, no el formulario |
+| Aplicar los defaults de la columna (`estado: "activo"`) | Es el `DEFAULT` del `CREATE TABLE` |
+| Validar los UNIQUE y las reglas de negocio, y lanzar `ApiError` con el código del contrato | Es lo que devuelve el `service.ts` |
+| Devolver copias, nunca el objeto del array | La API devuelve JSON nuevo en cada request |
+| Poder fallar (`?demo=error`) | Los 500 y la red caída existen |
+
+Un fixture que no hace esto produce una pantalla que **parece** terminada y que hay que reescribir el día de la conexión.
 
 ---
 
@@ -183,4 +215,4 @@ En la pantalla:
 - Contratos y su formato: [`docs/api-contracts.md`](api-contracts.md) · guías por módulo en [`docs/contratos/`](contratos/)
 - Cliente HTTP: [`src/lib/api-client.ts`](../src/lib/api-client.ts) (`apiGet`, `apiGetOpcional`, `apiSend`, `ApiError`, `mensajeDeError`)
 - Catálogos para `<select>`: [`src/lib/use-catalogo.ts`](../src/lib/use-catalogo.ts)
-- Ejemplo completo: [`src/data/materias.ts`](../src/data/materias.ts)
+- Ejemplo con fixture: [`src/data/alumnos.ts`](../src/data/alumnos.ts) · ejemplo ya conectado: [`src/data/materias.ts`](../src/data/materias.ts)

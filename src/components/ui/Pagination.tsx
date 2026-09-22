@@ -13,9 +13,11 @@ interface PaginationProps {
   onPageSizeChange: (size: number) => void;
   disabled?: boolean;
   itemLabel?: string;
+  /** Tamaños de página ofrecidos. Default [10, 25, 50] — cambiado porque la HU-ALU-01 pide 20. */
+  pageSizes?: number[];
 }
 
-const PAGE_SIZES = [10, 25, 50];
+const PAGE_SIZES_DEFAULT = [10, 25, 50];
 
 export function Pagination({
   page,
@@ -28,6 +30,7 @@ export function Pagination({
   onPageSizeChange,
   disabled = false,
   itemLabel = "artículos",
+  pageSizes = PAGE_SIZES_DEFAULT,
 }: PaginationProps) {
   const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
   const visiblePages = pages.filter((p) => {
@@ -59,7 +62,7 @@ export function Pagination({
             disabled={disabled}
             className="h-11 cursor-pointer rounded-full border border-outline-variant bg-surface-container-low px-3 text-sm font-semibold text-on-surface focus:border-secondary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-secondary/20 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            {PAGE_SIZES.map((size) => (
+            {pageSizes.map((size) => (
               <option key={size} value={size}>
                 {size}
               </option>

@@ -14,7 +14,7 @@ const NAV_ITEMS = [
   { label: "Dashboard", href: "#", icon: "dashboard", disabled: true },
   { label: "Sedes", href: "#", icon: "location_city", disabled: true },
   { label: "Turnos y Agenda", href: "#", icon: "calendar_month", disabled: true },
-  { label: "Alumnos", href: "#", icon: "group", disabled: true },
+  { label: "Alumnos", href: "/alumnos", icon: "group", disabled: false },
   { label: "Cuerpo Docente", href: "/profesores", icon: "groups", disabled: false },
   { label: "Materias", href: "/materias", icon: "menu_book", disabled: false },
   { label: "Cobranzas", href: "#", icon: "receipt_long", disabled: true },
