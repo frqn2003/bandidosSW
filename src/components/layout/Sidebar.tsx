@@ -3,27 +3,29 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
+import { formatearFecha, inicialesDe, tonoAvatarDe } from "@/lib/formato";
+import { MODULOS, modulosDe } from "@/lib/permisos";
+import { useSesion } from "@/lib/sesion";
 
-// Navegación lateral del sistema. Los módulos no desarrollados navegan con
-// href="#" y quedan marcados como "Próximamente" (las pantallas activas son
-// /profesores — HU-PRO-01 — y /materias — HU-MAT-01).
-// BACKEND: no consume API; los nombres de ruta se
-// definen acá y en el layout de cada módulo.
-// Los nombres de `icon` son ligaduras de Material Symbols Outlined.
-const NAV_ITEMS = [
-  { label: "Dashboard", href: "#", icon: "dashboard", disabled: true },
-  { label: "Sedes", href: "#", icon: "location_city", disabled: true },
-  { label: "Turnos y Agenda", href: "#", icon: "calendar_month", disabled: true },
-  { label: "Alumnos", href: "/alumnos", icon: "group", disabled: false },
-  { label: "Cuerpo Docente", href: "/profesores", icon: "groups", disabled: false },
-  { label: "Materias", href: "/materias", icon: "menu_book", disabled: false },
-  { label: "Cobranzas", href: "#", icon: "receipt_long", disabled: true },
-  { label: "Usuarios", href: "#", icon: "school", disabled: true },
-  { label: "Reportes", href: "#", icon: "settings", disabled: true },
-];
+// Navegación lateral del sistema.
+//
+// Los módulos y los permisos NO viven acá: vienen de `src/lib/permisos.ts`, la
+// misma tabla que usa el guard `RequiereSesion`. Si cada uno tuviera su lista,
+// el menú terminaría escondiendo algo que la ruta igual deja entrar.
+//
+// Sin sesión (o mientras se resuelve) se muestran todos los módulos en estado
+// deshabilitado: el Sidebar nunca se renderiza fuera del guard, así que es solo
+// el instante de carga.
+//
+// BACKEND: no consume API. El rol sale de la sesión
+// (`GET /api/auth/sesion` → contrato src/contracts/auth.ts).
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { sesion, cerrar } = useSesion();
+
+  const modulos = sesion ? modulosDe(sesion.usuario.rol.nombre) : MODULOS;
+  const usuario = sesion?.usuario;
 
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-outline-variant bg-surface-container-lowest">
@@ -39,17 +41,17 @@ export function Sidebar() {
 
       <nav aria-label="Navegación principal" className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="flex flex-col gap-1">
-          {NAV_ITEMS.map(({ label, href, icon, disabled }) => {
-            const active = !disabled && pathname === href;
+          {modulos.map(({ id, label, href, icon, construido }) => {
+            const active = construido && pathname === href;
             return (
-              <li key={label}>
+              <li key={id}>
                 <Link
                   href={href}
                   aria-current={active ? "page" : undefined}
-                  aria-disabled={disabled}
-                  tabIndex={disabled ? -1 : undefined}
+                  aria-disabled={!construido}
+                  tabIndex={construido ? undefined : -1}
                   className={`flex min-h-11 items-center gap-3 rounded-sm px-3 text-sm font-semibold transition-colors duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary ${
-                    disabled
+                    !construido
                       ? "cursor-not-allowed text-on-surface-variant/50"
                       : active
                         ? "bg-primary text-on-primary"
@@ -58,7 +60,7 @@ export function Sidebar() {
                 >
                   <Icon name={icon} size={20} className="shrink-0" />
                   {label}
-                  {disabled && (
+                  {!construido && (
                     <span className="ml-auto rounded-full bg-surface-container-high px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
                       Próx.
                     </span>
@@ -70,11 +72,49 @@ export function Sidebar() {
         </ul>
       </nav>
 
-      <div className="border-t border-outline-variant px-5 py-4">
-        <p className="text-xs font-medium text-on-surface-variant">
-          Diseño UI — v0.1 · datos placeholder
-        </p>
-      </div>
+      {usuario ? (
+        <div className="flex flex-col gap-3 border-t border-outline-variant px-4 py-4">
+          <div className="flex items-center gap-2.5">
+            <span
+              aria-hidden="true"
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${tonoAvatarDe(usuario.id)}`}
+            >
+              {inicialesDe(usuario.nombre, usuario.apellido)}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-on-surface">
+                {usuario.nombre} {usuario.apellido}
+              </p>
+              <p className="truncate text-xs font-medium text-on-surface-variant">
+                {usuario.rol.nombre}
+              </p>
+            </div>
+          </div>
+
+          {/* "Última conexión" (criterio opcional). BACKEND: último evento
+              `login` de auditoria_sesion, anterior al actual. */}
+          {sesion?.ultimaConexion && (
+            <p className="text-[11px] font-medium text-on-surface-variant">
+              Última conexión: {formatearFecha(sesion.ultimaConexion)}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={() => void cerrar()}
+            className="flex min-h-11 cursor-pointer items-center gap-2 rounded-sm px-2 text-sm font-semibold text-on-surface-variant transition-colors duration-fast ease-out hover:bg-surface-container-low hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
+          >
+            <Icon name="logout" size={18} />
+            Cerrar sesión
+          </button>
+        </div>
+      ) : (
+        <div className="border-t border-outline-variant px-5 py-4">
+          <p className="text-xs font-medium text-on-surface-variant">
+            Diseño UI — v0.1 · datos placeholder
+          </p>
+        </div>
+      )}
     </aside>
   );
 }

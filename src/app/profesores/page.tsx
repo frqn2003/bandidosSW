@@ -28,6 +28,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Pagination } from "@/components/ui/Pagination";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { RequiereSesion } from "@/components/auth/RequiereSesion";
 import { AgendaSemanalModal } from "@/components/profesores/AgendaSemanalModal";
 import { BajaProfesorModal } from "@/components/profesores/BajaProfesorModal";
 import { FiltrosProfesores, type FiltrosProfesoresState } from "@/components/profesores/FiltrosProfesores";
@@ -556,8 +557,10 @@ function CuerpoDocenteContent() {
 
 export default function ProfesoresPage() {
   return (
-    <ToastProvider>
-      <CuerpoDocenteContent />
-    </ToastProvider>
+    <RequiereSesion>
+      <ToastProvider>
+        <CuerpoDocenteContent />
+      </ToastProvider>
+    </RequiereSesion>
   );
 }

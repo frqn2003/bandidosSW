@@ -4,6 +4,24 @@ Log del equipo (diseño front). Se alimenta automáticamente durante `/disenar` 
 
 ---
 
+### 2026-09-22 · Sesión (HU-SIS-01) — un rol sin módulos construidos quedaba varado en el login
+
+- **Qué pasó:** el rol **Profesor** iniciaba sesión correctamente (la sesión quedaba guardada) pero la pantalla seguía mostrando el formulario de login. Parecía que el login no funcionaba.
+- **Cómo se detectó:** paso 6b de `/disenar`, probando los tres roles uno por uno. Con Gerente y Mesa de Entrada no se veía: los dos tienen módulos construidos.
+- **Causa:** el login redirige al primer módulo **construido** que el rol puede ver. Profesor solo tiene módulos que todavía no existen (Turnos, Mi ficha, Reportes), así que no había destino y el `router.replace` caía en `"/"` — la misma pantalla.
+- **Regla para no repetirlo:** toda redirección "al inicio" necesita un **destino que exista siempre**. Se creó `/inicio`, que no pertenece a ningún módulo (no pasa por el control de permisos) y muestra el Sidebar con lo que el rol va a tener. Al agregar un rol o sacar un módulo, probar el login **con cada rol**: el caso roto es siempre el del rol con menos permisos.
+
+---
+
+### 2026-09-22 · Sesión (HU-SIS-01) — `Date.now()` en el inicializador de un `useRef`
+
+- **Qué pasó:** `npm run lint` falló con `react-hooks/purity` en `src/lib/sesion.tsx`: *"Cannot call impure function during render"*.
+- **Cómo se detectó:** paso 6a de `/disenar`. TypeScript no lo marca.
+- **Causa:** `useRef<number>(Date.now())`. El inicializador de `useRef` se evalúa **durante el render**, y ahí no se pueden llamar funciones impuras: dos renders darían valores distintos.
+- **Regla para no repetirlo:** `Date.now()`, `Math.random()` y `crypto.randomUUID()` van en efectos o en callbacks de eventos, **nunca en el cuerpo del render** — y el inicializador de `useRef`/`useState` es cuerpo del render. El patrón es inicializar con un valor neutro (`0`, `null`) y asignar el real dentro del `useEffect`.
+
+---
+
 ### 2026-09-22 · Alumnos (HU-ALU-01) — mensajes de validación en inglés salidos del contrato
 
 - **Qué pasó:** el formulario mostraba `"Invalid"` (en inglés) como error del DNI y del teléfono **del responsable**, mientras que los del alumno sí decían el mensaje en español.

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { SesionProvider } from "@/lib/sesion";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -43,7 +44,9 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-surface text-on-surface">
-        {children}
+        {/* La sesión (HU-SIS-01) envuelve toda la app: el login, las
+            pantallas con guard y el aviso de expiración comparten estado. */}
+        <SesionProvider>{children}</SesionProvider>
       </body>
     </html>
   );

@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Pagination } from "@/components/ui/Pagination";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { RequiereSesion } from "@/components/auth/RequiereSesion";
 import { AlumnosTable } from "@/components/alumnos/AlumnosTable";
 import {
   AlumnoFormModal,
@@ -344,8 +345,10 @@ function AlumnosContent() {
 
 export default function AlumnosPage() {
   return (
-    <ToastProvider>
-      <AlumnosContent />
-    </ToastProvider>
+    <RequiereSesion>
+      <ToastProvider>
+        <AlumnosContent />
+      </ToastProvider>
+    </RequiereSesion>
   );
 }
