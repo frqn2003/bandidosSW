@@ -151,3 +151,45 @@ export async function inactivar(
     return mapper.toApi(row);
   });
 }
+
+/**
+ * Reactiva una materia inactiva.
+ */
+export async function activar(
+  id: number,
+  usuarioId: number,
+): Promise<MateriaResponse> {
+  return withTransaction(async (client) => {
+    // 1. Auditoría
+    await withAuditUser(client, usuarioId);
+
+    // 2. ¿Existe?
+    const actual = await repo.findById(id, client);
+    if (!actual) {
+      throw new NotFoundError("la materia", id);
+    }
+
+    // 3. Idempotente: si ya está activa, devolver estado actual
+    if (actual.estado === "activo") {
+      return mapper.toApi(actual);
+    }
+
+    // 4. Validar que no choque con otra materia activa del mismo nombre
+    const duplicado = await repo.findActivoByNombre(actual.nombre, id, client);
+    if (duplicado) {
+      throw new ConflictError(
+        "NOMBRE_DUPLICADO",
+        `No se puede reactivar: ya existe una materia activa con el nombre "${actual.nombre}".`,
+        "nombre",
+      );
+    }
+
+    // 5. Reactivar
+    const row = await repo.activar(id, client);
+    if (!row) {
+      throw new NotFoundError("la materia", id);
+    }
+
+    return mapper.toApi(row);
+  });
+}

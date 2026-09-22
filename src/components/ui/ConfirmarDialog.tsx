@@ -1,8 +1,8 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
+import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 
 // Dialog de confirmación (regla Pet Bliss: acciones destructivas y cambios
@@ -23,6 +23,8 @@ interface ConfirmarDialogProps {
   tone?: ConfirmarTone;
   onClose: () => void;
   onConfirm: () => void;
+  /** Contenido opcional adicional (ej: aviso de cantidad de turnos en la baja). */
+  children?: ReactNode;
 }
 
 const TONES: Record<
@@ -30,19 +32,19 @@ const TONES: Record<
   { icon: ReactNode; variant: "destructive" | "primary" | "secondary"; iconClass: string }
 > = {
   danger: {
-    icon: <AlertTriangle className="h-5 w-5" aria-hidden="true" />,
+    icon: <Icon name="warning" size={20} />,
     variant: "destructive",
-    iconClass: "text-destructive",
+    iconClass: "text-error",
   },
   success: {
-    icon: <CheckCircle2 className="h-5 w-5" aria-hidden="true" />,
+    icon: <Icon name="check_circle" size={20} />,
     variant: "primary",
     iconClass: "text-status-success-strong",
   },
   neutral: {
-    icon: <Info className="h-5 w-5" aria-hidden="true" />,
+    icon: <Icon name="info" size={20} />,
     variant: "secondary",
-    iconClass: "text-text-secondary",
+    iconClass: "text-on-surface-variant",
   },
 };
 
@@ -55,6 +57,7 @@ export function ConfirmarDialog({
   tone = "danger",
   onClose,
   onConfirm,
+  children,
 }: ConfirmarDialogProps) {
   const style = TONES[tone];
   return (
@@ -71,7 +74,8 @@ export function ConfirmarDialog({
         </>
       }
     >
-      <p className="text-sm text-text-secondary">{description}</p>
+      <p className="text-sm text-on-surface-variant">{description}</p>
+      {children}
     </Modal>
   );
 }

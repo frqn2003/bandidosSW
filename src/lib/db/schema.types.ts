@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // GENERADO AUTOMÁTICAMENTE — NO EDITAR A MANO.
 //
-//   Regenerar:  npm run db:types
-//   Generador:  scripts/db-types.mjs
+//   Fuente:    docs/esquema-bd-front.md (diccionario de datos)
+//   Generador: scripts/db-types.mjs (adaptado a esquema Centro Académico)
 //
 // Describe el esquema REAL de la base, con los tipos que devuelve el driver
 // `pg` (ojo: numeric y bigint llegan como string, no como number).
@@ -13,9 +13,9 @@
 //
 //   import type { Row } from "@/lib/db/schema.types";
 //
-//   export type ProveedorRow = Pick<
-//     Row<"proveedor">,
-//     "id" | "razon_social" | "cuit" | "estado"
+//   export type AlumnoRow = Pick<
+//     Row<"alumno">,
+//     "id" | "legajo" | "nombre" | "apellido" | "dni" | "estado"
 //   >;
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -87,7 +87,7 @@ export interface DbTables {
     updated_at: Date | string;  // auto (default)
   };
   auditoria: {
-    id: string;  // auto (identity)
+    id: string;  // auto (default)
     tabla: string;
     operacion: TipoOperacionAuditoria;
     registro_id: number;
@@ -97,7 +97,7 @@ export interface DbTables {
     valores_nuevos: unknown | null;
   };
   auditoria_sesion: {
-    id: string;  // auto (identity)
+    id: number;  // auto (identity)
     usuario_id: number | null;
     evento: TipoEventoSesion;
     fecha_hora: Date;  // auto (default)
@@ -131,9 +131,29 @@ export interface DbTables {
   };
   profesor_materia: {
     id: number;  // auto (identity)
-    profesor_id: number;
-    materia_id: number;
-    capacidad_maxima: number;  // auto (default)
+    nombre: string;
+    duracion_estimada_minutos: number | null;
+    estado: EstadoActivoInactivo;  // auto (default)
+  };
+  presentacion: {
+    id: number;  // auto (default)
+    nombre: string;
+  };
+  proveedor: {
+    id: number;  // auto (default)
+    razon_social: string;
+    cuit: string;
+    direccion: string | null;
+    telefono: string | null;
+    email: string | null;
+    contacto: string | null;
+    plazo_entrega_dias: number | null;
+    estado: EstadoActivoInactivo;  // auto (default)
+    calificacion: string | null;
+  };
+  proveedor_forma_pago: {
+    proveedor_id: number;
+    forma_pago_id: number;
   };
   rol: {
     id: number;  // auto (identity)
@@ -141,10 +161,12 @@ export interface DbTables {
   };
   turno: {
     id: number;  // auto (identity)
-    codigo: string | null;
-    alumno_id: number;
-    profesor_id: number;
-    materia_id: number;
+    cliente_id: number;
+    mascota_id: number;
+    sucursal_id: number;
+    agenda_profesional_id: number;
+    practica_id: number;
+    estado_id: number;  // auto (default)
     fecha: Date;
     hora_inicio: string;
     hora_fin: string;
@@ -163,10 +185,9 @@ export interface DbTables {
     dni: string;
     email: string;
     estado: EstadoActivoInactivo;  // auto (default)
-    auth_id: string;
+    fecha_creacion: Date;  // auto (default)
     intentos_fallidos: number;  // auto (default)
     bloqueado_hasta: Date | null;
-    fecha_creacion: Date;  // auto (default)
   };
 }
 
@@ -184,8 +205,8 @@ export interface DbViews {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** La fila de una tabla: `Row<"proveedor">`. */
+/** La fila de una tabla: `Row<"alumno">`. */
 export type Row<T extends keyof DbTables> = DbTables[T];
 
-/** La fila de una vista: `ViewRow<"vista_cuenta_corriente_proveedor">`. */
+/** La fila de una vista: `ViewRow<"vw_huecos_disponibles">`. */
 export type ViewRow<T extends keyof DbViews> = DbViews[T];

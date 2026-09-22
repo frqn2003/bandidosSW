@@ -176,6 +176,25 @@ export async function inactivar(
 }
 
 /**
+ * Reactiva una materia cambiando su estado a 'activo'.
+ */
+export async function activar(
+  id: number,
+  client: PoolClient,
+): Promise<MateriaRow | null> {
+  const sql = `
+    UPDATE materia
+    SET estado = 'activo',
+        updated_at = now()
+    WHERE id = $1
+    RETURNING ${COLUMNAS}
+  `;
+
+  const { rows } = await client.query<MateriaRow>(sql, [id]);
+  return rows[0] ?? null;
+}
+
+/**
  * Cuenta turnos futuros reservados asociados a esta materia.
  */
 export async function contarTurnosFuturos(

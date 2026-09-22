@@ -1,26 +1,191 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* La fuente de iconos (Material Symbols Outlined) se carga como stylesheet
+   externa en src/app/layout.tsx (Tailwind descarta los @import remotos).
+   Acá abajo viven su paleta (Nexo Académico) y sus estilos base. */
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* Iconos: Material Symbols Outlined */
+  --font-icon: "Material Symbols Outlined", sans-serif;
+
+  /* ── Paleta Nexo Académico (documento de diseño) ──────────────────────
+
+     Azul Nexo (primario)       #142B6F  encabezados, sidebar, marca
+     Azul Conexión (secundario) #2F6FED  botones principales, links, foco
+     Turquesa Nexo (acento)     #14B8A6  íconos, acentos, destacados
+     Verde Éxito                #22C55E  Activo, asistencia, confirmaciones
+     Ámbar Atención             #F59E0B  alertas, deuda, advertencias
+     Rojo Error                 #EF4444  errores, bajas, cancelaciones
+     Gris Oscuro (texto)        #1E293B  texto principal
+     Gris Medio (texto sec.)    #64748B  texto secundario y etiquetas
+     Gris Claro (fondo)         #F1F5F9  fondos de pantalla y tarjetas
+  ────────────────────────────────────────────────────────────────────────── */
+
+  --color-primary: #142b6f;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #1e3a8a;
+  --color-on-primary-container: #b6c8ff;
+  --color-primary-fixed: #dce1ff;
+  --color-primary-fixed-dim: #b6c4ff;
+  --color-on-primary-fixed: #00164e;
+  --color-on-primary-fixed-variant: #264191;
+
+  --color-secondary: #2f6fed;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #4a83f1;
+  --color-on-secondary-container: #fefcff;
+  --color-secondary-fixed: #d8e2ff;
+  --color-secondary-fixed-dim: #adc6ff;
+  --color-on-secondary-fixed: #001a42;
+  --color-on-secondary-fixed-variant: #004395;
+
+  --color-tertiary: #14b8a6;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #5eead4;
+  --color-on-tertiary-container: #0f766e;
+  --color-tertiary-fixed: #ccfbf1;
+  --color-tertiary-fixed-dim: #99f6e4;
+  --color-on-tertiary-fixed: #042f2e;
+  --color-on-tertiary-fixed-variant: #0f766e;
+
+  --color-error: #ef4444;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  --color-background: #f1f5f9;
+  --color-on-background: #1e293b;
+  --color-surface: #f1f5f9;
+  --color-on-surface: #1e293b;
+  --color-surface-dim: #cbd5e1;
+  --color-surface-bright: #f1f5f9;
+  --color-surface-variant: #e2e8f0;
+  --color-on-surface-variant: #64748b;
+  --color-surface-tint: #2f6fed;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f8fafc;
+  --color-surface-container: #e2e8f0;
+  --color-surface-container-high: #d9e2ec;
+  --color-surface-container-highest: #cbd5e1;
+
+  --color-inverse-surface: #334155;
+  --color-inverse-on-surface: #f1f5f9;
+  --color-inverse-primary: #93c5fd;
+
+  --color-outline: #64748b;
+  --color-outline-variant: #cbd5e1;
+
+  /* ── Status colors (badges) ────────────────────────────────────────── */
+
+  --color-status-success: #22c55e;
+  --color-status-success-strong: #16a34a;
+  --color-status-warning: #f59e0b;
+  --color-status-warning-strong: #d97706;
+  --color-status-info: #2f6fed;
+  --color-status-info-strong: #1d4ed8;
+  --color-status-danger: #ef4444;
+  --color-status-danger-strong: #dc2626;
+  --color-status-neutral: #64748b;
+  --color-status-neutral-strong: #475569;
+  --color-status-pink: #d81b60;
+  --color-status-pink-strong: #ad1457;
+
+  /* ── Motion ────────────────────────────────────────────────────────── */
+
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 500ms;
+
+  /* ── Shadows ───────────────────────────────────────────────────────── */
+
+  --shadow-card: 0 4px 24px 0 rgb(20 43 111 / 0.1), 0 1px 3px 0 rgb(20 43 111 / 0.08);
+  --shadow-modal: 0 8px 40px 0 rgb(20 43 111 / 0.22), 0 2px 8px 0 rgb(20 43 111 / 0.12);
+
+  /* ── Spacing custom ────────────────────────────────────────────────── */
+
+  --spacing-2xs: 2px;
+  --spacing-gutter: 20px;
+  --spacing-gutter-compact: 12px;
+  --spacing-margin: 24px;
+  --spacing-margin-wide: 32px;
+
+  /* ── Radius (MASTER: DEFAULT 2px, lg 4px, xl 8px, full 12px) ───────── */
+
+  --radius-xs: 2px; /* elementos mínimos */
+  --radius-sm: 4px; /* botones, inputs */
+  --radius-md: 8px; /* modales, cards */
+  --radius-lg: 12px; /* badges, pills no redondas */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  background: var(--color-background);
+  color: var(--color-on-surface);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-background);
+  color: var(--color-on-surface);
+}
+
+/* ── Material Symbols Outlined ─────────────────────────────────────────── */
+/* Se usa vía <Icon name="..."/> (src/components/ui/Icon.tsx).              */
+
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined", sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* Variante rellena (para estados activos o énfasis de marca). */
+.material-symbols-outlined--filled {
+  font-variation-settings:
+    "FILL" 1,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
+}
+/* ── Impresión ─────────────────────────────────────────────────────────── */
+/* La exportación a PDF del listado (HU-MAT-01) usa el diálogo de impresión   */
+/* del navegador: se imprime solo el contenido, sin sidebar ni controles.     */
+/* Los elementos que no van al papel se marcan con la utilidad `print:hidden`.*/
+
+@media print {
+  :root,
+  body {
+    background: #ffffff;
+  }
+
+  main {
+    padding: 0;
+  }
+
+  /* Que la tabla no se corte a la mitad de una fila. */
+  tr,
+  img {
+    break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group;
+  }
 }
