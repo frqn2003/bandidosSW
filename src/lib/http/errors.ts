@@ -51,12 +51,21 @@ export class NotFoundError extends AppError {
   }
 }
 
-/**
- * 409 — choca con un único: CUIT o nombre duplicado, código repetido.
- * Distinto de BusinessRuleError: acá el problema es que el dato YA EXISTE.
- */
 export class ConflictError extends AppError {
   readonly status = 409;
+
+  override get datos(): Record<string, unknown> | undefined {
+    return this._datos;
+  }
+
+  constructor(
+    codigo: string,
+    mensaje: string,
+    campo?: string,
+    private readonly _datos?: Record<string, unknown>,
+  ) {
+    super(codigo, mensaje, campo);
+  }
 }
 
 /**
@@ -212,6 +221,9 @@ export function traducirErrorPostgres(e: unknown): AppError | null {
     if (constraint.includes("deposito_nombre")) {
       return new ConflictError("DEPOSITO_DUPLICADO", "Ya existe un depósito con ese nombre.", "nombre");
     }
+    if (constraint.includes("uq_alumno_dni_activo") || constraint.includes("alumno_dni")) {
+      return new ConflictError("DNI_DUPLICADO", "Ya existe un alumno activo con ese DNI.", "dni");
+    }
     if (constraint.includes("profesor_usuario_id")) {
       return new ConflictError("USUARIO_YA_ES_PROFESOR", "Ese usuario ya tiene ficha de profesor.", "usuarioId");
     }
@@ -235,6 +247,18 @@ export function traducirErrorPostgres(e: unknown): AppError | null {
 
   // 23514 = check_violation
   if (codigo === "23514") {
+    if (constraint.includes("alumno_dni")) {
+      return new ValidationError("DNI_INVALIDO", "El DNI debe tener 7 u 8 dígitos.", "dni");
+    }
+    if (constraint.includes("alumno_telefono") || constraint.includes("alumno_responsable_tel")) {
+      return new ValidationError("TELEFONO_INVALIDO", "El teléfono debe tener 10 u 11 dígitos, sin guiones.", "telefono");
+    }
+    if (constraint.includes("alumno_fecha_nacimiento")) {
+      return new ValidationError("FECHA_NACIMIENTO_INVALIDA", "La fecha de nacimiento no puede ser futura.", "fechaNacimiento");
+    }
+    if (constraint.includes("alumno_responsable_menor")) {
+      return new ValidationError("RESPONSABLE_REQUERIDO", "Un alumno menor de edad necesita los datos del responsable.", "responsableNombre");
+    }
     if (constraint.includes("profesor_telefono")) {
       return new ValidationError("TELEFONO_INVALIDO", "El teléfono debe tener 10 u 11 dígitos, sin guiones.", "telefono");
     }

@@ -69,15 +69,13 @@ export interface DbTables {
     hora_fin: string;
     estado: EstadoActivoInactivo;  // auto (default)
   };
-  articulo: {
-    id: number;  // auto (default)
-    categoria_id: number;
-    unidad_medida_id: number;
-    codigo: string;
+  alumno: {
+    id: number;  // auto (identity)
+    legajo: string | null;
     nombre: string;
     apellido: string;
     dni: string;
-    fecha_nacimiento: Date;
+    fecha_nacimiento: Date | string;
     telefono: string;
     email: string | null;
     nivel_educativo: NivelMateria;
@@ -85,8 +83,8 @@ export interface DbTables {
     responsable_dni: string | null;
     responsable_telefono: string | null;
     estado: EstadoActivoInactivo;  // auto (default)
-    created_at: Date;  // auto (default)
-    updated_at: Date;  // auto (default)
+    created_at: Date | string;  // auto (default)
+    updated_at: Date | string;  // auto (default)
   };
   auditoria: {
     id: string;  // auto (default)

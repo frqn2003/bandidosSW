@@ -43,7 +43,6 @@ export function FiltrosAlumnos({ estado, onChange, totalActivos }: FiltrosAlumno
             value={estado.busqueda}
             onChange={(e) => set({ busqueda: e.target.value })}
             className="pl-10"
-            hint="Busca por cualquiera de los cuatro datos, con coincidencia parcial."
           />
           <Icon
             name="search"
