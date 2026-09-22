@@ -13,6 +13,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Pagination } from "@/components/ui/Pagination";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { RequiereSesion } from "@/components/auth/RequiereSesion";
 import { BajaMateriaModal } from "@/components/materias/BajaMateriaModal";
 import {
   FiltrosMaterias,
@@ -440,8 +441,10 @@ function MateriasContent() {
 
 export default function MateriasPage() {
   return (
-    <ToastProvider>
-      <MateriasContent />
-    </ToastProvider>
+    <RequiereSesion>
+      <ToastProvider>
+        <MateriasContent />
+      </ToastProvider>
+    </RequiereSesion>
   );
 }
