@@ -4,6 +4,15 @@ Log del equipo (diseño front). Se alimenta automáticamente durante `/disenar` 
 
 ---
 
+### 2026-09-22 · Calendario (HU-CAL-01) — leer un `useRef().current` durante el render
+
+- **Qué pasó:** `npm run lint` falló con `react-hooks/refs` en `CalendarioTurnos.tsx`: `const hoyISO = useRef(aISO(new Date())).current;` (y su uso en el inicializador de `useState`). La regla prohíbe leer `ref.current` **durante el render** porque el valor puede cambiar entre renders y romper la concordancia de React.
+- **Cómo se detectó:** paso 6a de `/disenar` (verificación estática). TypeScript no lo marca.
+- **Causa:** se usó `useRef` pensando "solo lo inicializo", pero la lectura en render es inválida.
+- **Regla para no repetirlo:** para un valor calculado una sola vez que no se escribe después de montar, usar `const [hoyISO] = useState(() => aISO(new Date()))` — el inicializador corre una sola vez y no hay refs de por medio. Además, el botón "Reintentar" no debe ir en las deps del `useCallback` de datos: se incrementa un contador `intento` y ese contador va en las deps del `useEffect` (`useEffect(traer, [traer, intento])`) para repetir la búsqueda sin recrear la función.
+
+---
+
 ### 2026-09-22 · Sesión (HU-SIS-01) — un rol sin módulos construidos quedaba varado en el login
 
 - **Qué pasó:** el rol **Profesor** iniciaba sesión correctamente (la sesión quedaba guardada) pero la pantalla seguía mostrando el formulario de login. Parecía que el login no funcionaba.

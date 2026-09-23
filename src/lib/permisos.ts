@@ -23,6 +23,7 @@ export type ModuloId =
   | "dashboard"
   | "sedes"
   | "turnos"
+  | "calendario"
   | "alumnos"
   | "profesores"
   | "mi-ficha"
@@ -47,6 +48,13 @@ export const MODULOS: Modulo[] = [
   { id: "dashboard", label: "Dashboard", href: "#", icon: "dashboard", construido: false },
   { id: "sedes", label: "Sedes", href: "#", icon: "location_city", construido: false },
   { id: "turnos", label: "Turnos y Agenda", href: "#", icon: "calendar_month", construido: false },
+  {
+    id: "calendario",
+    label: "Calendario",
+    href: "/calendario",
+    icon: "calendar_view_month",
+    construido: true,
+  },
   { id: "alumnos", label: "Alumnos", href: "/alumnos", icon: "group", construido: true },
   { id: "profesores", label: "Cuerpo Docente", href: "/profesores", icon: "groups", construido: true },
   // Solo para el rol Profesor: su propia ficha en modo LECTURA. Todavía no
@@ -70,10 +78,10 @@ export const PERMISOS_POR_ROL: Record<NombreRol, ModuloId[]> = {
   Gerente: MODULOS.map((m) => m.id).filter((id) => id !== "mi-ficha"),
   // "Mesa de Entrada: alumnos, turnos, calendarios y pagos
   //  (sin usuarios ni indicadores de dirección)."
-  "Mesa de Entrada": ["turnos", "alumnos", "cobranzas"],
+  "Mesa de Entrada": ["turnos", "calendario", "alumnos", "cobranzas"],
   // "Profesor: su calendario, su ficha en modo LECTURA, asistencia de sus
   //  clases e indicadores propios."
-  Profesor: ["turnos", "mi-ficha", "reportes"],
+  Profesor: ["calendario", "turnos", "mi-ficha", "reportes"],
 };
 
 /** Los módulos que le corresponden al rol, en el orden del menú. */
