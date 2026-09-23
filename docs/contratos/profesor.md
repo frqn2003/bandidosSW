@@ -201,11 +201,19 @@ const [candidatos, materias] = await Promise.all([
   apiGetOpcional<CandidatoProfesorResponse[]>(rutaCandidatos, []),
   apiGetOpcional<MateriaOpcion[]>("/api/materias?estado=activo", []),
 ]);
+
+// Resolver la ficha del profesor logueado (rol Profesor en /calendario):
+// La sesión tiene `usuarioId`; con ese dato se obtiene el profesor.id.
+const [miProfesor] = await apiGet<ProfesorResponse[]>(`${RUTA}?usuarioId=${session.usuarioId}`);
+// `miProfesor` puede ser undefined si el usuario aún no tiene ficha creada.
 ```
 
 `rutaCandidatos` ya devuelve los usuarios con rol Profesor, activos, con academia y
 **sin ficha**: son los únicos ids que `crearProfesorBody.usuarioId` acepta. Filtrar
 `/api/usuarios` en el front no alcanza — desde ahí no se ve quién ya tiene ficha.
+
+El filtro `usuarioId` devuelve un array de 0 o 1 elementos. Si devuelve vacío, el
+usuario tiene rol Profesor en el sistema pero su ficha todavía no fue creada.
 
 ## 3. Armar el body tipado
 

@@ -23,7 +23,6 @@ import {
   DIAS_MAXIMOS_RESERVA,
   MAX_OBSERVACIONES,
   buscarAlumnosActivos,
-  emailDelAlumno,
   enviarComprobantePorEmail,
   hoyISO,
   listarFranjas,
@@ -100,6 +99,7 @@ function ReservaContent() {
   const [confirmando, setConfirmando] = useState(false);
   const [turno, setTurno] = useState<TurnoResponse | null>(null);
   const [dniComprobante, setDniComprobante] = useState<string | undefined>();
+  const [emailComprobante, setEmailComprobante] = useState<string | null>(null);
   const [enviandoEmail, setEnviandoEmail] = useState(false);
 
   // ── Cargas (el "cargando" se deriva de la clave: sin setState síncrono en efectos) ──
@@ -297,6 +297,7 @@ function ReservaContent() {
       // BACKEND: POST /api/turnos — el back registra la reserva en `auditoria`.
       const creado = await reservarTurno(body);
       setDniComprobante(alumno.dni);
+      setEmailComprobante(alumno.email);
       setTurno(creado);
       setConfirmarOpen(false);
       showToast("success", `Turno ${creado.codigo} reservado.`);
@@ -441,7 +442,7 @@ function ReservaContent() {
               // OPCIONAL: envío por email (borrar estas tres props si no se quiere).
               onEnviarEmail={enviarEmail}
               enviandoEmail={enviandoEmail}
-              emailDestino={emailDelAlumno(turno.alumno.id)}
+              emailDestino={emailComprobante}
             />
           ) : (
             <>

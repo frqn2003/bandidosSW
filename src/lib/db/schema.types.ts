@@ -161,12 +161,10 @@ export interface DbTables {
   };
   turno: {
     id: number;  // auto (identity)
-    cliente_id: number;
-    mascota_id: number;
-    sucursal_id: number;
-    agenda_profesional_id: number;
-    practica_id: number;
-    estado_id: number;  // auto (default)
+    codigo: string | null;
+    alumno_id: number;
+    profesor_id: number;
+    materia_id: number;
     fecha: Date;
     hora_inicio: string;
     hora_fin: string;
