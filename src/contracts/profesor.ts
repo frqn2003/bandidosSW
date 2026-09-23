@@ -46,6 +46,9 @@ export const listarProfesoresQuery = z
     academiaId: z.coerce.number().int().positive().optional(),
     diaSemana: z.coerce.number().int().min(1).max(6).optional(), // 1 = lunes ... 6 = sábado
     estado: z.enum(["activo", "inactivo"]).optional(),
+    /** Filtra por el usuario vinculado. Permite que el rol Profesor resuelva
+     *  su propio profesor.id desde la sesión: GET /api/profesores?usuarioId=X */
+    usuarioId: z.coerce.number().int().positive().optional(),
   })
   .strict();
 

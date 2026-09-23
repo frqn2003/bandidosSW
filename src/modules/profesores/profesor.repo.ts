@@ -84,6 +84,11 @@ export async function findAll(
     )`);
   }
 
+  if (filtros.usuarioId) {
+    params.push(filtros.usuarioId);
+    condiciones.push(`p.usuario_id = $${params.length}`);
+  }
+
   const where = condiciones.length > 0 ? `WHERE ${condiciones.join(" AND ")}` : "";
   const sql = `
     SELECT ${COLUMNAS_PROFESOR}
