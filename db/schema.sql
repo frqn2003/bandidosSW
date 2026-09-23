@@ -188,7 +188,8 @@ CREATE TABLE usuario (
   auth_id uuid NOT NULL,
   intentos_fallidos smallint(16,0) DEFAULT 0 NOT NULL,
   bloqueado_hasta timestamp without time zone,
-  fecha_creacion timestamp without time zone DEFAULT now() NOT NULL
+  fecha_creacion timestamp without time zone DEFAULT now() NOT NULL,
+  cambiar_contraseña boolean DEFAULT true
 );
 
 

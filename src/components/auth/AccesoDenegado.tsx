@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { inicioDe, type Modulo } from "@/lib/permisos";
 import type { NombreRol } from "@/contracts/rol";
@@ -22,12 +23,21 @@ interface AccesoDenegadoProps {
  * nombra: "Ir al inicio" significa algo distinto para cada rol, y un botón que
  * no dice a dónde lleva obliga a probar.
  *
- * BACKEND: el intento queda registrado como `acceso_denegado` en
- * `auditoria_sesion` — lo hace el server cuando rechaza el endpoint, no el
- * front. Esconder el ítem del menú es UX; lo que protege es `requireSession()`.
+ * Registra el intento como `acceso_denegado` en `auditoria_sesion`.
  */
 export function AccesoDenegado({ rol, modulo }: AccesoDenegadoProps) {
   const destino = inicioDe(rol);
+
+  useEffect(() => {
+    fetch("/api/auth/acceso-denegado", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        modulo: modulo?.id,
+        ruta: typeof window !== "undefined" ? window.location.pathname : undefined,
+      }),
+    }).catch(() => { });
+  }, [modulo]);
 
   return (
     <section
