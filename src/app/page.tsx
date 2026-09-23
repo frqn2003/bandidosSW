@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
 import { CampoContrasena } from "@/components/auth/CampoContrasena";
-import { CREDENCIALES_DEMO, login } from "@/data/auth";
+import { login } from "@/data/auth";
 import { inicioDe } from "@/lib/permisos";
 import { useSesion } from "@/lib/sesion";
 
@@ -189,46 +189,7 @@ export default function LoginPage() {
             ¿Olvidaste tu contraseña?
           </Link>
         </form>
-
-        <PanelDemo />
       </div>
     </div>
-  );
-}
-
-/**
- * Credenciales de prueba.
- *
- * Se renderiza SOLO fuera de producción. Si dependiera de que alguien se
- * acuerde de borrarlo, el día que el login sea real quedaría una lista de
- * usuarios y contraseñas a la vista de cualquiera.
- *
- * BACKEND: este panel entero se borra cuando el login use Supabase Auth.
- */
-function PanelDemo() {
-  if (process.env.NODE_ENV === "production") return null;
-
-  return (
-    <section className="flex flex-col gap-2 rounded-md border border-dashed border-outline-variant bg-surface-container-low p-4">
-      <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-on-surface-variant">
-        <Icon name="science" size={14} />
-        Datos de prueba (demo del front)
-      </h2>
-      <ul className="flex flex-col gap-1">
-        {CREDENCIALES_DEMO.map((c) => (
-          <li key={c.email} className="flex flex-wrap items-baseline gap-x-2 text-xs">
-            <span className="font-semibold text-on-surface">{c.rol}</span>
-            <span className="font-mono text-on-surface-variant">
-              {c.email} / {c.password}
-            </span>
-            {c.nota && (
-              <span className="rounded-full bg-status-warning/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-status-warning-strong">
-                {c.nota}
-              </span>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }

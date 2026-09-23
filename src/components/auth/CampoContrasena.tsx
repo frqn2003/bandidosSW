@@ -42,7 +42,7 @@ export function CampoContrasena({ label, id, className = "", ...props }: CampoCo
         aria-pressed={visible}
         aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
         aria-controls={id}
-        className="absolute right-1 top-[30px] flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors duration-fast ease-out hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
+        className="absolute right-1 top-[26px] flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors duration-fast ease-out hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
       >
         <Icon name={visible ? "visibility_off" : "visibility"} size={20} />
       </button>
