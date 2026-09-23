@@ -276,6 +276,59 @@ export async function findCandidatos(
 }
 
 /**
+ * ¿Hay un usuario ACTIVO con ese DNI o ese email? (alta rápida de candidato).
+ * La base todavía no tiene los UNIQUE parciales de dni/email: este chequeo es
+ * la única barrera, así que se corre dentro de la transacción del alta.
+ */
+export async function buscarUsuarioActivoDuplicado(
+  dni: string,
+  email: string,
+  ejecutor: Ejecutor = pool,
+): Promise<{ dni: string; email: string } | null> {
+  const sql = `
+    SELECT dni, email
+    FROM usuario
+    WHERE estado = 'activo' AND (dni = $1 OR lower(email) = lower($2))
+    LIMIT 1
+  `;
+  const params = [dni, email];
+  if ("query" in ejecutor && ejecutor !== pool) {
+    const { rows } = await ejecutor.query<{ dni: string; email: string }>(sql, params);
+    return rows[0] ?? null;
+  }
+  const filas = await query<{ dni: string; email: string }>(sql, params);
+  return filas[0] ?? null;
+}
+
+/**
+ * Inserta el usuario con rol Profesor y lo devuelve con la forma de candidato.
+ * `rol_id` 2 = Profesor y `academia_id` 1 fijos hasta la HU de usuarios/academias.
+ */
+export async function insertUsuarioProfesor(
+  datos: { nombre: string; apellido: string; dni: string; email: string; authId: string },
+  client: PoolClient,
+): Promise<UsuarioCandidatoRow> {
+  const sql = `
+    WITH nuevo AS (
+      INSERT INTO usuario (rol_id, academia_id, nombre, apellido, dni, email, estado, auth_id, "cambiar_contraseña")
+      VALUES (2, 1, $1, $2, $3, $4, 'activo', $5, true)
+      RETURNING id, nombre, apellido, dni, email, academia_id
+    )
+    SELECT n.id, n.nombre, n.apellido, n.dni, n.email, n.academia_id, a.nombre AS academia_nombre
+    FROM nuevo n
+    LEFT JOIN academia a ON a.id = n.academia_id
+  `;
+  const { rows } = await client.query<UsuarioCandidatoRow>(sql, [
+    datos.nombre,
+    datos.apellido,
+    datos.dni,
+    datos.email,
+    datos.authId,
+  ]);
+  return rows[0];
+}
+
+/**
  * Cuenta turnos futuros reservados para un profesor.
  */
 export async function contarTurnosFuturos(

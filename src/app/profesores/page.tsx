@@ -41,6 +41,7 @@ import {
   type ModoProfesorForm,
 } from "@/components/profesores/ProfesorFormModal";
 import { bloquesDesdeFranjas, capacidadMaxDe, franjasDesdeBloques } from "@/lib/profesores";
+import { useSesion } from "@/lib/sesion";
 
 const FILTROS_INICIALES: FiltrosProfesoresState = {
   busqueda: "",
@@ -85,6 +86,9 @@ function errorDeFormulario(e: unknown): { campo?: string; mensaje: string } {
 }
 
 function CuerpoDocenteContent() {
+  // Alta rápida de usuario docente: solo el Gerente (el back también lo valida).
+  const { sesion } = useSesion();
+  const esGerente = sesion?.usuario.rol.nombre === "Gerente";
   const { showToast } = useToast();
   const [filtros, setFiltros] = useState(FILTROS_INICIALES);
   const [pagina, setPagina] = useState(1);
@@ -529,6 +533,12 @@ function CuerpoDocenteContent() {
             : undefined
         }
         usuariosSinFicha={usuariosSinFicha}
+        puedeCrearUsuario={esGerente}
+        onUsuarioCreado={(u) =>
+          setUsuariosSinFicha((prev) =>
+            [...prev.filter((p) => p.id !== u.id), u].sort((a, b) => a.apellido.localeCompare(b.apellido)),
+          )
+        }
         materiasCatalogo={materiasCatalogo}
         errorRemoto={errorRemoto}
         guardando={guardando}

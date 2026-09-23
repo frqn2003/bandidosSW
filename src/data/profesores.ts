@@ -13,7 +13,9 @@ import {
   rutaCandidatos,
   rutaInactivar,
   rutaProfesor,
+  type CandidatoCreadoResponse,
   type CandidatoProfesorResponse,
+  type CrearCandidatoBody,
   type CrearProfesorBody,
   type EditarProfesorBody,
   type EstadoProfesor,
@@ -214,6 +216,20 @@ export async function listarCandidatos(): Promise<UsuarioSinFicha[]> {
     apellido: c.apellido,
     email: c.email,
   }));
+}
+
+/**
+ * Alta rápida de un usuario Profesor (solo Gerente). Devuelve el usuario ya
+ * con la forma del combo y la contraseña temporal, que se muestra una sola vez.
+ */
+export async function crearCandidato(
+  body: CrearCandidatoBody,
+): Promise<{ usuario: UsuarioSinFicha; passwordTemporal: string }> {
+  const r = await apiSend<CandidatoCreadoResponse>("POST", rutaCandidatos, body);
+  return {
+    usuario: { id: r.usuario.id, nombre: r.usuario.nombre, apellido: r.usuario.apellido, email: r.usuario.email },
+    passwordTemporal: r.passwordTemporal,
+  };
 }
 
 /** Catálogo de materias activas (filtro del listado y checkboxes del formulario). */

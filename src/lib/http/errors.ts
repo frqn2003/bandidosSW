@@ -165,11 +165,11 @@ export class CuentaBloqueadaError extends AppError {
 export class ServicioAuthNoDisponibleError extends AppError {
   readonly status = 503;
 
-  constructor() {
-    super(
-      "AUTH_NO_DISPONIBLE",
-      "No se pudo validar el inicio de sesión en este momento. Intentá de nuevo en unos segundos.",
-    );
+  /** `mensaje` opcional: el alta de usuarios (profesor.service) usa otro texto. */
+  constructor(
+    mensaje = "No se pudo validar el inicio de sesión en este momento. Intentá de nuevo en unos segundos.",
+  ) {
+    super("AUTH_NO_DISPONIBLE", mensaje);
   }
 }
 

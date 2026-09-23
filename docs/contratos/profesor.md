@@ -265,3 +265,19 @@ if (codigo === "USUARIO_YA_ES_PROFESOR") {
   setErrorGlobal(mensajeDeError(e));
 }
 ```
+
+---
+
+## Alta rápida de usuario candidato (`POST /api/profesores/candidatos`)
+
+Destraba el alta de profesores mientras no exista el módulo `/usuarios` (solución 1 de la propuesta "usuarios candidatos"). Solo **Gerente** (`ACCESO_DENEGADO` 403 para el resto).
+
+- **Body** `crearCandidatoBody`: `{ nombre, apellido, dni (7-8 dígitos), email }`. Rol (`rol_id = 2`, Profesor) y academia (`academia_id = 1`) los fija el back hasta la HU de usuarios/academias.
+- **Response 201** `CandidatoCreadoResponse`: `{ usuario: CandidatoProfesorResponse, passwordTemporal }`. La contraseña se muestra **una sola vez** y no se guarda en el sistema.
+- **Errores:** `DNI_DUPLICADO` / `EMAIL_DUPLICADO` (409), `EMAIL_YA_REGISTRADO_EN_AUTH` (409, el email tiene cuenta en Supabase Auth pero no fila en `usuario`), `AUTH_NO_DISPONIBLE` (503, Supabase no respondió o falta `SUPABASE_SERVICE_ROLE_KEY`).
+
+**Cómo se obtiene `usuario.auth_id`** (`auth_id uuid NOT NULL UNIQUE`): con la **API de administración** de Supabase Auth (`POST /auth/v1/admin/users`, `email_confirm: true`) desde `src/lib/auth/gotrue.ts`, con la `SUPABASE_SERVICE_ROLE_KEY` (solo servidor). No se usa `signUp`: es auto-registro (pide confirmar el email y, si el email ya existe, devuelve un id falso).
+
+**Orden en `profesor.service.crearCandidato`:** transacción + `pg_advisory_xact_lock` (la base todavía no tiene UNIQUE de dni/email) → chequeo de duplicados → alta en Supabase Auth → `INSERT usuario` con `auth_id` y `cambiar_contraseña = true` → si el INSERT o el COMMIT fallan, se borra la cuenta de Auth (`DELETE /auth/v1/admin/users/:id`).
+
+**Primer ingreso:** `cambiar_contraseña = true` hace que el login obligue a definir una contraseña nueva (`/cambiar-contrasena`, HU-SIS-01).
