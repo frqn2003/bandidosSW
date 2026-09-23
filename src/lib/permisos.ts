@@ -47,12 +47,20 @@ export type Modulo = {
 export const MODULOS: Modulo[] = [
   { id: "dashboard", label: "Dashboard", href: "#", icon: "dashboard", construido: false },
   { id: "sedes", label: "Sedes", href: "#", icon: "location_city", construido: false },
-  { id: "turnos", label: "Turnos y Agenda", href: "#", icon: "calendar_month", construido: false },
   {
     id: "calendario",
     label: "Calendario",
     href: "/calendario",
     icon: "calendar_view_month",
+    construido: true,
+  },
+  // Después de Calendario a propósito: `inicioDe` toma el primer módulo
+  // construido del rol, y la pantalla de entrada sigue siendo el calendario.
+  {
+    id: "turnos",
+    label: "Turnos y Agenda",
+    href: "/turnos/reservas",
+    icon: "calendar_month",
     construido: true,
   },
   { id: "alumnos", label: "Alumnos", href: "/alumnos", icon: "group", construido: true },

@@ -150,8 +150,8 @@ const BLOQUES: {
   { id: 20, profesorId: 4, diaSemana: 5, horaInicio: "14:00", horaFin: "19:00", franjaAtencionId: 10 },
 ];
 
-/** El fixture coma `fecha` (no viaja en TurnoCalendarioResponse: se agrupa por día). */
-type TurnoFixture = TurnoCalendarioResponse & { profesorId: number; fecha: string };
+/** El fixture suma `fecha` (no viaja en TurnoCalendarioResponse: se agrupa por día). */
+export type TurnoFixture = TurnoCalendarioResponse & { profesorId: number; fecha: string };
 
 /**
  * Turnos reservados de los profesores (tabla `turno`).
@@ -385,4 +385,58 @@ function generarHuecos(
     if (cursor < finB) nuevoHueco(bloque.id, cursor, finB);
   }
   return huecos;
+}
+// ─── Solo fixture: puente con la reserva (HU-TUR-01) ─────────────────────
+// `src/data/turnos.ts` necesita los mismos bloques y turnos que muestra la
+// grilla para calcular las franjas libres, y la reserva tiene que aparecer en
+// el calendario al volver. Con el back esto desaparece: la reserva escribe en
+// `turno` y la vista `vw_huecos_disponibles` lee de la misma tabla.
+
+/** Turno reservado reducido a lo que la reserva necesita para chequear cruces. */
+export interface TurnoAgendaFixture {
+  id: number;
+  profesorId: number;
+  alumnoId: number;
+  materiaId: number;
+  fecha: string;
+  horaInicio: string;
+  horaFin: string;
+}
+
+const aAgendaFixture = (t: TurnoFixture): TurnoAgendaFixture => ({
+  id: t.id,
+  profesorId: t.profesorId,
+  alumnoId: t.alumno.id,
+  materiaId: t.materia.id,
+  fecha: t.fecha,
+  horaInicio: t.horaInicio,
+  horaFin: t.horaFin,
+});
+
+/** Bloques del profesor y turnos reservados de ese día (síncrono, sin demora). */
+export function agendaFixture(
+  profesorId: number,
+  fecha: string,
+): { bloques: { horaInicio: string; horaFin: string }[]; turnos: TurnoAgendaFixture[] } {
+  const dia = diaIsoDe(aDate(fecha));
+  const bloques = BLOQUES.filter((b) => {
+    const franja = FRANJAS_ATENCION.find((f) => f.id === b.franjaAtencionId);
+    return b.profesorId === profesorId && franja?.diaSemana === dia;
+  }).map((b) => ({ horaInicio: b.horaInicio, horaFin: b.horaFin }));
+  const turnos = TURNOS.filter(
+    (t) => t.profesorId === profesorId && t.fecha === fecha && t.estado === "Reservado",
+  ).map(aAgendaFixture);
+  return { bloques, turnos };
+}
+
+/** Turnos reservados del alumno en esa fecha, con cualquier profesor. */
+export function turnosDelAlumnoFixture(alumnoId: number, fecha: string): TurnoAgendaFixture[] {
+  return TURNOS.filter(
+    (t) => t.alumno.id === alumnoId && t.fecha === fecha && t.estado === "Reservado",
+  ).map(aAgendaFixture);
+}
+
+/** Suma a la grilla un turno recién reservado desde HU-TUR-01. */
+export function registrarTurnoFixture(turno: TurnoFixture): void {
+  TURNOS.push({ ...turno });
 }

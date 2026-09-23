@@ -25,6 +25,13 @@ interface ConfirmarDialogProps {
   onConfirm: () => void;
   /** Contenido opcional adicional (ej: aviso de cantidad de turnos en la baja). */
   children?: ReactNode;
+  /**
+   * true mientras se envía la confirmación: deshabilita los dos botones para no
+   * mandar la operación dos veces (ej: reserva de turno, HU-TUR-01). Opcional.
+   */
+  confirmando?: boolean;
+  /** Texto del botón mientras `confirmando` es true. Default: `confirmLabel`. */
+  confirmandoLabel?: string;
 }
 
 const TONES: Record<
@@ -58,19 +65,36 @@ export function ConfirmarDialog({
   onClose,
   onConfirm,
   children,
+  confirmando = false,
+  confirmandoLabel,
 }: ConfirmarDialogProps) {
   const style = TONES[tone];
+  // Mientras se envía no se puede cerrar (Escape / fondo): el resultado tiene
+  // que llegar a una pantalla que lo muestre.
+  const cerrar = () => {
+    if (!confirmando) onClose();
+  };
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={cerrar}
       title={title}
       icon={<span className={style.iconClass}>{style.icon}</span>}
       maxWidth="max-w-md"
       footer={
         <>
-          <Button type="button" variant="outline" onClick={onClose}>{cancelLabel}</Button>
-          <Button type="button" variant={style.variant} onClick={onConfirm}>{confirmLabel}</Button>
+          <Button type="button" variant="outline" onClick={cerrar} disabled={confirmando}>
+            {cancelLabel}
+          </Button>
+          <Button
+            type="button"
+            variant={style.variant}
+            onClick={onConfirm}
+            disabled={confirmando}
+            aria-busy={confirmando || undefined}
+          >
+            {confirmando ? (confirmandoLabel ?? confirmLabel) : confirmLabel}
+          </Button>
         </>
       }
     >

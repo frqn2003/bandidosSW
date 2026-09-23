@@ -20,7 +20,7 @@ import { ReservaTurnoModal } from "./ReservaTurnoModal";
 // Vista Semana (6 días, lun–sáb) o Día; zoom de 30/60 min por fila; navegación
 // Hoy/◀/▶; leyenda de colores siempre visible; resaltado del día y la hora
 // actual. Click en turno → detalle LECTURA (HU-TUR-02); click en franja libre →
-// reserva precargada (HU-TUR-01, chip "Próx.").
+// reserva precargada (HU-TUR-01, /turnos/reservas).
 //
 // Diseño: adapta la estética de la agenda semanal del diseño "Turnos y Agenda"
 // (tarjetas con borde lateral de color, pill contador, leyenda con puntos) al

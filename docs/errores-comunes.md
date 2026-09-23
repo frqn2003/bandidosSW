@@ -2,6 +2,33 @@
 
 Log del equipo (diseño front). Se alimenta automáticamente durante `/disenar` (pasos de verificación) cuando se detecta un problema.
 
+## Reglas activas
+
+Resumen de las reglas de las entradas de abajo; se verifican en el paso 6 de `/disenar`.
+
+1. No leer `useRef().current` durante el render; valor calculado una vez → `useState(() => …)`. Reintentos con contador `intento` en las deps del efecto.
+2. Toda redirección "al inicio" tiene un destino que siempre existe (`/inicio`); probar el login con cada rol.
+3. `Date.now()`, `Math.random()`, `randomUUID()` nunca en el render ni en inicializadores de `useRef`.
+4. Todo `.regex()` / `.refine()` / `.superRefine()` de un contrato lleva mensaje en español.
+5. `AnimatePresence` de modales envuelto en `pointer-events-none` cuando está cerrado.
+6. En `useEffect`, el estado se toca solo en callbacks async; el "cargando" inicial va en `useState` (o se deriva de una clave).
+7. El documento de diseño manda: `MASTER.md` se actualiza en el mismo cambio que la paleta.
+8. Íconos solo con `ui/Icon` (Material Symbols); nada de `lucide-react`.
+9. Fuentes externas con `<link>` en `layout.tsx`, no `@import` en CSS (y el disable de `no-page-custom-font` en una sola línea arriba del `<link>`).
+10. Antes de usar una clase de Tailwind, confirmar que el token existe en `globals.css`.
+11. `npx next typegen` antes de `tsc`; no importar `LayoutProps`.
+12. Sin `node_modules`, correr `npm install` antes de verificar.
+13. **Contraste de texto chico:** `status-warning-strong` y `error` no llegan a 4.5:1 como texto sobre fondos claros, y `on-surface-variant` tampoco sobre `surface-container`/`-high`. Ahí el texto va en `on-surface` (o `status-danger-strong` sobre blanco / `error/5`) y el color de estado queda en el ícono o el borde.
+
+---
+
+### 2026-09-23 · Turnos (HU-TUR-01) — texto de estado con contraste insuficiente
+
+- **Qué pasó:** en las franjas horarias, el motivo de una franja deshabilitada iba en `text-on-surface-variant` sobre `bg-surface-container-high` (≈3.6:1), el aviso "último cupo" en `text-status-warning-strong` sobre blanco (≈3.2:1) y "El alumno ya tiene un turno" en `text-error` sobre gris. Ninguno llega a 4.5:1 para texto de 12 px. El mismo patrón ámbar se había puesto en el aviso de "día pasado" del `ReservaTurnoModal`.
+- **Cómo se detectó:** paso 6a de `/disenar` (checklist de accesibilidad), calculando el contraste con los hex de `globals.css`.
+- **Causa:** se eligió el color por semántica (gris = deshabilitado, ámbar = atención) sin chequear el par texto/fondo. El gris del deshabilitado es un requisito de la HU, pero el **motivo** es información que el operador tiene que leer.
+- **Regla para no repetirlo:** el color de estado va en el ícono, el borde o el fondo suave; el texto chico va en `on-surface` (o `status-danger-strong` para errores). Ver regla activa 13.
+
 ---
 
 ### 2026-09-22 · Calendario (HU-CAL-01) — leer un `useRef().current` durante el render
