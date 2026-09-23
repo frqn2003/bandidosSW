@@ -58,6 +58,14 @@ type ConfigGoTrue = { url: string; anonKey: string };
  * .env.local no matcheaba) enseñó que un problema de configuración disfrazado
  * de error de permisos cuesta una tarde.
  */
+function sanitizarUrlSupabase(raw: string): string {
+  return raw
+    .trim()
+    .replace(/\/rest\/v1\/?$/, "")
+    .replace(/\/auth\/v1\/?$/, "")
+    .replace(/\/+$/, "");
+}
+
 function leerConfig(): ConfigGoTrue {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -73,7 +81,7 @@ function leerConfig(): ConfigGoTrue {
     );
   }
 
-  return { url: url.replace(/\/+$/, ""), anonKey };
+  return { url: sanitizarUrlSupabase(url), anonKey };
 }
 
 /** Aborta la llamada si GoTrue no contesta: sin esto el login cuelga el request. */

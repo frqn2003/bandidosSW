@@ -90,7 +90,16 @@ export class UnauthorizedError extends AppError {
   readonly status = 401;
 
   constructor(mensaje = "Tu sesión no está activa o venció. Volvé a iniciar sesión.") {
-    super("SIN_SESION", mensaje);
+    super("NO_AUTENTICADO", mensaje);
+  }
+}
+
+/** 403 — sin permisos para esta acción (rol insuficiente). */
+export class ForbiddenError extends AppError {
+  readonly status = 403;
+
+  constructor(mensaje = "No tenés permisos para acceder a este recurso.") {
+    super("ACCESO_DENEGADO", mensaje);
   }
 }
 

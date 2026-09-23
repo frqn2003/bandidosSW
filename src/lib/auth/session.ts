@@ -1,5 +1,5 @@
 import { query } from "@/lib/db/client";
-import { UnauthorizedError } from "@/lib/http/errors";
+import { ForbiddenError, UnauthorizedError } from "@/lib/http/errors";
 import { leerCookie, borrarCookie } from "./cookie";
 import { invalidarToken } from "./gotrue";
 
@@ -81,11 +81,11 @@ export async function getSession(): Promise<Session | null> {
       console.warn(
         u
           ? `[sesion] SESSION_USUARIO_DNI está puesto: TODAS las requests operan como ` +
-              `${u.nombre} ${u.apellido} sin pasar por el login. Para probar HU-SIS-04, ` +
-              `saca esa línea del .env.local. (Este aviso se muestra una sola vez.)`
+          `${u.nombre} ${u.apellido} sin pasar por el login. Para probar HU-SIS-04, ` +
+          `saca esa línea del .env.local. (Este aviso se muestra una sola vez.)`
           : `[sesion] SESSION_USUARIO_DNI="${dni}" no coincide con ningún usuario activo. ` +
-              `El fallback queda sin efecto: hace falta iniciar sesión. ` +
-              `(Este aviso se muestra una sola vez.)`,
+          `El fallback queda sin efecto: hace falta iniciar sesión. ` +
+          `(Este aviso se muestra una sola vez.)`,
       );
     }
 
@@ -131,4 +131,30 @@ export async function destroySession(): Promise<void> {
   const payload = await leerCookie();
   if (payload?.at) await invalidarToken(payload.at);
   await borrarCookie();
+}
+
+/**
+ * Valida que el rol del usuario esté en la lista permitida.
+ * Si no está, registra el intento como `acceso_denegado` en `auditoria_sesion`
+ * y lanza `ForbiddenError` (403).
+ */
+export async function exigirRol(
+  session: Session,
+  rolesPermitidos: string | string[],
+  ip: string | null = null,
+  detalle?: Record<string, unknown>,
+): Promise<void> {
+  const permitidos = Array.isArray(rolesPermitidos) ? rolesPermitidos : [rolesPermitidos];
+  if (!permitidos.includes(session.rol)) {
+    try {
+      await query(
+        `INSERT INTO auditoria_sesion (usuario_id, evento, ip_origen, detalle)
+         VALUES ($1, 'acceso_denegado'::tipo_evento_sesion, $2, $3)`,
+        [session.usuarioId, ip, detalle ? JSON.stringify(detalle) : null],
+      );
+    } catch {
+      // Best-effort para asegurar que el intento denegado siempre lance 403
+    }
+    throw new ForbiddenError(`Tu rol (${session.rol}) no tiene permisos para esta acción.`);
+  }
 }
