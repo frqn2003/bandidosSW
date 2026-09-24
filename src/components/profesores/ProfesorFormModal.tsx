@@ -12,10 +12,10 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Switch } from "@/components/ui/Switch";
 import { EstadoProfesorBadge } from "@/components/profesores/EstadoProfesorBadge";
 import { UsuarioRapidoModal } from "@/components/profesores/UsuarioRapidoModal";
+import { HorarioAcademia, useAgendaAcademia } from "@/components/profesores/HorarioAcademia";
 import {
   DIAS_SEMANA_SELECT,
-  HORARIOS_OPCIONES,
-  aMin,
+  horariosDesde,
   horariosHasta,
   horasEntre,
   inicialesDe,
@@ -123,6 +123,10 @@ export function ProfesorFormModal({
   }
 
   const set = (patch: Partial<ProfesorFormData>) => setDatos((d) => ({ ...d, ...patch }));
+  const academiaId = modo === "EDICION"
+    ? profesor?.academiaId ?? null
+    : usuariosSinFicha.find((u) => String(u.id) === datos.usuarioId)?.academia?.id ?? null;
+  const horario = useAgendaAcademia(academiaId, open);
 
   const erroresLocales = useMemo(() => (envio ? validar(datos) : {}), [envio, datos]);
   // El error de la API pisa al local: viene del back, que es la autoridad.
@@ -130,8 +134,10 @@ export function ProfesorFormModal({
     ? { ...erroresLocales, [errorRemoto.campo]: errorRemoto.mensaje }
     : erroresLocales;
   const erroresFranjas = useMemo(
-    () => (envio ? validarFranjas(datos.franjas) : {}),
-    [envio, datos.franjas],
+    () => horario.habilitado
+      ? validarFranjas(envio ? datos.franjas : datos.franjas.filter((f) => f.desde && f.hasta), horario.franjas)
+      : {},
+    [envio, datos.franjas, horario.habilitado, horario.franjas],
   );
   const errorFranjasGeneral =
     envio && datos.franjas.length === 0 ? "Agregá al menos 1 bloque horario semanal" : undefined;
@@ -165,7 +171,8 @@ export function ProfesorFormModal({
   // La franja nace sin horas: primero se elige el inicio y recién ahí se
   // habilita el fin, que solo ofrece horarios posteriores.
   const agregarFranja = () => {
-    set({ franjas: [...datos.franjas, nuevaFranja()] });
+    if (!horario.habilitado) return;
+    set({ franjas: [...datos.franjas, nuevaFranja(horario.dias[0].value)] });
   };
 
   const actualizarFranja = (id: number, patch: Partial<Omit<FranjaForm, "id">>) => {
@@ -183,7 +190,7 @@ export function ProfesorFormModal({
     set({
       franjas: datos.franjas.map((f) =>
         f.id === id
-          ? { ...f, desde, hasta: f.hasta && aMin(f.hasta) > aMin(desde) ? f.hasta : "" }
+          ? { ...f, desde, hasta: horariosHasta(desde, horario.franjas, f.dia).includes(f.hasta) ? f.hasta : "" }
           : f,
       ),
     });
@@ -206,8 +213,8 @@ export function ProfesorFormModal({
   const guardar = () => {
     setEnvio(true);
     const err = validar(datos);
-    const errF = validarFranjas(datos.franjas);
-    if (Object.keys(err).length > 0 || Object.keys(errF).length > 0 || datos.franjas.length === 0)
+    const errF = validarFranjas(datos.franjas, horario.franjas);
+    if (!horario.habilitado || guardando || Object.keys(err).length > 0 || Object.keys(errF).length > 0 || datos.franjas.length === 0)
       return;
     onGuardar(datos);
   };
@@ -262,7 +269,7 @@ export function ProfesorFormModal({
           <Button type="button" variant="outline" onClick={onClose} disabled={guardando}>
             Cancelar
           </Button>
-          <Button type="button" variant="primary" onClick={guardar} disabled={guardando}>
+          <Button type="button" variant="primary" onClick={guardar} disabled={guardando || !horario.habilitado}>
             <Icon name={guardando ? "progress_activity" : "check"} size={16} />
             {guardando
               ? "Guardando…"
@@ -301,7 +308,7 @@ export function ProfesorFormModal({
                 }
                 value={datos.usuarioId}
                 options={usuariosOpciones}
-                onChange={(v) => set({ usuarioId: v })}
+                onChange={(v) => set({ usuarioId: v, franjas: v === datos.usuarioId ? datos.franjas : [] })}
                 noResultsText={
                   puedeCrearUsuario ? "Sin usuarios disponibles. Creá uno con el botón +" : "Sin resultados"
                 }
@@ -461,9 +468,18 @@ export function ProfesorFormModal({
             Gestión de Disponibilidad Horaria Semanal
             <span className="text-error"> * </span>
           </legend>
+          <HorarioAcademia
+            horario={horario}
+            sinAcademia={modo === "INSERCION" && !datos.usuarioId
+              ? "Seleccioná un usuario para ver los horarios de su academia."
+              : undefined}
+          />
           <p className="text-xs font-medium text-on-surface-variant">
-            Define franjas horarias en bloques de 30 min.
+            Definí bloques de 30 min dentro de una misma franja de atención.
           </p>
+          {errorRemoto?.campo === "franjas" && (
+            <p role="alert" className="text-sm font-semibold text-on-surface">{errorRemoto.mensaje}</p>
+          )}
           <p className="text-sm font-semibold text-on-surface" aria-live="polite">
             Total activo programado: {totalHorasFranjas.toFixed(1)} h semanales asignables
           </p>
@@ -474,6 +490,8 @@ export function ProfesorFormModal({
           )}
           <div className="flex flex-col gap-2">
             {datos.franjas.map((franja) => {
+              const inicios = horariosDesde(horario.franjas, franja.dia);
+              const finales = horariosHasta(franja.desde, horario.franjas, franja.dia);
               return (
                 <div
                   key={franja.id}
@@ -484,10 +502,16 @@ export function ProfesorFormModal({
                     id={`franja-dia-${franja.id}`}
                     aria-label="Día de la franja"
                     value={franja.dia}
-                    onChange={(e) => actualizarFranja(franja.id, { dia: e.target.value })}
-                    className="h-10 min-h-10 w-full px-2 text-sm"
+                    disabled={guardando || !horario.habilitado}
+                    onChange={(e) => actualizarFranja(franja.id, { dia: e.target.value, desde: "", hasta: "" })}
+                    className="h-11 min-h-11 w-full px-2 text-sm"
                   >
-                    {DIAS_SEMANA_SELECT.map((d) => (
+                    {!horario.dias.some((d) => d.value === franja.dia) && (
+                      <option value={franja.dia} disabled>
+                        {DIAS_SEMANA_SELECT.find((d) => d.value === franja.dia)?.label ?? "Día"} · no disponible
+                      </option>
+                    )}
+                    {horario.dias.map((d) => (
                       <option key={d.value} value={d.value}>
                         {d.label}
                       </option>
@@ -500,14 +524,18 @@ export function ProfesorFormModal({
                       id={`franja-desde-${franja.id}`}
                       aria-label={`Hora de inicio del día ${franja.dia}`}
                       value={franja.desde}
+                      disabled={guardando || !horario.habilitado || inicios.length === 0}
                       onChange={(e) => cambiarDesde(franja.id, e.target.value)}
-                      className="h-10 min-h-10 w-full px-2 text-sm"
+                      className="h-11 min-h-11 w-full px-2 text-sm"
                     >
                       {/* Obligatoria y primera: sin ella no se habilita la hora de fin. */}
                       <option value="" disabled>
                         Elegí hora
                       </option>
-                      {HORARIOS_OPCIONES.map((h) => (
+                      {franja.desde && !inicios.includes(franja.desde) && (
+                        <option value={franja.desde} disabled>{franja.desde} · fuera de horario</option>
+                      )}
+                      {inicios.map((h) => (
                         <option key={h} value={h}>
                           {h}
                         </option>
@@ -520,16 +548,19 @@ export function ProfesorFormModal({
                       id={`franja-hasta-${franja.id}`}
                       aria-label={`Hora de fin del día ${franja.dia}`}
                       value={franja.hasta}
-                      disabled={!franja.desde}
+                      disabled={guardando || !horario.habilitado || finales.length === 0}
                       title={!franja.desde ? "Elegí primero la hora de inicio" : undefined}
                       onChange={(e) => actualizarFranja(franja.id, { hasta: e.target.value })}
-                      className="h-10 min-h-10 w-full px-2 text-sm"
+                      className="h-11 min-h-11 w-full px-2 text-sm"
                     >
                       <option value="" disabled>
                         {franja.desde ? "Elegí hora" : "Elegí el inicio"}
                       </option>
                       {/* Solo horarios posteriores al inicio. */}
-                      {horariosHasta(franja.desde).map((h) => (
+                      {franja.hasta && !finales.includes(franja.hasta) && (
+                        <option value={franja.hasta} disabled>{franja.hasta} · fuera de horario</option>
+                      )}
+                      {finales.map((h) => (
                         <option key={h} value={h}>
                           {h}
                         </option>
@@ -550,7 +581,7 @@ export function ProfesorFormModal({
                     <Icon name="delete" size={20} />
                   </Button>
                   {erroresFranjas[franja.id] && (
-                    <p role="alert" className="w-full text-sm font-semibold text-error">
+                    <p role="alert" className="w-full text-sm font-semibold text-on-surface">
                       {erroresFranjas[franja.id]}
                     </p>
                   )}
@@ -559,7 +590,7 @@ export function ProfesorFormModal({
             })}
           </div>
           <div>
-            <Button type="button" variant="outline" onClick={agregarFranja}>
+            <Button type="button" variant="outline" onClick={agregarFranja} disabled={guardando || !horario.habilitado}>
               <Icon name="add" size={16} />
               Agregar Bloque Horario
             </Button>
@@ -599,7 +630,7 @@ export function ProfesorFormModal({
         onClose={() => setRapidoAbierto(false)}
         onUsuarioCreado={(u) => {
           onUsuarioCreado?.(u);
-          set({ usuarioId: String(u.id) });
+          set({ usuarioId: String(u.id), franjas: [] });
         }}
       />
     )}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSesion } from "@/funciones/sesion";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Select } from "@/components/ui/Select";
@@ -8,6 +9,7 @@ import {
   limiteAtencion,
   verAgendaDia,
   verAgendaSemana,
+  verProximoTurno,
   type AgendaDiaResponse,
   type ProfesorCalendario,
 } from "@/data/calendario";
@@ -27,7 +29,7 @@ import { ReservaTurnoModal } from "./ReservaTurnoModal";
 // dominio de academia con el design system Nexo Académico. Sin superposiciones
 // visuales: cada turno cae en la fila donde ARRANCA (como en la referencia).
 
-const DIAS_CORTOS = ["", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"] as const;
+const DIAS_CORTOS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"] as const;
 const DIAS_LARGOS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado"] as const;
 const MESES = [
   "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -107,7 +109,7 @@ function formatearSemana(ancla: string): string {
 /** "Miércoles 21 de octubre de 2025" para la vista Día. */
 function formatearDia(iso: string): string {
   const d = aDate(iso);
-  const dia = DIAS_LARGOS[d.getDay() - 1];
+  const dia = d.getDay() === 0 ? "domingo" : DIAS_LARGOS[d.getDay() - 1];
   return `${dia[0].toUpperCase()}${dia.slice(1)} ${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
 }
 
@@ -118,13 +120,19 @@ interface CalendarioTurnosProps {
 }
 
 export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosProps) {
+  const { sesion } = useSesion();
+  const rol = sesion?.usuario.rol.nombre;
+  const puedeReservar = rol === "Gerente" || rol === "Mesa de Entrada";
   const [hoyISO] = useState(() => aISO(new Date()));
   const [lunes, setLunes] = useState(() => lunesDe(hoyISO));
   const [vista, setVista] = useState<Vista>("semana");
   const [zoom, setZoom] = useState<Zoom>(30);
-  const [profesorId, setProfesorId] = useState(profesorFijo ? String(profesorFijo.id) : "");
+  const [profesorElegido, setProfesorId] = useState("");
+  // La ficha del rol Profesor llega async (después del primer render): se deriva
+  // en vez de copiarla al estado inicial, que la perdería.
+  const profesorId = profesorFijo ? String(profesorFijo.id) : rol === "Profesor" ? "" : profesorElegido;
   // El rol Profesor entra con su ficha ya aplicada: el selector queda bloqueado.
-  const filtroBloqueado = profesorFijo !== null;
+  const filtroBloqueado = rol === "Profesor" || profesorFijo !== null;
 
   // Límites de la grilla: horario de atención del CENTRO, no del profesor.
   const [limites, setLimites] = useState<{ min: number; max: number } | null>(null);
@@ -132,6 +140,44 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
   const [agenda, setAgenda] = useState<AgendaDiaResponse[]>([]);
   const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>("cargando");
   const [intento, setIntento] = useState(0);
+  const solicitudProximo = useRef(0);
+  const [busquedaProximo, setBusquedaProximo] = useState<{
+    profesorId: string;
+    estado: "buscando" | "listo" | "error";
+    mensaje: string;
+  } | null>(null);
+  const busquedaActual = busquedaProximo?.profesorId === profesorId ? busquedaProximo : null;
+
+  useEffect(() => () => { solicitudProximo.current += 1; }, [profesorId]);
+
+  const irProximoTurno = async () => {
+    if (!profesorId || busquedaActual?.estado === "buscando") return;
+    const solicitud = ++solicitudProximo.current;
+    setBusquedaProximo({ profesorId, estado: "buscando", mensaje: "Buscando próximo turno…" });
+    try {
+      const turno = await verProximoTurno(Number(profesorId));
+      if (solicitud !== solicitudProximo.current) return;
+      setBusquedaProximo({
+        profesorId,
+        estado: "listo",
+        mensaje: turno
+          ? `Próximo turno: ${formatearDia(turno.fecha)}, a las ${turno.horaInicio}.`
+          : "No hay turnos reservados próximos para este profesor.",
+      });
+      if (!turno) return;
+      setEstadoCarga("cargando");
+      setVista("dia");
+      setLunes(turno.fecha);
+      setIntento((i) => i + 1);
+    } catch {
+      if (solicitud !== solicitudProximo.current) return;
+      setBusquedaProximo({
+        profesorId,
+        estado: "error",
+        mensaje: "No pudimos buscar el próximo turno. Volvé a intentar con el botón Próximo turno.",
+      });
+    }
+  };
 
   const [detalle, setDetalle] = useState<{ turno: AgendaDiaResponse["turnos"][number]; fecha: string } | null>(null);
   const [reserva, setReserva] = useState<{ fecha: string; hueco: AgendaDiaResponse["huecos"][number] } | null>(null);
@@ -266,7 +312,7 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
               </span>
               <div className="flex h-11 items-center gap-2 rounded-sm border border-outline-variant bg-surface-container-low px-4 text-base text-on-surface">
                 <Icon name="school" size={18} className="text-on-surface-variant" />
-                {profesorFijo?.apellido}, {profesorFijo?.nombre}
+                {profesorFijo ? `${profesorFijo.apellido}, ${profesorFijo.nombre}` : "Sin ficha de profesor disponible"}
               </div>
             </div>
           ) : (
@@ -275,6 +321,8 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
               requiredMark
               value={profesorId}
               onChange={(e) => {
+                solicitudProximo.current += 1;
+                setBusquedaProximo(null);
                 setProfesorId(e.target.value);
                 setEstadoCarga("cargando");
               }}
@@ -330,6 +378,21 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
         </div>
       </div>
 
+      {rol === "Profesor" && (
+        <p className="-mt-2 text-sm font-medium text-on-surface print:hidden">
+          Tu calendario es de solo lectura. Las reservas las gestiona Mesa de Entrada.
+        </p>
+      )}
+
+      {busquedaActual && (
+        <p
+          role={busquedaActual.estado === "error" ? "alert" : "status"}
+          className="text-sm font-medium text-on-surface print:hidden"
+        >
+          {busquedaActual.mensaje}
+        </p>
+      )}
+
       {sinProfesor && !filtroBloqueado && (
         <p className="-mt-2 text-sm font-medium text-on-surface-variant print:hidden">
           Elegí un profesor para ver su calendario.
@@ -352,6 +415,16 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
         </div>
 
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Navegación del calendario">
+          <Button
+            variant="outline"
+            size="md"
+            type="button"
+            onClick={irProximoTurno}
+            disabled={sinProfesor || busquedaActual?.estado === "buscando"}
+          >
+            <Icon name="event_upcoming" size={20} />
+            {busquedaActual?.estado === "buscando" ? "Buscando…" : "Próximo turno"}
+          </Button>
           <Button variant="outline" size="md" type="button" onClick={irHoy}>
             Hoy
           </Button>
@@ -367,9 +440,13 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
       {sinProfesor ? (
         <section className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed border-outline-variant bg-surface-container-lowest px-6 py-16 text-center">
           <Icon name="calendar_view_month" size={40} className="text-on-surface-variant" />
-          <h2 className="text-lg font-bold text-on-surface">Seleccione un profesor para ver su calendario</h2>
+          <h2 className="text-lg font-bold text-on-surface">
+            {filtroBloqueado ? "No hay una ficha de profesor disponible" : "Seleccione un profesor para ver su calendario"}
+          </h2>
           <p className="max-w-sm text-sm font-medium text-on-surface-variant">
-            La grilla muestra los bloques de disponibilidad del profesor y sus turnos reservados.
+            {filtroBloqueado
+              ? "Si tu calendario no aparece, consultá con Mesa de Entrada."
+              : "La grilla muestra los bloques de disponibilidad del profesor y sus turnos reservados."}
           </p>
         </section>
       ) : estadoCarga === "error" ? (
@@ -485,7 +562,7 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
                                   : "flex-col justify-start"
                               }`}
                             >
-                              {turnosCelda.length === 0 && huecoCelda && (
+                              {turnosCelda.length === 0 && huecoCelda && (puedeReservar ? (
                                 <button
                                   type="button"
                                   onClick={() => setReserva({ fecha: d.fecha, hueco: huecoCelda })}
@@ -495,7 +572,11 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
                                   <Icon name="add_circle" size={16} />
                                   Disponible
                                 </button>
-                              )}
+                              ) : (
+                                <div className="flex min-h-12 w-full items-center justify-center rounded-sm border border-dashed border-outline-variant bg-surface-container-low/60 px-2 text-xs font-semibold text-on-surface">
+                                  Disponible
+                                </div>
+                              ))}
                               {turnosCelda.map((t) => (
                                 <button
                                   key={t.id}
@@ -558,7 +639,7 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
       />
 
       <ReservaTurnoModal
-        open={reserva !== null}
+        open={puedeReservar && reserva !== null}
         fecha={reserva?.fecha ?? ""}
         huecoInicio={reserva?.hueco.horaInicio ?? ""}
         huecoFin={reserva?.hueco.horaFin ?? ""}

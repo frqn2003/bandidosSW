@@ -89,7 +89,7 @@ export const PERMISOS_POR_ROL: Record<NombreRol, ModuloId[]> = {
   "Mesa de Entrada": ["turnos", "calendario", "alumnos", "cobranzas"],
   // "Profesor: su calendario, su ficha en modo LECTURA, asistencia de sus
   //  clases e indicadores propios."
-  Profesor: ["calendario", "turnos", "mi-ficha", "reportes"],
+  Profesor: ["calendario", "mi-ficha", "reportes"],
 };
 
 /** Los módulos que le corresponden al rol, en el orden del menú. */

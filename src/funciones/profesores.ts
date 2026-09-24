@@ -3,6 +3,7 @@
 // de presentación que reutilizan la tabla, la ficha, el form y la agenda.
 
 import type { Profesor } from "@/data/profesores";
+import type { FranjaSemanalResponse } from "@/contracts/agenda";
 
 // Utilidades de presentación genéricas: viven en `src/funciones/formato.ts` desde
 // HU-ALU-01 (las usan también Alumnos y las próximas pantallas). Se re-exportan
@@ -77,9 +78,31 @@ export function aMin(h: string): number {
  * Horarios válidos para la hora de FIN de una franja: solo los posteriores a la
  * de inicio. Sin inicio elegido no hay opciones — el select queda deshabilitado.
  */
-export function horariosHasta(desde: string): string[] {
-  if (!desde) return [];
-  return HORARIOS_OPCIONES.filter((h) => aMin(h) > aMin(desde));
+export function horariosHasta(desde: string, franjas: FranjaSemanalResponse[], dia: string): string[] {
+  if (!horariosDesde(franjas, dia).includes(desde)) return [];
+  return [...new Set(franjas
+    .filter((f) => f.estado === "activo" && String(f.diaSemana) === dia && f.horaInicio <= desde && desde < f.horaFin)
+    .flatMap((f) => horariosDeFranja(f).filter((h) => h > desde)))].sort();
+}
+
+function horariosDeFranja(franja: FranjaSemanalResponse): string[] {
+  const inicio = Math.ceil(aMin(franja.horaInicio) / 30) * 30;
+  const fin = Math.min(aMin(franja.horaFin), 23 * 60 + 30);
+  const horas: string[] = [];
+  for (let minuto = inicio; minuto <= fin; minuto += 30) {
+    horas.push(`${String(Math.floor(minuto / 60)).padStart(2, "0")}:${String(minuto % 60).padStart(2, "0")}`);
+  }
+  return horas;
+}
+
+export function horariosDesde(franjas: FranjaSemanalResponse[], dia: string): string[] {
+  return [...new Set(franjas
+    .filter((f) => f.estado === "activo" && String(f.diaSemana) === dia)
+    .flatMap((f) => horariosDeFranja(f).slice(0, -1)))].sort();
+}
+
+export function diasDeAtencion(franjas: FranjaSemanalResponse[]) {
+  return DIAS_SEMANA_SELECT.filter((dia) => horariosDesde(franjas, dia.value).length > 0);
 }
 
 /** Horas de una franja (1 decimal). 0 si está incompleta o al revés. */
@@ -138,7 +161,7 @@ export function franjasDesdeBloques(bloques: Record<number, string[]>): FranjaFo
  * superposición por día. Una franja a medias se señala sola y no entra en el
  * chequeo de superposición (no hay con qué compararla).
  */
-export function validarFranjas(franjas: FranjaForm[]): Record<string, string> {
+export function validarFranjas(franjas: FranjaForm[], atencion?: FranjaSemanalResponse[]): Record<string, string> {
   const errores: Record<string, string> = {};
   for (const f of franjas) {
     if (!f.desde) {
@@ -147,6 +170,8 @@ export function validarFranjas(franjas: FranjaForm[]): Record<string, string> {
       errores[f.id] = "Elegí la hora de fin";
     } else if (aMin(f.hasta) <= aMin(f.desde)) {
       errores[f.id] = "La hora de fin debe ser posterior al inicio";
+    } else if (atencion && !horariosHasta(f.desde, atencion, f.dia).includes(f.hasta)) {
+      errores[f.id] = "Elegí un bloque dentro de una misma franja de atención de la academia, en intervalos de 30 minutos.";
     }
   }
   const completas = franjas.filter((f) => f.desde && f.hasta);

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { formatearFecha } from "@/funciones/formato";
 import type { ProfesorCalendario } from "@/data/calendario";
 import { hoyISO } from "@/data/turnos";
+import { useSesion } from "@/funciones/sesion";
 
 // Puente del calendario a la reserva (HU-TUR-01). Muestra el hueco elegido y
 // lleva a /turnos/reservas con Profesor/Fecha/Horario como query: allá se
@@ -36,6 +37,9 @@ export function ReservaTurnoModal({
   // Un hueco de un día que ya pasó se ve en la grilla pero no se reserva.
   const [hoy] = useState(() => hoyISO());
   const pasado = fecha !== "" && fecha < hoy;
+  const { sesion } = useSesion();
+  const rol = sesion?.usuario.rol.nombre;
+  if (rol !== "Gerente" && rol !== "Mesa de Entrada") return null;
 
   return (
     <Modal

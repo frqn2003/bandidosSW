@@ -113,6 +113,7 @@ export interface UsuarioSinFicha {
   nombre: string;
   apellido: string;
   email: string;
+  academia: CandidatoProfesorResponse["academia"];
 }
 
 /** `ProfesorResponse` + sus bloques → la vista que consumen los componentes. */
@@ -225,6 +226,7 @@ export async function listarCandidatos(): Promise<UsuarioSinFicha[]> {
     nombre: c.nombre,
     apellido: c.apellido,
     email: c.email,
+    academia: c.academia,
   }));
 }
 
@@ -237,7 +239,7 @@ export async function crearCandidato(
 ): Promise<{ usuario: UsuarioSinFicha; passwordTemporal: string }> {
   const r = await apiSend<CandidatoCreadoResponse>("POST", rutaCandidatos, body);
   return {
-    usuario: { id: r.usuario.id, nombre: r.usuario.nombre, apellido: r.usuario.apellido, email: r.usuario.email },
+    usuario: { id: r.usuario.id, nombre: r.usuario.nombre, apellido: r.usuario.apellido, email: r.usuario.email, academia: r.usuario.academia },
     passwordTemporal: r.passwordTemporal,
   };
 }
@@ -278,9 +280,15 @@ export async function listarBloquesDe(
  * Sin academia se usa la agenda por defecto del centro.
  */
 async function franjasDeAtencion(academiaId: number | null): Promise<FranjaSemanalResponse[]> {
-  const url = academiaId ? `${RUTA_AGENDA}?academiaId=${academiaId}` : RUTA_AGENDA;
-  const agenda = await apiGet<AgendaResponse>(url);
-  return agenda.franjas.filter((f) => f.estado === "activo");
+  const agenda = await obtenerAgendaAcademia(academiaId);
+  return agenda.estado === "activo" ? agenda.franjas.filter((f) => f.estado === "activo") : [];
+}
+
+export async function obtenerAgendaAcademia(academiaId: number | null): Promise<AgendaResponse> {
+  if (!academiaId) {
+    throw new ApiError("USUARIO_SIN_ACADEMIA", "El profesor no tiene una academia asignada.", "franjas", 422);
+  }
+  return apiGet<AgendaResponse>(`${RUTA_AGENDA}?academiaId=${academiaId}`);
 }
 
 /**

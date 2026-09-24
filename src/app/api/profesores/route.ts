@@ -19,6 +19,9 @@ export const GET = withRoute(async ({ req }) => {
   const diaSemana = sp.get("diaSemana")?.trim();
   if (diaSemana) raw.diaSemana = diaSemana;
 
+  const usuarioId = sp.get("usuarioId")?.trim();
+  if (usuarioId) raw.usuarioId = usuarioId;
+
   const estado = sp.get("estado")?.trim().toLowerCase();
   if (estado && estado !== "todos") raw.estado = estado;
 

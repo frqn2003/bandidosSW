@@ -16,6 +16,7 @@ import {
   type EstadoProfesor,
   type ProfesorResponse,
 } from "@/contracts/profesor";
+import { RUTA as RUTA_TURNOS, type TurnoResponse } from "@/contracts/turno";
 import { apiGet } from "@/lib/api-client";
 
 export type { AgendaDiaResponse, HuecoResponse, TurnoCalendarioResponse };
@@ -107,4 +108,23 @@ export async function verAgendaSemana(
   // Una llamada por día: el back expone la agenda diaria; la semana se arma acá.
   const dias = Array.from({ length: 6 }, (_, i) => sumarDias(lunes, i));
   return Promise.all(dias.map((fecha) => verAgendaDia(profesorId, fecha)));
+}
+
+export async function verProximoTurno(profesorId: number): Promise<TurnoResponse | null> {
+  const params = new URLSearchParams({
+    profesorId: String(profesorId),
+    estado: "Reservado",
+    desde: aISO(new Date()),
+  });
+  const turnos = await apiGet<TurnoResponse[]>(`${RUTA_TURNOS}?${params.toString()}`);
+  const ahora = Date.now();
+  return turnos
+    .filter((turno) =>
+      turno.profesor.id === profesorId &&
+      turno.estado === "Reservado" &&
+      new Date(`${turno.fecha}T${turno.horaInicio}`).getTime() > ahora,
+    )
+    .sort((a, b) =>
+      a.fecha.localeCompare(b.fecha) || a.horaInicio.localeCompare(b.horaInicio) || a.id - b.id,
+    )[0] ?? null;
 }

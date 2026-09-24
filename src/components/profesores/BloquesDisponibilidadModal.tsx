@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
+import { HorarioAcademia, useAgendaAcademia } from "@/components/profesores/HorarioAcademia";
 import {
   DIAS_SEMANA_SELECT,
-  HORARIOS_OPCIONES,
-  aMin,
+  horariosDesde,
   bloquesDesdeFranjas,
   franjasDesdeBloques,
   horariosHasta,
@@ -38,6 +38,7 @@ export function BloquesDisponibilidadModal({
 }: BloquesDisponibilidadModalProps) {
   const [franjas, setFranjas] = useState<FranjaForm[]>([]);
   const [envio, setEnvio] = useState(false);
+  const horario = useAgendaAcademia(profesor?.academiaId ?? null, open);
 
   // Al abrir con un profesor distinto, copia sus bloques actuales como franjas.
   const key = profesor?.id ?? -1;
@@ -62,7 +63,7 @@ export function BloquesDisponibilidadModal({
     setFranjas((prev) =>
       prev.map((f) =>
         f.id === id
-          ? { ...f, desde, hasta: f.hasta && aMin(f.hasta) > aMin(desde) ? f.hasta : "" }
+          ? { ...f, desde, hasta: horariosHasta(desde, horario.franjas, f.dia).includes(f.hasta) ? f.hasta : "" }
           : f,
       ),
     );
@@ -81,16 +82,18 @@ export function BloquesDisponibilidadModal({
   );
 
   const erroresFranjas = useMemo(
-    () => (envio ? validarFranjas(franjas) : {}),
-    [envio, franjas],
+    () => horario.habilitado
+      ? validarFranjas(envio ? franjas : franjas.filter((f) => f.desde && f.hasta), horario.franjas)
+      : {},
+    [envio, franjas, horario.habilitado, horario.franjas],
   );
   const errorFranjasGeneral =
     envio && franjas.length === 0 ? "El profesor no tiene bloques cargados en este editor" : undefined;
 
   const guardar = () => {
     setEnvio(true);
-    const err = validarFranjas(franjas);
-    if (Object.keys(err).length > 0 || franjas.length === 0) return;
+    const err = validarFranjas(franjas, horario.franjas);
+    if (!horario.habilitado || Object.keys(err).length > 0 || franjas.length === 0) return;
     onGuardar(bloquesDesdeFranjas(franjas));
     onClose();
   };
@@ -107,7 +110,7 @@ export function BloquesDisponibilidadModal({
           <Button type="button" variant="outline" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="button" variant="primary" onClick={guardar}>
+          <Button type="button" variant="primary" onClick={guardar} disabled={!horario.habilitado}>
             <Icon name="check" size={16} />
             Guardar bloques
           </Button>
@@ -119,6 +122,8 @@ export function BloquesDisponibilidadModal({
           Edita los bloques horarios ya cargados. La alta de nuevos bloques se hace desde{" "}
           <span className="font-semibold">Editar Profesor</span>.
         </p>
+
+        <HorarioAcademia horario={horario} />
 
         {franjas.length === 0 ? (
           <p
@@ -140,6 +145,8 @@ export function BloquesDisponibilidadModal({
             )}
             <div className="flex flex-col gap-2">
               {franjas.map((franja) => {
+                const inicios = horariosDesde(horario.franjas, franja.dia);
+                const finales = horariosHasta(franja.desde, horario.franjas, franja.dia);
                 return (
                   <div
                     key={franja.id}
@@ -150,10 +157,16 @@ export function BloquesDisponibilidadModal({
                         id={`bloque-dia-${franja.id}`}
                         aria-label="Día de la franja"
                         value={franja.dia}
-                        onChange={(e) => actualizarFranja(franja.id, { dia: e.target.value })}
-                        className="h-10 min-h-10 w-full px-2 text-sm"
+                        disabled={!horario.habilitado}
+                        onChange={(e) => actualizarFranja(franja.id, { dia: e.target.value, desde: "", hasta: "" })}
+                        className="h-11 min-h-11 w-full px-2 text-sm"
                       >
-                        {DIAS_SEMANA_SELECT.map((d) => (
+                        {!horario.dias.some((d) => d.value === franja.dia) && (
+                          <option value={franja.dia} disabled>
+                            {DIAS_SEMANA_SELECT.find((d) => d.value === franja.dia)?.label ?? "Día"} · no disponible
+                          </option>
+                        )}
+                        {horario.dias.map((d) => (
                           <option key={d.value} value={d.value}>
                             {d.label}
                           </option>
@@ -166,14 +179,18 @@ export function BloquesDisponibilidadModal({
                         id={`bloque-desde-${franja.id}`}
                         aria-label={`Hora de inicio del día ${franja.dia}`}
                         value={franja.desde}
+                        disabled={!horario.habilitado || inicios.length === 0}
                         onChange={(e) => cambiarDesde(franja.id, e.target.value)}
-                        className="h-10 min-h-10 w-full px-2 text-sm"
+                        className="h-11 min-h-11 w-full px-2 text-sm"
                       >
                         {/* Obligatoria y primera: sin ella no se habilita la hora de fin. */}
                         <option value="" disabled>
                           Elegí hora
                         </option>
-                        {HORARIOS_OPCIONES.map((h) => (
+                        {franja.desde && !inicios.includes(franja.desde) && (
+                          <option value={franja.desde} disabled>{franja.desde} · fuera de horario</option>
+                        )}
+                        {inicios.map((h) => (
                           <option key={h} value={h}>
                             {h}
                           </option>
@@ -186,16 +203,19 @@ export function BloquesDisponibilidadModal({
                         id={`bloque-hasta-${franja.id}`}
                         aria-label={`Hora de fin del día ${franja.dia}`}
                         value={franja.hasta}
-                        disabled={!franja.desde}
+                        disabled={!horario.habilitado || finales.length === 0}
                         title={!franja.desde ? "Elegí primero la hora de inicio" : undefined}
                         onChange={(e) => actualizarFranja(franja.id, { hasta: e.target.value })}
-                        className="h-10 min-h-10 w-full px-2 text-sm"
+                        className="h-11 min-h-11 w-full px-2 text-sm"
                       >
                         <option value="" disabled>
                           {franja.desde ? "Elegí hora" : "Elegí el inicio"}
                         </option>
                         {/* Solo horarios posteriores al inicio. */}
-                        {horariosHasta(franja.desde).map((h) => (
+                        {franja.hasta && !finales.includes(franja.hasta) && (
+                          <option value={franja.hasta} disabled>{franja.hasta} · fuera de horario</option>
+                        )}
+                        {finales.map((h) => (
                           <option key={h} value={h}>
                             {h}
                           </option>
@@ -216,7 +236,7 @@ export function BloquesDisponibilidadModal({
                       <Icon name="delete" size={20} />
                     </Button>
                     {erroresFranjas[franja.id] && (
-                      <p role="alert" className="w-full text-sm font-semibold text-error">
+                      <p role="alert" className="w-full text-sm font-semibold text-on-surface">
                         {erroresFranjas[franja.id]}
                       </p>
                     )}
