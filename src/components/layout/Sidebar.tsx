@@ -28,7 +28,7 @@ export function Sidebar() {
   const usuario = sesion?.usuario;
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-outline-variant bg-surface-container-lowest">
+    <aside className="sticky top-0 flex h-dvh w-60 shrink-0 self-start flex-col justify-between border-r border-outline-variant bg-surface-container-lowest">
       <div className="flex items-center gap-2.5 border-b border-outline-variant px-5 py-5">
         <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary">
           <Icon name="school" size={24} className="text-on-primary" />
@@ -50,13 +50,12 @@ export function Sidebar() {
                   aria-current={active ? "page" : undefined}
                   aria-disabled={!construido}
                   tabIndex={construido ? undefined : -1}
-                  className={`flex min-h-11 items-center gap-3 rounded-sm px-3 text-sm font-semibold transition-colors duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary ${
-                    !construido
+                  className={`flex min-h-11 items-center gap-3 rounded-sm px-3 text-sm font-semibold transition-colors duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary ${!construido
                       ? "cursor-not-allowed text-on-surface-variant/50"
                       : active
                         ? "bg-primary text-on-primary"
                         : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
-                  }`}
+                    }`}
                 >
                   <Icon name={icon} size={20} className="shrink-0" />
                   {label}
