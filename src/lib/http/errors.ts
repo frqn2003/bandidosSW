@@ -165,11 +165,11 @@ export class CuentaBloqueadaError extends AppError {
 export class ServicioAuthNoDisponibleError extends AppError {
   readonly status = 503;
 
-  constructor() {
-    super(
-      "AUTH_NO_DISPONIBLE",
-      "No se pudo validar el inicio de sesión en este momento. Intentá de nuevo en unos segundos.",
-    );
+  /** `mensaje` opcional: el alta de usuarios (profesor.service) usa otro texto. */
+  constructor(
+    mensaje = "No se pudo validar el inicio de sesión en este momento. Intentá de nuevo en unos segundos.",
+  ) {
+    super("AUTH_NO_DISPONIBLE", mensaje);
   }
 }
 
@@ -244,6 +244,20 @@ export function traducirErrorPostgres(e: unknown): AppError | null {
 
   // 23P01 = exclusion_violation
   if (codigo === "23P01") {
+    if (constraint.includes("turno") || constraint.includes("alumno_sin_superposicion")) {
+      return new ConflictError(
+        "ALUMNO_CON_TURNO_SUPERPUESTO",
+        "El alumno ya tiene un turno reservado que se superpone con ese horario.",
+        "alumnoId",
+      );
+    }
+    if (constraint.includes("agenda_semanal")) {
+      return new ConflictError(
+        "FRANJA_SUPERPUESTA",
+        "Ya existe una franja de atención que se superpone con ese horario.",
+        "horaInicio",
+      );
+    }
     if (constraint.includes("agenda_profesional") || constraint.includes("superposicion")) {
       return new ConflictError(
         "BLOQUE_SUPERPUESTO",
@@ -274,7 +288,7 @@ export function traducirErrorPostgres(e: unknown): AppError | null {
     if (constraint.includes("agenda_profesional_30min")) {
       return new ValidationError("HORA_NO_PERMITIDA", "La hora debe ser HH:00 o HH:30.", "horaInicio");
     }
-    if (constraint.includes("agenda_profesional_rango")) {
+    if (constraint.includes("agenda_profesional_rango") || constraint.includes("turno_rango") || constraint.includes("agenda_semanal_rango")) {
       return new ValidationError("RANGO_HORARIO_INVALIDO", "La hora de fin tiene que ser posterior a la de inicio.", "horaFin");
     }
     if (constraint.includes("stock_no_negativo")) {

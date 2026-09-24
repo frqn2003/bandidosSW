@@ -4,7 +4,7 @@
 
 import type { Profesor } from "@/data/profesores";
 
-// Utilidades de presentación genéricas: viven en `src/lib/formato.ts` desde
+// Utilidades de presentación genéricas: viven en `src/funciones/formato.ts` desde
 // HU-ALU-01 (las usan también Alumnos y las próximas pantallas). Se re-exportan
 // acá para no tocar a los consumidores que ya las importaban desde este módulo.
 export {

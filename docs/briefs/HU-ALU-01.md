@@ -234,7 +234,7 @@ const FIXTURE: AlumnoResponse[] = [
 - **Componentes extendidos:**
   - `ui/Pagination` → prop opcional `pageSizes` (default `[10, 25, 50]`; Alumnos pasa `[20, 50, 100]`). Retrocompatible: Materias y Profesores no se tocaron.
   - `layout/Sidebar` → ítem Alumnos activo.
-  - `src/lib/profesores.ts` → los helpers genéricos se mudaron a **`src/lib/formato.ts`** y se re-exportan desde su lugar original.
+  - `src/lib/profesores.ts` → los helpers genéricos se mudaron a **`src/funciones/formato.ts`** y se re-exportan desde su lugar original.
 - **Componentes nuevos** (`src/components/alumnos/`): `AlumnosTable`, `FiltrosAlumnos`, `AlumnoFormModal`, `DuplicadosModal`, `EstadoAlumnoBadge`. Datos en `src/data/alumnos.ts`.
 
 ### Decisiones no obvias

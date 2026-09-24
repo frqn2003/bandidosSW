@@ -13,7 +13,9 @@ import {
   rutaCandidatos,
   rutaInactivar,
   rutaProfesor,
+  type CandidatoCreadoResponse,
   type CandidatoProfesorResponse,
+  type CrearCandidatoBody,
   type CrearProfesorBody,
   type EditarProfesorBody,
   type EstadoProfesor,
@@ -28,9 +30,16 @@ import {
 } from "@/contracts/materia";
 import {
   RUTA as RUTA_DISPONIBILIDAD,
+  rutaInactivar as rutaInactivarBloque,
   type BloqueDisponibilidadResponse,
+  type CrearBloqueBody,
 } from "@/contracts/disponibilidad";
-import { apiGet, apiGetOpcional, apiSend } from "@/lib/api-client";
+import {
+  RUTA as RUTA_AGENDA,
+  type AgendaResponse,
+  type FranjaSemanalResponse,
+} from "@/contracts/agenda";
+import { ApiError, apiGet, apiGetOpcional, apiSend } from "@/lib/api-client";
 
 export type {
   CandidatoProfesorResponse,
@@ -82,6 +91,8 @@ export interface Profesor {
   materias: MateriaAsignada[];
   estado: EstadoProfesor; // profesor.estado
   fechaCreacion: string; // "YYYY-MM-DD", para "Alta en sistema"
+  /** usuario.academia_id: define qué horario de atención (agenda) le aplica. */
+  academiaId: number | null;
 
   /** Resumen semanal armado desde `agenda_profesional` (ver `listarBloquesDe`). */
   bloquesPorDia: Record<number, string[]>;
@@ -136,6 +147,7 @@ export function aProfesor(
     estado: resp.estado,
     // La API manda ISO 8601 completo; la ficha muestra solo la fecha.
     fechaCreacion: resp.fechaCreacion.slice(0, 10),
+    academiaId: resp.academia?.id ?? null,
     bloquesPorDia,
     capacidadDefault:
       materias.length > 0 ? Math.max(...materias.map((m) => m.capacidadMaxima)) : undefined,
@@ -216,6 +228,20 @@ export async function listarCandidatos(): Promise<UsuarioSinFicha[]> {
   }));
 }
 
+/**
+ * Alta rápida de un usuario Profesor (solo Gerente). Devuelve el usuario ya
+ * con la forma del combo y la contraseña temporal, que se muestra una sola vez.
+ */
+export async function crearCandidato(
+  body: CrearCandidatoBody,
+): Promise<{ usuario: UsuarioSinFicha; passwordTemporal: string }> {
+  const r = await apiSend<CandidatoCreadoResponse>("POST", rutaCandidatos, body);
+  return {
+    usuario: { id: r.usuario.id, nombre: r.usuario.nombre, apellido: r.usuario.apellido, email: r.usuario.email },
+    passwordTemporal: r.passwordTemporal,
+  };
+}
+
 /** Catálogo de materias activas (filtro del listado y checkboxes del formulario). */
 export async function listarMateriasCatalogo(): Promise<MateriaRef[]> {
   const materias = await apiGetOpcional<MateriaResponse[]>(
@@ -246,6 +272,83 @@ export async function listarBloquesDe(
     [],
   );
 }
+
+/**
+ * Franjas activas del horario de atención de la academia (`agenda_semanal`).
+ * Sin academia se usa la agenda por defecto del centro.
+ */
+async function franjasDeAtencion(academiaId: number | null): Promise<FranjaSemanalResponse[]> {
+  const url = academiaId ? `${RUTA_AGENDA}?academiaId=${academiaId}` : RUTA_AGENDA;
+  const agenda = await apiGet<AgendaResponse>(url);
+  return agenda.franjas.filter((f) => f.estado === "activo");
+}
+
+/**
+ * Guarda la disponibilidad semanal de un profesor: deja en `agenda_profesional`
+ * exactamente los rangos de `bloquesPorDia`.
+ *
+ * Compara contra los bloques activos de la base: los que no cambiaron quedan,
+ * los que sobran se inactivan (primero, para no chocar con el EXCLUDE de
+ * superposición) y los nuevos se crean colgados de la franja de atención que
+ * los contiene (`agendaSemanalId`). Devuelve el resumen tal como quedó en la base.
+ */
+export async function guardarDisponibilidad(
+  profesorId: number,
+  academiaId: number | null,
+  bloquesPorDia: Record<number, string[]>,
+): Promise<Record<number, string[]>> {
+  const [actuales, franjas] = await Promise.all([
+    apiGet<BloqueDisponibilidadResponse[]>(
+      `${RUTA_DISPONIBILIDAD}?profesorId=${profesorId}&estado=activo`,
+    ),
+    franjasDeAtencion(academiaId),
+  ]);
+
+  const clave = (dia: number, inicio: string, fin: string) => `${dia}|${inicio}|${fin}`;
+  const deseados = new Map<string, { dia: number; horaInicio: string; horaFin: string }>();
+  for (const [dia, rangos] of Object.entries(bloquesPorDia)) {
+    for (const rango of rangos) {
+      const [horaInicio, horaFin] = rango.split("-");
+      deseados.set(clave(Number(dia), horaInicio, horaFin), { dia: Number(dia), horaInicio, horaFin });
+    }
+  }
+
+  const sobrantes = actuales.filter(
+    (b) => !deseados.delete(clave(b.diaSemana, b.horaInicio, b.horaFin)),
+  );
+
+  // Se resuelve la franja de cada bloque nuevo ANTES de tocar la base: si alguno
+  // cae fuera del horario de atención, no se guarda nada a medias.
+  const nuevos: CrearBloqueBody[] = [...deseados.values()].map((d) => {
+    const franja = franjas.find(
+      (f) => f.diaSemana === d.dia && f.horaInicio <= d.horaInicio && f.horaFin >= d.horaFin,
+    );
+    if (!franja) {
+      throw new ApiError(
+        "FUERA_DE_HORARIO_ATENCION",
+        `El bloque ${d.horaInicio}-${d.horaFin} del ${DIAS_LARGOS[d.dia - 1] ?? "día " + d.dia} queda fuera del horario de atención de la sede.`,
+        "franjas",
+        422,
+      );
+    }
+    return { profesorId, agendaSemanalId: franja.id, horaInicio: d.horaInicio, horaFin: d.horaFin };
+  });
+
+  // BACKEND: POST /api/disponibilidad/:id/inactivar (baja lógica, no hay DELETE).
+  for (const b of sobrantes) {
+    await apiSend<BloqueDisponibilidadResponse>("POST", rutaInactivarBloque(b.id));
+  }
+  // BACKEND: POST /api/disponibilidad (uno por bloque; no hay alta en lote).
+  const creados: BloqueDisponibilidadResponse[] = [];
+  for (const body of nuevos) {
+    creados.push(await apiSend<BloqueDisponibilidadResponse>("POST", RUTA_DISPONIBILIDAD, body));
+  }
+
+  const quedan = actuales.filter((b) => !sobrantes.includes(b));
+  return bloquesPorDiaDesde([...quedan, ...creados]);
+}
+
+const DIAS_LARGOS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
 /**
  * Turnos futuros reservados del profesor, para avisar antes de dar de baja.

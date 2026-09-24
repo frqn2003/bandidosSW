@@ -11,6 +11,7 @@ import { Select } from "@/components/ui/Select";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Switch } from "@/components/ui/Switch";
 import { EstadoProfesorBadge } from "@/components/profesores/EstadoProfesorBadge";
+import { UsuarioRapidoModal } from "@/components/profesores/UsuarioRapidoModal";
 import {
   DIAS_SEMANA_SELECT,
   HORARIOS_OPCIONES,
@@ -72,6 +73,10 @@ interface ProfesorFormModalProps {
   errorRemoto?: { campo?: string; mensaje: string } | null;
   /** Mientras se espera a la API: bloquea los botones y evita el doble submit. */
   guardando?: boolean;
+  /** Muestra el botón + de alta rápida de usuario (solo Gerente; el back también lo valida). */
+  puedeCrearUsuario?: boolean;
+  /** El alta rápida creó un usuario: la página lo suma a la lista de candidatos. */
+  onUsuarioCreado?: (usuario: UsuarioSinFicha) => void;
 }
 
 function validar(datos: ProfesorFormData): Partial<Record<"usuarioId" | "telefono" | "materias", string>> {
@@ -97,8 +102,11 @@ export function ProfesorFormModal({
   onBaja,
   errorRemoto,
   guardando = false,
+  puedeCrearUsuario = false,
+  onUsuarioCreado,
 }: ProfesorFormModalProps) {
   const [datos, setDatos] = useState<ProfesorFormData>(EMPTY_FORM);
+  const [rapidoAbierto, setRapidoAbierto] = useState(false);
   const [envio, setEnvio] = useState(false);
 
   // Los estados se inicializan al abrir (mismo modal para los 2 modos).
@@ -111,6 +119,7 @@ export function ProfesorFormModal({
   if (!open && initialized) {
     setInitialized(false);
     setEnvio(false);
+    setRapidoAbierto(false);
   }
 
   const set = (patch: Partial<ProfesorFormData>) => setDatos((d) => ({ ...d, ...patch }));
@@ -204,9 +213,11 @@ export function ProfesorFormModal({
   };
 
   return (
+    <>
     <Modal
       open={open}
-      onClose={onClose}
+      // Con el alta rápida abierta, Escape/fondo cierran solo esa ventana.
+      onClose={rapidoAbierto ? () => {} : onClose}
       title={titulo}
       subtitle={
         modo === "EDICION" && profesor
@@ -276,17 +287,40 @@ export function ProfesorFormModal({
 
         {/* BACKEND: usuarios con rol Profesor, activos y sin ficha → GET /api/usuarios?rol=profesor&sin-ficha=true */}
         {modo === "INSERCION" ? (
-          <div className="flex flex-col gap-1.5">
-            <Combobox
-              id="usuario-asociado"
-              label="Usuario Activo del Sistema"
-              requiredMark
-              error={errores.usuarioId}
-              hint="Nombre, Apellido y Email se vinculan automáticamente"
-              value={datos.usuarioId}
-              options={usuariosOpciones}
-              onChange={(v) => set({ usuarioId: v })}
-            />
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <Combobox
+                id="usuario-asociado"
+                label="Usuario Activo del Sistema"
+                requiredMark
+                error={errores.usuarioId}
+                hint={
+                  usuariosOpciones.length === 0 && puedeCrearUsuario
+                    ? "No hay usuarios Profesor sin ficha. Creá uno con el botón +."
+                    : "Nombre, Apellido y Email se vinculan automáticamente"
+                }
+                value={datos.usuarioId}
+                options={usuariosOpciones}
+                onChange={(v) => set({ usuarioId: v })}
+                noResultsText={
+                  puedeCrearUsuario ? "Sin usuarios disponibles. Creá uno con el botón +" : "Sin resultados"
+                }
+              />
+            </div>
+            {puedeCrearUsuario && (
+              // mt-7: alinea con el input (debajo del label del Combobox).
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                className="mt-7 shrink-0"
+                aria-label="Crear nuevo usuario docente"
+                title="Crear nuevo usuario docente"
+                onClick={() => setRapidoAbierto(true)}
+              >
+                <Icon name="add" size={20} />
+              </Button>
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-1.5">
@@ -556,5 +590,19 @@ export function ProfesorFormModal({
         </div>
       </form>
     </Modal>
+
+    {/* Hermano del Modal, no hijo: el panel del Modal tiene transform y un
+        `fixed` adentro quedaría atrapado en él. */}
+    {puedeCrearUsuario && (
+      <UsuarioRapidoModal
+        open={rapidoAbierto}
+        onClose={() => setRapidoAbierto(false)}
+        onUsuarioCreado={(u) => {
+          onUsuarioCreado?.(u);
+          set({ usuarioId: String(u.id) });
+        }}
+      />
+    )}
+    </>
   );
 }

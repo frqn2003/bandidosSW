@@ -204,3 +204,121 @@ export async function invalidarToken(accessToken: string): Promise<boolean> {
     return false;
   }
 }
+
+
+// ─── API de administración (alta de usuarios desde el back) ──────────────
+//
+// Por qué la API de ADMIN y no `signUp`:
+//   · signUp es auto-registro: con confirmación de email activa el usuario no
+//     entra hasta confirmar, tiene límite de mails por hora y, si el email ya
+//     existe, devuelve un usuario FALSO con un id al azar (anti-enumeración).
+//     Guardaríamos un `auth_id` que no apunta a nadie.
+//   · /auth/v1/admin/users crea la cuenta ya confirmada y devuelve el id real.
+//
+// Usa la SERVICE ROLE KEY: salta todas las políticas de Supabase, así que vive
+// SOLO en el servidor (.env.local, nunca con prefijo NEXT_PUBLIC_).
+
+export type ResultadoAltaAuth =
+  | { ok: true; authId: string }
+  /** El email ya tiene cuenta en Supabase Auth. */
+  | { ok: false; motivo: "email_existente" }
+  /** Supabase no respondió, respondió algo inesperado o falta la configuración. */
+  | { ok: false; motivo: "servicio" };
+
+function leerConfigAdmin(): { url: string; serviceKey: string } | null {
+  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) {
+    console.error(
+      "[auth] Falta SUPABASE_SERVICE_ROLE_KEY (o SUPABASE_URL) en .env.local para crear usuarios.\n" +
+        "Sale de: Supabase → Project Settings → API → service_role (secret).\n" +
+        "Es secreta: solo servidor, nunca con prefijo NEXT_PUBLIC_.",
+    );
+    return null;
+  }
+  return { url: sanitizarUrlSupabase(url), serviceKey };
+}
+
+/**
+ * Crea la cuenta en `auth.users` ya confirmada (sin mail de confirmación).
+ * Devuelve el UUID que va a `usuario.auth_id`.
+ */
+export async function crearUsuarioAuth(
+  email: string,
+  password: string,
+  metadata: Record<string, unknown> = {},
+): Promise<ResultadoAltaAuth> {
+  const config = leerConfigAdmin();
+  if (!config) return { ok: false, motivo: "servicio" };
+
+  let respuesta: Response;
+  try {
+    respuesta = await fetch(`${config.url}/auth/v1/admin/users`, {
+      method: "POST",
+      headers: {
+        apikey: config.serviceKey,
+        Authorization: `Bearer ${config.serviceKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password, email_confirm: true, user_metadata: metadata }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      cache: "no-store",
+    });
+  } catch (e) {
+    console.error("[auth] no se pudo contactar a Supabase Auth (admin):", e);
+    return { ok: false, motivo: "servicio" };
+  }
+
+  let datos: { id?: unknown; code?: unknown; error_code?: unknown; msg?: unknown } = {};
+  try {
+    datos = await respuesta.json();
+  } catch {
+    // sin body: se decide por el status
+  }
+
+  if (!respuesta.ok) {
+    const codigo = String(datos.error_code ?? datos.code ?? "");
+    // Versiones nuevas de GoTrue mandan error_code; las viejas, solo el texto.
+    const yaExiste =
+      codigo === "email_exists" || /already (been )?registered/i.test(String(datos.msg ?? ""));
+    if (respuesta.status === 422 && yaExiste) {
+      return { ok: false, motivo: "email_existente" };
+    }
+    console.error(
+      `[auth] Supabase Auth (admin) respondió ${respuesta.status} ${codigo}: ${String(datos.msg ?? "")}. ` +
+        "Revisá SUPABASE_SERVICE_ROLE_KEY.",
+    );
+    return { ok: false, motivo: "servicio" };
+  }
+
+  if (typeof datos.id !== "string") {
+    console.error("[auth] Supabase Auth (admin) respondió 200 pero sin el id del usuario.");
+    return { ok: false, motivo: "servicio" };
+  }
+  return { ok: true, authId: datos.id };
+}
+
+/**
+ * Borra la cuenta de `auth.users`. Es la compensación cuando el INSERT en
+ * `usuario` falla después de crear la cuenta: sin esto queda un usuario de Auth
+ * huérfano y el email no se puede volver a usar. No lanza.
+ */
+export async function eliminarUsuarioAuth(authId: string): Promise<boolean> {
+  const config = leerConfigAdmin();
+  if (!config) return false;
+  try {
+    const respuesta = await fetch(`${config.url}/auth/v1/admin/users/${encodeURIComponent(authId)}`, {
+      method: "DELETE",
+      headers: { apikey: config.serviceKey, Authorization: `Bearer ${config.serviceKey}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      cache: "no-store",
+    });
+    if (!respuesta.ok) {
+      console.error(`[auth] no se pudo borrar el usuario huérfano ${authId} de Supabase Auth (${respuesta.status}).`);
+    }
+    return respuesta.ok;
+  } catch (e) {
+    console.error(`[auth] no se pudo borrar el usuario huérfano ${authId} de Supabase Auth:`, e);
+    return false;
+  }
+}

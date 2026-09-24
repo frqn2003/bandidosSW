@@ -72,7 +72,7 @@ export function BloquesDisponibilidadModal({
     setFranjas((prev) => prev.filter((f) => f.id !== id));
   };
 
-  // BACKEND: PUT /api/profesores/:id/disponibilidad (franjas → agenda_profesional)
+  // El guardado lo hace la página (guardarDisponibilidad → /api/disponibilidad).
   // Las franjas a medias suman 0: la hora de fin todavía no se eligió.
   const totalHoras = useMemo(
     () =>

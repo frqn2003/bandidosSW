@@ -222,7 +222,7 @@ Errores — **los códigos ya existen en `src/lib/http/errors.ts`, no se inventa
 |---|---|---|
 | `ui/Button`, `ui/Input`, `ui/Icon`, `ui/Toast` | **Reusar** | Sin cambios |
 | `layout/Sidebar` | **Extender** | Filtrar `NAV_ITEMS` por rol + bloque de usuario con "Cerrar sesión" y última conexión |
-| `lib/formato.ts` | **Reusar** | `inicialesDe` y `tonoAvatarDe` para el avatar del usuario |
+| `funciones/formato.ts` | **Reusar** | `inicialesDe` y `tonoAvatarDe` para el avatar del usuario |
 | `auth/CampoContrasena` | **Crear** | Input de contraseña con botón mostrar/ocultar (`visibility` / `visibility_off`), `aria-pressed`. Lo usan las 3 pantallas con contraseña |
 | `auth/RequisitosContrasena` | **Crear** | Lista de requisitos que se tildan en vivo |
 | `auth/AccesoDenegado` | **Crear** | Pantalla de rol sin permiso, dentro del layout |
@@ -298,7 +298,7 @@ Las credenciales se muestran en un panel "Datos de prueba" en la pantalla de log
 ## Decisiones de diseño (completado por /disenar)
 
 - **Rutas:** `/` (login) · `/cambiar-contrasena` · `/recuperar-contrasena` · **`/inicio`** (no estaba en el brief: ver más abajo).
-- **Componentes reusados:** `ui/Button`, `ui/Input`, `ui/Modal`, `ui/Icon`, `lib/formato` (`inicialesDe`, `tonoAvatarDe`, `formatearFecha`).
+- **Componentes reusados:** `ui/Button`, `ui/Input`, `ui/Modal`, `ui/Icon`, `funciones/formato` (`inicialesDe`, `tonoAvatarDe`, `formatearFecha`).
 - **Componentes extendidos:** `layout/Sidebar` → filtra por rol, y sus ítems salen de `lib/permisos.ts` en vez de una constante propia; suma el bloque de usuario con última conexión y Cerrar sesión.
 - **Componentes nuevos:** `auth/CampoContrasena`, `auth/RequisitosContrasena`, `auth/AccesoDenegado`, `auth/RequiereSesion`, `auth/AvisoInactividad`, más `lib/permisos.ts`, `lib/sesion.tsx` y `data/auth.ts`.
 - **Contrato creado antes de la pantalla:** [`src/contracts/auth.ts`](../../src/contracts/auth.ts) + [guía](../contratos/auth.md).

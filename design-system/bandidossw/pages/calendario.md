@@ -1,0 +1,21 @@
+# Página: calendario
+
+> Reglas específicas del Calendario de turnos por profesor (módulo Calendario, `/calendario`, HU-CAL-01). Si existe este archivo, reemplaza al MASTER para esta página. Los tokens base (navy primary, azul conexión secondary, fondo `#f8f9ff`, Inter, Material Symbols Outlined, radios 4/8, motion con `prefers-reduced-motion`) vienen del `MASTER.md`; acá van solo los matices de esta pantalla. La grilla sigue la estética de la agenda semanal del diseño "Turnos y Agenda" (tarjetas con borde lateral de color, pill contador) aplicada al dominio de HU-CAL-01.
+
+## Desviaciones
+
+- **Encabezado de la grilla con rango**: el título de la página es fijo "Calendario" con subtítulo "Disponibilidad y reservas de cada profesor"; el rango vive en la línea que encabeza la grilla ("Semana del X al Y de Mes de Año" o "Miércoles 21 de octubre de 2025" en vista Día) con un pill contador "N turnos" (lenguaje vago SIEMPRE en plural) y los botones Hoy ◀ ▶ + "Imprimir semana" en la esquina derecha de esa misma línea.
+- **Sin leyenda**: el estado de cada turno se comunica dentro de la tarjeta (borde lateral + badge `TurnoCalendarioBadge`); no hay leyenda separada ni nota de anticipación.
+- **Contexto semanal real**: la grilla abre en la semana actual del calendario real (hoy = martes, semana lunes→sábado que lo contiene), no en un fixture congelado. Los turnos del fixture se generan relativos a esa semana real (`lunesDe(now)`).
+- **Filtro Profesor obligatorio, no "Todos"**: Mesa de Entrada y Gerente deben elegir un profesor (Select nativo con estado inicial "Seleccione un profesor…"); la grilla no se dibuja hasta elegir. El rol Profesor no elige: viene bloqueado con `lock` + su nombre/su apellido (es la única pantalla que ve su propia agenda).
+- **Día y hora actuales resaltados**: la columna del día de hoy lleva el badge pill "Hoy" en `primary` (redondeado) sobre un header `secondary` sólido (el cuerpo queda igual que los otros días); si la semana visible contiene hoy, la banda de la hora actual pinta `bg-secondary/10` + un punto indicador. Es un HIGHLIGHT de contexto, no un CTA.
+- **Vistas Semana y Día**: una misma grilla comparte el componente con un switch de vista; en vista Día las bandas del día elegido ocupan todo el ancho.
+- **Zoom 30'/60'**: toggle que compacta/expande la altura de cada banda (las tarjetas de turno se comprimen; no cambia la semántica). Banda mínima 56px (touch target ≥ 44px).
+- **6 días Lun–Sáb**: el domingo no se muestra (no hay cobertura el domingo en ninguna franja del Centro).
+- **Celdas sin cobertura atenuadas "—"**: un día sin franjas (domingo → no aparece) o un período fuera de la franja del profesor muestra "—"; una franja disponible sin turnos muestra "Disponible" con `add_circle` (borde punteado, hover secondary), clickeable (abre el placeholder de reserva). Ambos distinguen una agenda vacía de una franja libre.
+- **Tarjeta de turno tipo agenda**: cada turno ocupa su celda como tarjeta con borde lateral de color (izquierda, 4px): `secondary` si Reservado, `error` con fondo `error/5` si Cancelado. Línea superior: código en mono + hora inicio–fin + badge de estado; segunda línea: Apellido y Nombre del alumno en negrita; tercera: materia. Click → `TurnoDetalleModal` en LECTURA (sin acciones de escritura; cambiar estado es de HU-TUR-01).
+- **Reservar/lugar**: "Disponible" abre `ReservaTurnoModal` que es un **placeholder** hasta HU-TUR-01 (chip "Próx." + `<dl>` Profesor/Fecha/Horario, sin formulario real). No se fuerza la reserva donde el brief no la implementa.
+- **Abandono de leyenda**: el estado del turno se comunica exclusivamente con borde `border-l-4` + badge; no hay leyenda de estados ni nota de anticipación.
+- **Impresión**: botón "Imprimir semana" (`window.print()`); el encabezado `print:` solo (Academia + Profesor + rango de fechas) y todo lo interactivo lleva `print:hidden`. Un printed semanal aprobado como criterio del audit.
+- **Estados de carga**: `cargando` con `opacity-60` sobre la grilla (no skeleton por ahora); `error` con botón "Reintentar" que vuelve a traer la agenda (incrementa `intento`, que es una dependencia del efecto de datos).
+- **Horarios desde la disponibilidad**: la tabla se arma desde `limiteAtencion` (mín/máx de las franjas del profesor seleccionado), sin inventar bandas fuera de la cobertura.

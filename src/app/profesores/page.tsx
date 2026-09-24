@@ -6,6 +6,7 @@ import type {
   EditarProfesorBody,
   ErrorProfesor,
 } from "@/contracts/profesor";
+import { useSesion } from "@/funciones/sesion";
 import { ApiError, mensajeDeError } from "@/lib/api-client";
 import {
   VACIO_COPY,
@@ -13,6 +14,7 @@ import {
   bloquesPorDiaDesde,
   crearProfesor,
   editarProfesor,
+  guardarDisponibilidad as guardarDisponibilidadDe,
   inactivarProfesor,
   listarBloquesDe,
   listarCandidatos,
@@ -85,6 +87,9 @@ function errorDeFormulario(e: unknown): { campo?: string; mensaje: string } {
 }
 
 function CuerpoDocenteContent() {
+  // Alta rápida de usuario docente: solo el Gerente (el back también lo valida).
+  const { sesion } = useSesion();
+  const esGerente = sesion?.usuario.rol.nombre === "Gerente";
   const { showToast } = useToast();
   const [filtros, setFiltros] = useState(FILTROS_INICIALES);
   const [pagina, setPagina] = useState(1);
@@ -235,6 +240,33 @@ function CuerpoDocenteContent() {
     setModalForm(null);
   };
 
+  /**
+   * Persiste los bloques de un profesor y refleja en pantalla lo que quedó en
+   * la base. Si falla a mitad de camino, vuelve a leer los bloques para no
+   * mostrar un estado que la base no tiene. Devuelve si se guardó.
+   */
+  const persistirBloques = async (
+    profesor: Pick<Profesor, "id" | "academiaId">,
+    bloquesPorDia: Record<number, string[]>,
+  ): Promise<boolean> => {
+    const aplicar = (bloques: Record<number, string[]>) => {
+      cacheBloques.current.set(profesor.id, bloques);
+      setProfesores((prev) =>
+        prev.map((p) => (p.id === profesor.id ? { ...p, bloquesPorDia: bloques } : p)),
+      );
+    };
+    try {
+      aplicar(await guardarDisponibilidadDe(profesor.id, profesor.academiaId, bloquesPorDia));
+      return true;
+    } catch (e) {
+      showToast("error", `La disponibilidad no se guardó: ${mensajeDeError(e)}`);
+      listarBloquesDe(profesor.id)
+        .then((b) => aplicar(bloquesPorDiaDesde(b)))
+        .catch(() => undefined);
+      return false;
+    }
+  };
+
   const guardarProfesor = async (datos: ProfesorFormData) => {
     const enEdicion = modalForm?.modo === "EDICION" ? modalForm.profesor : null;
 
@@ -265,6 +297,7 @@ function CuerpoDocenteContent() {
     setGuardando(true);
     setErrorRemoto(null);
     try {
+      let vista: Profesor;
       if (enEdicion) {
         const body: EditarProfesorBody = ficha;
         let actualizado = await editarProfesor(enEdicion.id, body);
@@ -272,33 +305,31 @@ function CuerpoDocenteContent() {
         if (!datos.estado && actualizado.estado === "activo") {
           actualizado = await inactivarProfesor(enEdicion.id);
         }
-        const vista = aProfesor(actualizado, enEdicion.bloquesPorDia);
-        setProfesores((prev) => prev.map((p) => (p.id === vista.id ? vista : p)));
-        showToast("success", `Ficha de ${vista.nombre} ${vista.apellido} actualizada.`);
+        const editado = aProfesor(actualizado, enEdicion.bloquesPorDia);
+        vista = editado;
+        setProfesores((prev) => prev.map((p) => (p.id === editado.id ? editado : p)));
+        showToast("success", `Ficha de ${editado.nombre} ${editado.apellido} actualizada.`);
       } else {
         const body: CrearProfesorBody = { usuarioId: Number(datos.usuarioId), ...ficha };
         let creado = await crearProfesor(body);
         if (!datos.estado) creado = await inactivarProfesor(creado.id);
         // Se agrega lo que devolvió la API, no el borrador local: trae el `id`
         // real y lo que la base completó por default.
-        const vista = aProfesor(creado);
-        setProfesores((prev) => [...prev, vista]);
+        const nuevo = aProfesor(creado);
+        vista = nuevo;
+        setProfesores((prev) => [...prev, nuevo]);
         // Ese usuario ya tiene ficha: sale del combo de candidatos.
         setUsuariosSinFicha((prev) => prev.filter((u) => u.id !== creado.usuario.id));
-        showToast("success", `${vista.nombre} ${vista.apellido} quedó dado de alta.`);
+        showToast("success", `${nuevo.nombre} ${nuevo.apellido} quedó dado de alta.`);
       }
 
-      // BACKEND: las franjas del formulario son agenda_profesional y van por
-      // POST /api/disponibilidad, que pide `agendaSemanalId` (la franja de
-      // atención de la sede). Ese dato todavía no lo expone ninguna ruta
-      // (/api/agenda no existe), así que la disponibilidad NO se persiste acá.
+      // Las franjas del formulario son agenda_profesional: van aparte, por
+      // /api/disponibilidad (ver guardarDisponibilidad en @/data/profesores).
+      // La ficha ya quedó guardada: si esto falla, se avisa y el form se cierra.
       const franjasNuevas = bloquesDesdeFranjas(datos.franjas);
       const franjasActuales = enEdicion?.bloquesPorDia ?? {};
       if (JSON.stringify(franjasNuevas) !== JSON.stringify(franjasActuales)) {
-        showToast(
-          "error",
-          "Los datos de la ficha se guardaron, pero la disponibilidad horaria no: falta el endpoint de agenda.",
-        );
+        await persistirBloques(vista, franjasNuevas);
       }
       cerrarForm();
     } catch (e) {
@@ -308,17 +339,13 @@ function CuerpoDocenteContent() {
     }
   };
 
-  const guardarDisponibilidad = (bloquesPorDia: Record<number, string[]>) => {
-    // BACKEND: POST/PUT /api/disponibilidad necesita `agendaSemanalId` (franja
-    // de atención de la academia) y no hay ruta que las liste todavía. Hasta
-    // entonces no se puede guardar: no se toca el estado para no simular un
-    // guardado que la base no tiene.
-    void bloquesPorDia;
-    showToast(
-      "error",
-      "La disponibilidad todavía no se puede guardar desde acá: falta el endpoint de agenda de la sede.",
-    );
+  const guardarDisponibilidad = async (bloquesPorDia: Record<number, string[]>) => {
+    if (!bloquesDe) return;
+    const profesor = bloquesDe;
     setBloquesDe(null);
+    if (await persistirBloques(profesor, bloquesPorDia)) {
+      showToast("success", `Disponibilidad de ${profesor.nombre} ${profesor.apellido} actualizada.`);
+    }
   };
 
   const confirmarBaja = async (motivo: string, observaciones: string) => {
@@ -529,6 +556,12 @@ function CuerpoDocenteContent() {
             : undefined
         }
         usuariosSinFicha={usuariosSinFicha}
+        puedeCrearUsuario={esGerente}
+        onUsuarioCreado={(u) =>
+          setUsuariosSinFicha((prev) =>
+            [...prev.filter((p) => p.id !== u.id), u].sort((a, b) => a.apellido.localeCompare(b.apellido)),
+          )
+        }
         materiasCatalogo={materiasCatalogo}
         errorRemoto={errorRemoto}
         guardando={guardando}
