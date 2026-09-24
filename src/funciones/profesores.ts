@@ -14,7 +14,7 @@ export {
   inicialesDe,
   TONOS_AVATAR,
   tonoAvatarDe,
-} from "@/lib/formato";
+} from "@/funciones/formato";
 
 /**
  * Franja horaria del formulario de disponibilidad. `dia` es 1-6 (ISO, Lun-Sáb).

@@ -10,7 +10,7 @@ import {
   NotFoundError,
   ValidationError,
 } from "@/lib/http/errors";
-import { edadEnAnios } from "@/lib/formato";
+import { edadEnAnios } from "@/funciones/formato";
 import type {
   FiltrosAlumno,
   CrearAlumnoInputDto,

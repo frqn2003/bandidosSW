@@ -4,8 +4,8 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { RequiereSesion } from "@/components/auth/RequiereSesion";
 import { Sidebar } from "@/components/layout/Sidebar";
-import { modulosDe } from "@/lib/permisos";
-import { useSesion } from "@/lib/sesion";
+import { modulosDe } from "@/funciones/permisos";
+import { useSesion } from "@/funciones/sesion";
 
 /**
  * Pantalla de aterrizaje (HU-SIS-01).

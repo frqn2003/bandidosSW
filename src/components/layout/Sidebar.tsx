@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
-import { formatearFecha, inicialesDe, tonoAvatarDe } from "@/lib/formato";
-import { MODULOS, modulosDe } from "@/lib/permisos";
-import { useSesion } from "@/lib/sesion";
+import { formatearFecha, inicialesDe, tonoAvatarDe } from "@/funciones/formato";
+import { MODULOS, modulosDe } from "@/funciones/permisos";
+import { useSesion } from "@/funciones/sesion";
 
 // Navegación lateral del sistema.
 //

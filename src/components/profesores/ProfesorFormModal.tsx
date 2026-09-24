@@ -22,7 +22,7 @@ import {
   tonoAvatarDe,
   validarFranjas,
   type FranjaForm,
-} from "@/lib/profesores";
+} from "@/funciones/profesores";
 
 export type ModoProfesorForm = "INSERCION" | "EDICION";
 

@@ -40,7 +40,7 @@ import {
   type ProfesorFormData,
   type ModoProfesorForm,
 } from "@/components/profesores/ProfesorFormModal";
-import { bloquesDesdeFranjas, capacidadMaxDe, franjasDesdeBloques } from "@/lib/profesores";
+import { bloquesDesdeFranjas, capacidadMaxDe, franjasDesdeBloques } from "@/funciones/profesores";
 
 const FILTROS_INICIALES: FiltrosProfesoresState = {
   busqueda: "",

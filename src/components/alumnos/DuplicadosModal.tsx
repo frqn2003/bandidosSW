@@ -1,7 +1,7 @@
 "use client";
 
 import { ConfirmarDialog } from "@/components/ui/ConfirmarDialog";
-import { formatearFecha } from "@/lib/formato";
+import { formatearFecha } from "@/funciones/formato";
 import type { AlumnoResponse } from "@/data/alumnos";
 
 interface DuplicadosModalProps {

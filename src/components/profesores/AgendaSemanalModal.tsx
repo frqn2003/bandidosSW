@@ -12,7 +12,7 @@ import {
   capacidadMaxDe,
   cargaHorariaSemanal,
   horaMasMin,
-} from "@/lib/profesores";
+} from "@/funciones/profesores";
 
 // Franjas de 1.5 h de la grilla de la semana (inicios alineados con TURNOS_SEMANA).
 const FRANJAS_GRILLA = ["08:30", "10:00", "14:00", "16:00"];

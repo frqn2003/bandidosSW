@@ -16,7 +16,7 @@ import {
   type PosiblesDuplicadosQuery,
 } from "@/contracts/alumno";
 import { apiGet, apiGetOpcional, apiSend } from "@/lib/api-client";
-import { edadEnAnios } from "@/lib/formato";
+import { edadEnAnios } from "@/funciones/formato";
 
 export type { AlumnoResponse, NivelEducativo };
 export type EstadoAlumno = AlumnoResponse["estado"];

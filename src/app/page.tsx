@@ -10,8 +10,8 @@ import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
 import { CampoContrasena } from "@/components/auth/CampoContrasena";
 import { CREDENCIALES_DEMO, login } from "@/data/auth";
-import { inicioDe } from "@/lib/permisos";
-import { useSesion } from "@/lib/sesion";
+import { inicioDe } from "@/funciones/permisos";
+import { useSesion } from "@/funciones/sesion";
 
 /** mm:ss a partir de segundos, para la cuenta regresiva del bloqueo. */
 function mmss(segundos: number): string {

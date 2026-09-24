@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { EstadoAlumnoBadge } from "@/components/alumnos/EstadoAlumnoBadge";
-import { inicialesDe, formatearTelefono, tonoAvatarDe } from "@/lib/formato";
+import { inicialesDe, formatearTelefono, tonoAvatarDe } from "@/funciones/formato";
 import type { AlumnoResponse } from "@/data/alumnos";
 
 interface AlumnosTableProps {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { Icon } from "@/components/ui/Icon";
-import { inicioDe, type Modulo } from "@/lib/permisos";
+import { inicioDe, type Modulo } from "@/funciones/permisos";
 import type { NombreRol } from "@/contracts/rol";
 
 interface AccesoDenegadoProps {

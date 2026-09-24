@@ -16,7 +16,7 @@ import {
   horasEntre,
   validarFranjas,
   type FranjaForm,
-} from "@/lib/profesores";
+} from "@/funciones/profesores";
 
 interface BloquesDisponibilidadModalProps {
   profesor: Profesor | null;

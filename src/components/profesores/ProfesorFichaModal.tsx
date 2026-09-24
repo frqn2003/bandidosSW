@@ -17,7 +17,7 @@ import {
   inicialesDe,
   jornadasConBloques,
   tonoAvatarDe,
-} from "@/lib/profesores";
+} from "@/funciones/profesores";
 
 interface ProfesorFichaModalProps {
   profesor: Profesor | null;

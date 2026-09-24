@@ -9,7 +9,7 @@ import {
   formatearTelefono,
   inicialesDe,
   tonoAvatarDe,
-} from "@/lib/profesores";
+} from "@/funciones/profesores";
 
 interface ProfesoresTableProps {
   profesores: Profesor[];

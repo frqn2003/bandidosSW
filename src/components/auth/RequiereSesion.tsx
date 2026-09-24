@@ -6,8 +6,8 @@ import { Icon } from "@/components/ui/Icon";
 import { AccesoDenegado } from "@/components/auth/AccesoDenegado";
 import { AvisoInactividad } from "@/components/auth/AvisoInactividad";
 import { Sidebar } from "@/components/layout/Sidebar";
-import { moduloDeRuta, puedeVer } from "@/lib/permisos";
-import { useSesion } from "@/lib/sesion";
+import { moduloDeRuta, puedeVer } from "@/funciones/permisos";
+import { useSesion } from "@/funciones/sesion";
 
 /**
  * Guard de las pantallas con sesión (HU-SIS-01).

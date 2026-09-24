@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { EstadoAlumnoBadge } from "@/components/alumnos/EstadoAlumnoBadge";
-import { edadEnAnios, formatearFecha } from "@/lib/formato";
+import { edadEnAnios, formatearFecha } from "@/funciones/formato";
 import {
   NIVELES_EDUCATIVOS,
   esMenorDeEdad,

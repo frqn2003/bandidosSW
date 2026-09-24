@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
-import { useSesion } from "@/lib/sesion";
+import { useSesion } from "@/funciones/sesion";
 
 /**
  * Aviso previo al cierre por inactividad (HU-SIS-01).

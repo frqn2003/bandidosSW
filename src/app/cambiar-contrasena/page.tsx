@@ -13,8 +13,8 @@ import { Icon } from "@/components/ui/Icon";
 import { CampoContrasena } from "@/components/auth/CampoContrasena";
 import { RequisitosContrasena } from "@/components/auth/RequisitosContrasena";
 import { cambiarContrasena } from "@/data/auth";
-import { inicioDe } from "@/lib/permisos";
-import { useSesion } from "@/lib/sesion";
+import { inicioDe } from "@/funciones/permisos";
+import { useSesion } from "@/funciones/sesion";
 
 type Campos = "actual" | "nueva" | "repetirNueva";
 
