@@ -24,7 +24,9 @@ interface FiltrosAlumnosProps {
 
 export function FiltrosAlumnos({ estado, onChange, totalActivos }: FiltrosAlumnosProps) {
   const set = (patch: Partial<FiltrosAlumnosState>) => onChange({ ...estado, ...patch });
-  const hayFiltros = estado.busqueda.trim() !== "" || estado.estado !== "activo";
+
+  // Limpia el selector de estado; la búsqueda se mantiene (no depende de este botón).
+  const borrarFiltros = () => onChange({ ...estado, estado: "activo" });
 
   return (
     <form
@@ -65,17 +67,10 @@ export function FiltrosAlumnos({ estado, onChange, totalActivos }: FiltrosAlumno
           </Select>
         </div>
 
-        {hayFiltros && (
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => onChange(FILTROS_ALUMNOS_INICIALES)}
-            className="self-end"
-          >
-            <Icon name="close" size={16} />
-            Borrar búsqueda
-          </Button>
-        )}
+        <Button type="button" variant="outline" onClick={borrarFiltros} className="self-end">
+          <Icon name="filter_alt_off" size={16} />
+          Limpiar filtros
+        </Button>
       </div>
       <p className="text-xs font-medium text-on-surface-variant" aria-live="polite">
         {totalActivos} {totalActivos === 1 ? "alumno activo" : "alumnos activos"}

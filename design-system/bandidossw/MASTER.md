@@ -25,8 +25,8 @@
 
 | Color | Nombre | Uso recomendado | Hex |
 |-------|--------|-----------------|-----|
-| Primario | Azul Nexo | Encabezados, barra lateral y marca del sistema | `#142B6F` |
-| Secundario | Azul Conexión | Botones principales, enlaces y elementos de foco | `#2F6FED` |
+| Primario | Azul Conexión | CTAs, estados activos, barra lateral y marca del sistema | `#2F6FED` |
+| Secundario | Azul Foco | Botones secundarios, enlaces y elementos de foco | `#1D4ED8` |
 | Acento | Turquesa Nexo | Íconos, acentos y elementos destacados | `#14B8A6` |
 | Éxito | Verde Éxito | Estados "Activo", asistencia y confirmaciones | `#22C55E` |
 | Atención | Ámbar Atención | Alertas, deuda pendiente y advertencias | `#F59E0B` |
@@ -39,29 +39,29 @@ Los tonos de contenedor/fixed de abajo son derivaciones MD3 de esos 9 colores
 base (tints para fondos, escalones para estados) — **no** introducen matices
 nuevos de marca.
 
-#### Primary (Azul Nexo)
+#### Primary (Azul Conexión)
 | Role | Hex | CSS Variable |
 |------|-----|--------------|
-| primary | `#142b6f` | `--color-primary` |
+| primary | `#2f6fed` | `--color-primary` |
 | on-primary | `#ffffff` | `--color-on-primary` |
-| primary-container | `#1e3a8a` | `--color-primary-container` |
-| on-primary-container | `#b6c8ff` | `--color-on-primary-container` |
-| primary-fixed | `#dce1ff` | `--color-primary-fixed` |
-| primary-fixed-dim | `#b6c4ff` | `--color-primary-fixed-dim` |
-| on-primary-fixed | `#00164e` | `--color-on-primary-fixed` |
-| on-primary-fixed-variant | `#264191` | `--color-on-primary-fixed-variant` |
+| primary-container | `#4a83f1` | `--color-primary-container` |
+| on-primary-container | `#fefcff` | `--color-on-primary-container` |
+| primary-fixed | `#d8e2ff` | `--color-primary-fixed` |
+| primary-fixed-dim | `#adc6ff` | `--color-primary-fixed-dim` |
+| on-primary-fixed | `#001a42` | `--color-on-primary-fixed` |
+| on-primary-fixed-variant | `#004395` | `--color-on-primary-fixed-variant` |
 
-#### Secondary (Azul Conexión)
+#### Secondary (Azul Foco)
 | Role | Hex | CSS Variable |
 |------|-----|--------------|
-| secondary | `#2f6fed` | `--color-secondary` |
+| secondary | `#1d4ed8` | `--color-secondary` |
 | on-secondary | `#ffffff` | `--color-on-secondary` |
-| secondary-container | `#4a83f1` | `--color-secondary-container` |
-| on-secondary-container | `#fefcff` | `--color-on-secondary-container` |
-| secondary-fixed | `#d8e2ff` | `--color-secondary-fixed` |
-| secondary-fixed-dim | `#adc6ff` | `--color-secondary-fixed-dim` |
-| on-secondary-fixed | `#001a42` | `--color-on-secondary-fixed` |
-| on-secondary-fixed-variant | `#004395` | `--color-on-secondary-fixed-variant` |
+| secondary-container | `#dbe4ff` | `--color-secondary-container` |
+| on-secondary-container | `#062f83` | `--color-on-secondary-container` |
+| secondary-fixed | `#e0e6ff` | `--color-secondary-fixed` |
+| secondary-fixed-dim | `#c0ccff` | `--color-secondary-fixed-dim` |
+| on-secondary-fixed | `#00114d` | `--color-on-secondary-fixed` |
+| on-secondary-fixed-variant | `#0e2c91` | `--color-on-secondary-fixed-variant` |
 
 #### Tertiary (Turquesa Nexo)
 | Role | Hex | CSS Variable |

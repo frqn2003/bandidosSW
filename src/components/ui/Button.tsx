@@ -7,15 +7,15 @@ type Variant = "primary" | "secondary" | "outline" | "ghost" | "destructive";
 type Size = "sm" | "md" | "lg" | "icon";
 
 // Roles de color del documento de diseño (Nexo Académico):
-// - "Azul Conexión" (#2F6FED) → botones principales, enlaces y foco.
-// - "Azul Nexo" (#142B6F)    → encabezados, barra lateral y marca.
+// - "Azul Conexión" (#2F6FED) → CTAs, activos, marca (tokens primary).
+// - "Azul Foco" (#1D4ED8)     → botones secundarios, foco y links.
 // Por eso el CTA principal (variant="primary") usa el azul de conexión y el
-// hover cae al azul institucional más profundo.
+// hover cae al azul profundo derivado (secondary).
 const variantClasses: Record<Variant, string> = {
   primary:
-    "bg-secondary text-on-secondary hover:bg-primary active:scale-[0.97] disabled:hover:bg-secondary",
-  secondary:
     "bg-primary text-on-primary hover:bg-secondary active:scale-[0.97] disabled:hover:bg-primary",
+  secondary:
+    "bg-secondary text-on-secondary hover:bg-primary active:scale-[0.97] disabled:hover:bg-secondary",
   outline:
     "border border-secondary bg-transparent text-secondary hover:bg-secondary/5 active:scale-[0.97]",
   ghost: "bg-transparent text-secondary hover:bg-secondary/10 active:scale-[0.97]",

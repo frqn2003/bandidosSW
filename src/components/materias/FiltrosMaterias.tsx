@@ -24,23 +24,13 @@ interface FiltrosMateriasProps {
   estado: FiltrosMateriasState;
   onChange: (next: FiltrosMateriasState) => void;
   totalActivas: number;
-  onExportarCsv: () => void;
-  onExportarPdf: () => void;
-  exportarDeshabilitado: boolean;
 }
 
-export function FiltrosMaterias({
-  estado,
-  onChange,
-  totalActivas,
-  onExportarCsv,
-  onExportarPdf,
-  exportarDeshabilitado,
-}: FiltrosMateriasProps) {
+export function FiltrosMaterias({ estado, onChange, totalActivas }: FiltrosMateriasProps) {
   const set = (patch: Partial<FiltrosMateriasState>) => onChange({ ...estado, ...patch });
 
-  const hayFiltros =
-    estado.busqueda.trim() !== "" || estado.nivel !== "" || estado.estado !== "activo";
+  // Limpia los selectores; la búsqueda se mantiene (no depende de este botón).
+  const borrarFiltros = () => onChange({ ...estado, nivel: "", estado: "activo" });
 
   return (
     <form
@@ -97,40 +87,10 @@ export function FiltrosMaterias({
           </Select>
         </div>
 
-        {hayFiltros && (
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => onChange(FILTROS_MATERIAS_INICIALES)}
-            className="self-end"
-          >
-            <Icon name="close" size={16} />
-            Borrar filtros
-          </Button>
-        )}
-
-        <div className="flex items-end gap-2 md:ml-auto">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onExportarCsv}
-            disabled={exportarDeshabilitado}
-            title="Descarga un .csv que abre en Excel"
-          >
-            <Icon name="download" size={16} />
-            Exportar CSV
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onExportarPdf}
-            disabled={exportarDeshabilitado}
-            title="Abre el diálogo de impresión: elegí «Guardar como PDF»"
-          >
-            <Icon name="print" size={16} />
-            PDF
-          </Button>
-        </div>
+        <Button type="button" variant="outline" onClick={borrarFiltros} className="self-end">
+          <Icon name="filter_alt_off" size={16} />
+          Limpiar filtros
+        </Button>
       </div>
       <p className="text-xs font-medium text-on-surface-variant" aria-live="polite">
         {totalActivas} {totalActivas === 1 ? "materia activa" : "materias activas"}

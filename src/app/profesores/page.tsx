@@ -390,23 +390,28 @@ function CuerpoDocenteContent() {
       <Sidebar />
       <main className="flex-1 px-6 py-6 lg:px-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-5">
-          <header className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <nav aria-label="Ruta de navegación" className="mb-1">
-                <ol className="flex items-center gap-1 text-xs font-semibold text-on-surface-variant">
-                  <li>Gestión Académica</li>
-                  <li aria-hidden="true" className="flex items-center">
-                    <Icon name="chevron_right" size={14} />
-                  </li>
-                  <li aria-current="page" className="text-on-surface">
-                    Cuerpo Docente
-                  </li>
-                </ol>
-              </nav>
-              <h1 className="font-display text-2xl font-bold text-on-surface">Cuerpo Docente</h1>
-              <p className="text-sm font-medium text-on-surface-variant">
-                Gestión de profesores, materias asignadas y disponibilidad
-              </p>
+          <header className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-md bg-primary-container/30">
+                <Icon name="groups" size={24} className="text-primary" />
+              </span>
+              <div>
+                <nav aria-label="Ruta de navegación" className="mb-1">
+                  <ol className="flex items-center gap-1 text-xs font-semibold text-on-surface-variant">
+                    <li>Gestión Académica</li>
+                    <li aria-hidden="true" className="flex items-center">
+                      <Icon name="chevron_right" size={14} />
+                    </li>
+                    <li aria-current="page" className="text-on-surface">
+                      Cuerpo Docente
+                    </li>
+                  </ol>
+                </nav>
+                <h1 className="font-display text-2xl font-bold text-on-surface">Cuerpo Docente</h1>
+                <p className="text-sm font-medium text-on-surface-variant">
+                  Gestión de profesores, materias asignadas y disponibilidad
+                </p>
+              </div>
             </div>
             <Button type="button" onClick={abrirNuevo}>
               <Icon name="add" size={16} />

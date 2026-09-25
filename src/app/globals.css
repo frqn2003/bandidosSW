@@ -13,8 +13,8 @@
 
   /* ── Paleta Nexo Académico (documento de diseño) ──────────────────────
 
-     Azul Nexo (primario)       #142B6F  encabezados, sidebar, marca
-     Azul Conexión (secundario) #2F6FED  botones principales, links, foco
+     Azul Conexión (primario)   #2F6FED  CTAs, activos, sidebar, marca
+     Azul Foco (secundario)     #1D4ED8  botones secundarios, foco, links
      Turquesa Nexo (acento)     #14B8A6  íconos, acentos, destacados
      Verde Éxito                #22C55E  Activo, asistencia, confirmaciones
      Ámbar Atención             #F59E0B  alertas, deuda, advertencias
@@ -24,23 +24,23 @@
      Gris Claro (fondo)         #F1F5F9  fondos de pantalla y tarjetas
   ────────────────────────────────────────────────────────────────────────── */
 
-  --color-primary: #142b6f;
+  --color-primary: #2f6fed;
   --color-on-primary: #ffffff;
-  --color-primary-container: #1e3a8a;
-  --color-on-primary-container: #b6c8ff;
-  --color-primary-fixed: #dce1ff;
-  --color-primary-fixed-dim: #b6c4ff;
-  --color-on-primary-fixed: #00164e;
-  --color-on-primary-fixed-variant: #264191;
+  --color-primary-container: #4a83f1;
+  --color-on-primary-container: #fefcff;
+  --color-primary-fixed: #d8e2ff;
+  --color-primary-fixed-dim: #adc6ff;
+  --color-on-primary-fixed: #001a42;
+  --color-on-primary-fixed-variant: #004395;
 
-  --color-secondary: #2f6fed;
+  --color-secondary: #1d4ed8;
   --color-on-secondary: #ffffff;
-  --color-secondary-container: #4a83f1;
-  --color-on-secondary-container: #fefcff;
-  --color-secondary-fixed: #d8e2ff;
-  --color-secondary-fixed-dim: #adc6ff;
-  --color-on-secondary-fixed: #001a42;
-  --color-on-secondary-fixed-variant: #004395;
+  --color-secondary-container: #dbe4ff;
+  --color-on-secondary-container: #062f83;
+  --color-secondary-fixed: #e0e6ff;
+  --color-secondary-fixed-dim: #c0ccff;
+  --color-on-secondary-fixed: #00114d;
+  --color-on-secondary-fixed-variant: #0e2c91;
 
   --color-tertiary: #14b8a6;
   --color-on-tertiary: #ffffff;
@@ -101,8 +101,8 @@
 
   /* ── Shadows ───────────────────────────────────────────────────────── */
 
-  --shadow-card: 0 4px 24px 0 rgb(20 43 111 / 0.1), 0 1px 3px 0 rgb(20 43 111 / 0.08);
-  --shadow-modal: 0 8px 40px 0 rgb(20 43 111 / 0.22), 0 2px 8px 0 rgb(20 43 111 / 0.12);
+  --shadow-card: 0 4px 24px 0 rgb(51 65 85 / 0.1), 0 1px 3px 0 rgb(51 65 85 / 0.08);
+  --shadow-modal: 0 8px 40px 0 rgb(51 65 85 / 0.22), 0 2px 8px 0 rgb(51 65 85 / 0.12);
 
   /* ── Spacing custom ────────────────────────────────────────────────── */
 

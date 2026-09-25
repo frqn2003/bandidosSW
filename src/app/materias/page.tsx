@@ -281,14 +281,32 @@ function MateriasContent() {
                 </p>
               </div>
             </div>
-            <Button
-              type="button"
-              onClick={() => abrirModal("INSERCION", null)}
-              className="print:hidden"
-            >
-              <Icon name="add" size={16} />
-              Nueva materia
-            </Button>
+            <div className="flex flex-wrap items-center gap-2 print:hidden">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={exportarCsv}
+                disabled={estadoCarga !== "listo" || filtradas.length === 0}
+                title="Descarga un .csv que abre en Excel"
+              >
+                <Icon name="download" size={16} />
+                CSV
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={imprimirListado}
+                disabled={estadoCarga !== "listo" || filtradas.length === 0}
+                title="Abre el diálogo de impresión: elegí «Guardar como PDF»"
+              >
+                <Icon name="print" size={16} />
+                PDF
+              </Button>
+              <Button type="button" onClick={() => abrirModal("INSERCION", null)}>
+                <Icon name="add" size={16} />
+                Nueva materia
+              </Button>
+            </div>
           </header>
 
           <FiltrosMaterias
@@ -298,9 +316,6 @@ function MateriasContent() {
               setPagina(1);
             }}
             totalActivas={activas}
-            onExportarCsv={exportarCsv}
-            onExportarPdf={imprimirListado}
-            exportarDeshabilitado={estadoCarga !== "listo" || filtradas.length === 0}
           />
 
           {estadoCarga === "cargando" && (
