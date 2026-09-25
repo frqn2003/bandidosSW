@@ -407,7 +407,13 @@ function ReservaContent() {
           : "Solo profesores activos que dictan la materia.";
 
   const mostrarSugerencia =
-    sugerenciaActual !== null && !(sugerenciaActual.fecha === fecha && sugerenciaActual.horaInicio === hora);
+    sugerenciaActual !== null &&
+    hora === null &&
+    (fecha === "" ||
+      (claveFranjas !== null &&
+        franjas?.clave === claveFranjas &&
+        !franjas.error &&
+        !franjas.lista.some((f) => f.disponible)));
 
   return (
     <div className="flex min-h-screen bg-surface">
