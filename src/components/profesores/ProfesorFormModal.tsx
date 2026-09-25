@@ -8,7 +8,6 @@ import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
-import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Switch } from "@/components/ui/Switch";
 import { EstadoProfesorBadge } from "@/components/profesores/EstadoProfesorBadge";
 import { UsuarioRapidoModal } from "@/components/profesores/UsuarioRapidoModal";
@@ -237,9 +236,9 @@ export function ProfesorFormModal({
       onClose={rapidoAbierto ? () => {} : onClose}
       title={titulo}
       subtitle={
-        modo === "EDICION" && profesor
-          ? `Modificá datos profesionales, materias asignadas o disponibilidad horaria de ${profesor.nombre} ${profesor.apellido}.`
-          : "Completá la ficha profesional, materias asignadas y disponibilidad semanal."
+        modo === "EDICION"
+          ? "Modificá la ficha profesional, materias y disponibilidad."
+          : "Completá la ficha profesional, materias y disponibilidad."
       }
       icon={
         <Icon
@@ -249,14 +248,11 @@ export function ProfesorFormModal({
         />
       }
       titleExtra={
-        <>
-          <StatusBadge
-            variant="info"
-            label={modo === "INSERCION" ? "MODO INSERCIÓN" : "MODO EDICIÓN"}
-            icon="info"
-          />
-          {modo === "EDICION" && <EstadoProfesorBadge estado={datos.estado ? "activo" : "inactivo"} />}
-        </>
+        modo === "EDICION" ? (
+          <span className="ml-auto">
+            <EstadoProfesorBadge estado={datos.estado ? "activo" : "inactivo"} />
+          </span>
+        ) : undefined
       }
       maxWidth="max-w-2xl"
       footer={
@@ -361,8 +357,7 @@ export function ProfesorFormModal({
                     {inicialesDe(profesor.nombre, profesor.apellido)}
                   </span>
                   <p className="text-sm font-bold text-on-surface">
-                    {profesor.tituloEspecialidad ? `${profesor.tituloEspecialidad} — ` : ""}
-                    {profesor.nombre} {profesor.apellido} ({profesor.email})
+                    {profesor.nombre} {profesor.apellido}
                   </p>
                 </div>
               )}

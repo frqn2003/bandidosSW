@@ -82,7 +82,7 @@ export function Modal({
               transition={{ duration: reduceMotion ? 0 : 0.25, ease: "easeOut" }}
             >
               <div className="flex items-center justify-between gap-4 border-b border-outline-variant px-6 py-4">
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
                   {icon}
                   <div className="min-w-0">
                     <h2
