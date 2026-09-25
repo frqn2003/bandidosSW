@@ -136,9 +136,15 @@ export function ComprobanteTurno({
         <div className="flex flex-col gap-3 sm:flex-row">
           {/* OPCIONAL: imprimir comprobante. Si no se quiere, borrar este botón y `onImprimir`. */}
           {onImprimir && (
-            <Button type="button" variant="ghost" onClick={onImprimir}>
-              <Icon name="print" size={18} />
-              Imprimir
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              onClick={onImprimir}
+              title="Abre el diálogo de impresión: elegí «Guardar como PDF»"
+            >
+              <Icon name="download" size={16} />
+              PDF
             </Button>
           )}
           {/* OPCIONAL: enviar por email. Si no se quiere, borrar este botón y `onEnviarEmail`. */}

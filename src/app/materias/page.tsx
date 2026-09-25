@@ -276,15 +276,19 @@ function MateriasContent() {
               <div>
                 <h1 className="font-display text-2xl font-bold text-on-surface">Materias</h1>
                 <p className="text-sm font-medium text-on-surface-variant">
-                  Catálogo del centro: nivel, duración de clase y valor. Es lo que se asigna a los
-                  profesores y lo que define el importe de cada turno.
+                  Catálogo: nivel, duración de clase y valor
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 print:hidden">
+              <Button type="button" onClick={() => abrirModal("INSERCION", null)}>
+                <Icon name="add" size={16} />
+                Nueva materia
+              </Button>
               <Button
                 type="button"
                 variant="outline"
+                size="md"
                 onClick={exportarCsv}
                 disabled={estadoCarga !== "listo" || filtradas.length === 0}
                 title="Descarga un .csv que abre en Excel"
@@ -295,16 +299,13 @@ function MateriasContent() {
               <Button
                 type="button"
                 variant="outline"
+                size="md"
                 onClick={imprimirListado}
                 disabled={estadoCarga !== "listo" || filtradas.length === 0}
                 title="Abre el diálogo de impresión: elegí «Guardar como PDF»"
               >
-                <Icon name="print" size={16} />
+                <Icon name="download" size={16} />
                 PDF
-              </Button>
-              <Button type="button" onClick={() => abrirModal("INSERCION", null)}>
-                <Icon name="add" size={16} />
-                Nueva materia
               </Button>
             </div>
           </header>

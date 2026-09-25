@@ -219,9 +219,15 @@ export function AgendaSemanalModal({
           <Button type="button" variant="outline" onClick={onClose}>
             Cerrar
           </Button>
-          <Button type="button" variant="secondary" onClick={() => window.print()}>
-            <Icon name="print" size={16} />
-            Imprimir Agenda
+          <Button
+            type="button"
+            variant="outline"
+            size="md"
+            onClick={() => window.print()}
+            title="Imprime la agenda semanal del profesor"
+          >
+            <Icon name="download" size={16} />
+            PDF
           </Button>
           <Button type="button" variant="primary" onClick={() => onModificarBloques(profesor)}>
             <Icon name="edit_calendar" size={16} />

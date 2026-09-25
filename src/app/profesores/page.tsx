@@ -414,7 +414,7 @@ function CuerpoDocenteContent() {
               </div>
             </div>
             <Button type="button" onClick={abrirNuevo}>
-              <Icon name="add" size={16} />
+              <Icon name="person_add" size={16} />
               Nuevo profesor
             </Button>
           </header>

@@ -341,9 +341,10 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
           type="button"
           onClick={() => window.print()}
           className="ml-auto"
+          title={vista === "semana" ? "Imprime la semana visible" : "Imprime el día visible"}
         >
-          <Icon name="print" size={16} />
-          {vista === "semana" ? "Imprimir semana" : "Imprimir día"}
+          <Icon name="download" size={16} />
+          PDF
         </Button>
       </div>
 
