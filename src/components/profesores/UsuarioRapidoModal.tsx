@@ -115,8 +115,8 @@ export function UsuarioRapidoModal({ open, onClose, onUsuarioCreado }: UsuarioRa
       maxWidth="max-w-md"
       footer={
         creado ? (
-          <Button type="button" onClick={onClose}>
-            <Icon name="link" size={18} />
+          <Button type="button" variant="primary" onClick={onClose}>
+            <Icon name="save" size={16} />
             Vincular y continuar
           </Button>
         ) : (
@@ -124,7 +124,14 @@ export function UsuarioRapidoModal({ open, onClose, onUsuarioCreado }: UsuarioRa
             <Button type="button" variant="outline" onClick={cerrar} disabled={guardando}>
               Cancelar
             </Button>
-            <Button type="submit" form="usuario-rapido-form" disabled={guardando} aria-busy={guardando || undefined}>
+            <Button
+              type="submit"
+              form="usuario-rapido-form"
+              variant="primary"
+              disabled={guardando}
+              aria-busy={guardando || undefined}
+            >
+              <Icon name={guardando ? "progress_activity" : "save"} size={16} />
               {guardando ? "Creando…" : "Crear usuario"}
             </Button>
           </>

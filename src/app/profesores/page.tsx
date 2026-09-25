@@ -26,13 +26,15 @@ import {
   type UsuarioSinFicha,
 } from "@/data/profesores";
 import { Button } from "@/components/ui/Button";
+import { ConfirmarDialog } from "@/components/ui/ConfirmarDialog";
 import { Icon } from "@/components/ui/Icon";
 import { Pagination } from "@/components/ui/Pagination";
+import { Select } from "@/components/ui/Select";
+import { Textarea } from "@/components/ui/Textarea";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { RequiereSesion } from "@/components/auth/RequiereSesion";
 import { AgendaSemanalModal } from "@/components/profesores/AgendaSemanalModal";
-import { BajaProfesorModal } from "@/components/profesores/BajaProfesorModal";
 import { FiltrosProfesores, type FiltrosProfesoresState } from "@/components/profesores/FiltrosProfesores";
 import { BloquesDisponibilidadModal } from "@/components/profesores/BloquesDisponibilidadModal";
 import { ProfesorFichaModal } from "@/components/profesores/ProfesorFichaModal";
@@ -49,6 +51,14 @@ const FILTROS_INICIALES: FiltrosProfesoresState = {
   estado: "activo",
 };
 const PAGE_SIZE_DEFAULT = 10;
+
+const MOTIVOS_BAJA = [
+  "Renuncia",
+  "Jubilación",
+  "Baja de la institución",
+  "Vencimiento de contrato",
+  "Otro",
+];
 
 type EstadoCarga = "cargando" | "error" | "listo";
 
@@ -100,6 +110,15 @@ function CuerpoDocenteContent() {
   const [agendaDe, setAgendaDe] = useState<Profesor | null>(null);
   const [bloquesDe, setBloquesDe] = useState<Profesor | null>(null);
   const [bajaDe, setBajaDe] = useState<Profesor | null>(null);
+  const [motivoBaja, setMotivoBaja] = useState("");
+  const [observacionesBaja, setObservacionesBaja] = useState("");
+  const [confirmandoBaja, setConfirmandoBaja] = useState(false);
+
+  const abrirBaja = (p: Profesor) => {
+    setMotivoBaja("");
+    setObservacionesBaja("");
+    setBajaDe(p);
+  };
 
   const [profesores, setProfesores] = useState<Profesor[]>([]);
   const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>("cargando");
@@ -345,20 +364,21 @@ function CuerpoDocenteContent() {
     }
   };
 
-  const confirmarBaja = async (motivo: string, observaciones: string) => {
+  const confirmarBaja = async () => {
     if (!bajaDe) return;
     const profesor = bajaDe;
     // BACKEND: el motivo y las observaciones todavía no viajan — POST
     // /api/profesores/:id/inactivar no los recibe y la auditoría la escribe el
     // trigger con el usuario de la sesión.
-    void motivo;
-    void observaciones;
-    setBajaDe(null);
+    void motivoBaja;
+    void observacionesBaja;
+    setConfirmandoBaja(true);
     try {
       const baja = await inactivarProfesor(profesor.id);
       const vista = aProfesor(baja, profesor.bloquesPorDia);
       setProfesores((prev) => prev.map((p) => (p.id === vista.id ? vista : p)));
       setModalForm(null); // si la baja se disparó desde el form de edición
+      setBajaDe(null);
       showToast(
         "success",
         filtros.estado === "activo"
@@ -372,6 +392,8 @@ function CuerpoDocenteContent() {
           ? "No se puede dar de baja: el profesor tiene turnos futuros reservados."
           : mensajeDeError(e),
       );
+    } finally {
+      setConfirmandoBaja(false);
     }
   };
 
@@ -489,7 +511,7 @@ function CuerpoDocenteContent() {
                   onVer={abrirFicha}
                   onEditar={abrirEdicion}
                   onVerAgenda={abrirAgenda}
-                  onBaja={setBajaDe}
+                  onBaja={abrirBaja}
                 />
                 <Pagination
                   page={paginaActual}
@@ -527,7 +549,7 @@ function CuerpoDocenteContent() {
         titulo={modalForm?.modo === "EDICION" ? "Editar Profesor" : "Nuevo Profesor"}
         onClose={cerrarForm}
         profesor={modalForm?.profesor ?? null}
-        onBaja={setBajaDe}
+        onBaja={abrirBaja}
         datosIniciales={
           modalForm?.profesor
             ? {
@@ -565,15 +587,72 @@ function CuerpoDocenteContent() {
         onGuardar={guardarDisponibilidad}
       />
 
-      <BajaProfesorModal
-        open={bajaDe !== null}
-        profesor={bajaDe}
-        // Aviso previo: lo que el front sabe hoy (todavía sin endpoint de
-        // turnos). El que decide es el 409 PROFESOR_CON_TURNOS_FUTUROS.
-        turnosFuturos={bajaDe ? turnosFuturosDe(bajaDe.id) : 0}
-        onClose={() => setBajaDe(null)}
-        onConfirmar={confirmarBaja}
-      />
+      {bajaDe && (
+        <ConfirmarDialog
+          open={bajaDe !== null}
+          title="Confirmar baja de profesor"
+          description={`Está a punto de desactivar al docente ${bajaDe.nombre} ${bajaDe.apellido}.`}
+          tone="danger"
+          // Aviso previo: lo que el front sabe hoy (todavía sin endpoint de
+          // turnos). El que decide es el 409 PROFESOR_CON_TURNOS_FUTUROS.
+          confirmLabel={
+            turnosFuturosDe(bajaDe.id) > 0
+              ? `Tiene ${turnosFuturosDe(bajaDe.id)} turnos futuros reservados — resuélvalos antes de dar de baja`
+              : "Confirmar baja"
+          }
+          confirmDisabled={turnosFuturosDe(bajaDe.id) > 0 || motivoBaja === ""}
+          confirmando={confirmandoBaja}
+          confirmandoLabel="Desactivando…"
+          onClose={() => setBajaDe(null)}
+          onConfirm={confirmarBaja}
+        >
+          <div className="mt-4 flex flex-col gap-4">
+            <div className="flex items-start gap-3 rounded-sm border border-status-warning/40 bg-status-warning/10 px-4 py-3">
+              <Icon name="info" size={18} className="mt-0.5 shrink-0 text-status-warning-strong" />
+              <div className="flex flex-col gap-1.5 text-xs font-medium text-on-surface">
+                <p className="font-bold text-status-warning-strong">Condiciones de la operación</p>
+                <p>
+                  La baja es LÓGICA: se conserva íntegro el historial de clases, asistencias y
+                  bitácora de auditoría.
+                </p>
+                <p className={turnosFuturosDe(bajaDe.id) > 0 ? "font-bold text-status-warning-strong" : ""}>
+                  Validación de turnos futuros:{" "}
+                  {turnosFuturosDe(bajaDe.id) > 0
+                    ? `${turnosFuturosDe(bajaDe.id)} ${turnosFuturosDe(bajaDe.id) === 1 ? "turno activo pendiente" : "turnos activos pendientes"} en la agenda.`
+                    : "No registra turnos activos pendientes en la agenda."}
+                </p>
+                <p>
+                  El docente no podrá ser seleccionado para nuevas reservas ni asignaciones horarias.
+                </p>
+              </div>
+            </div>
+
+            {/* BACKEND: profesor.estado + motivo de auditoría en PATCH /api/profesores/:id */}
+            <Select
+              id="motivo-baja"
+              label="Motivo de la desactivación"
+              requiredMark
+              value={motivoBaja}
+              onChange={(e) => setMotivoBaja(e.target.value)}
+            >
+              <option value="">Seleccionar motivo…</option>
+              {MOTIVOS_BAJA.map((motivo) => (
+                <option key={motivo} value={motivo}>
+                  {motivo}
+                </option>
+              ))}
+            </Select>
+
+            <Textarea
+              id="observaciones-baja"
+              label="Observaciones de auditoría"
+              placeholder="Detalle administrativo..."
+              value={observacionesBaja}
+              onChange={(e) => setObservacionesBaja(e.target.value)}
+            />
+          </div>
+        </ConfirmarDialog>
+      )}
     </div>
   );
 }

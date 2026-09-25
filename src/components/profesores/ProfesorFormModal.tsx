@@ -265,7 +265,7 @@ export function ProfesorFormModal({
               onClick={() => profesor && onBaja?.(profesor)}
             >
               <Icon name="person_off" size={16} />
-              Dar de Baja Profesor...
+              Dar de baja profesor…
             </Button>
           ) : (
             <p className="mr-auto text-xs font-medium text-on-surface-variant">
@@ -276,11 +276,11 @@ export function ProfesorFormModal({
             Cancelar
           </Button>
           <Button type="button" variant="primary" onClick={guardar} disabled={guardando || !horario.habilitado}>
-            <Icon name={guardando ? "progress_activity" : "check"} size={16} />
+            <Icon name={guardando ? "progress_activity" : "save"} size={16} />
             {guardando
               ? "Guardando…"
               : modo === "INSERCION"
-                ? "Guardar y Habilitar Profesor"
+                ? "Guardar y habilitar"
                 : "Guardar"}
           </Button>
         </>

@@ -22,7 +22,7 @@ interface BloquesDisponibilidadModalProps {
   profesor: Profesor | null;
   open: boolean;
   onClose: () => void;
-  onGuardar: (bloquesPorDia: Record<number, string[]>) => void;
+  onGuardar: (bloquesPorDia: Record<number, string[]>) => void | Promise<void>;
 }
 
 /**
@@ -38,6 +38,7 @@ export function BloquesDisponibilidadModal({
 }: BloquesDisponibilidadModalProps) {
   const [franjas, setFranjas] = useState<FranjaForm[]>([]);
   const [envio, setEnvio] = useState(false);
+  const [guardando, setGuardando] = useState(false);
   const horario = useAgendaAcademia(profesor?.academiaId ?? null, open);
 
   // Al abrir con un profesor distinto, copia sus bloques actuales como franjas.
@@ -90,12 +91,16 @@ export function BloquesDisponibilidadModal({
   const errorFranjasGeneral =
     envio && franjas.length === 0 ? "El profesor no tiene bloques cargados en este editor" : undefined;
 
-  const guardar = () => {
+  const guardar = async () => {
     setEnvio(true);
     const err = validarFranjas(franjas, horario.franjas);
     if (!horario.habilitado || Object.keys(err).length > 0 || franjas.length === 0) return;
-    onGuardar(bloquesDesdeFranjas(franjas));
-    onClose();
+    setGuardando(true);
+    try {
+      await onGuardar(bloquesDesdeFranjas(franjas));
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (
@@ -107,12 +112,18 @@ export function BloquesDisponibilidadModal({
       maxWidth="max-w-2xl"
       footer={
         <>
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={guardando}>
             Cancelar
           </Button>
-          <Button type="button" variant="primary" onClick={guardar} disabled={!horario.habilitado}>
-            <Icon name="check" size={16} />
-            Guardar bloques
+          <Button
+            type="button"
+            variant="primary"
+            onClick={guardar}
+            disabled={!horario.habilitado || guardando}
+            aria-busy={guardando || undefined}
+          >
+            <Icon name={guardando ? "progress_activity" : "save"} size={16} />
+            {guardando ? "Guardando…" : "Guardar bloques"}
           </Button>
         </>
       }

@@ -32,6 +32,8 @@ interface ConfirmarDialogProps {
   confirmando?: boolean;
   /** Texto del botón mientras `confirmando` es true. Default: `confirmLabel`. */
   confirmandoLabel?: string;
+  /** Deshabilita el botón de confirmar sin estado de envío (ej: falta completar un campo del `children`). */
+  confirmDisabled?: boolean;
 }
 
 const TONES: Record<
@@ -60,13 +62,14 @@ export function ConfirmarDialog({
   title,
   description,
   confirmLabel,
-  cancelLabel = "Volver",
+  cancelLabel = "Cancelar",
   tone = "danger",
   onClose,
   onConfirm,
   children,
   confirmando = false,
   confirmandoLabel,
+  confirmDisabled = false,
 }: ConfirmarDialogProps) {
   const style = TONES[tone];
   // Mientras se envía no se puede cerrar (Escape / fondo): el resultado tiene
@@ -90,7 +93,7 @@ export function ConfirmarDialog({
             type="button"
             variant={style.variant}
             onClick={onConfirm}
-            disabled={confirmando}
+            disabled={confirmando || confirmDisabled}
             aria-busy={confirmando || undefined}
           >
             {confirmando ? (confirmandoLabel ?? confirmLabel) : confirmLabel}

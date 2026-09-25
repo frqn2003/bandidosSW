@@ -266,7 +266,7 @@ export function AlumnoFormModal({
                 Próx.
               </span>
             </span>
-            <Button type="button" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose}>
               Cerrar
             </Button>
           </>
