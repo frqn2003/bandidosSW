@@ -108,18 +108,21 @@ export function ProfesorFormModal({
   const [datos, setDatos] = useState<ProfesorFormData>(EMPTY_FORM);
   const [rapidoAbierto, setRapidoAbierto] = useState(false);
   const [envio, setEnvio] = useState(false);
+  const [busquedaMateria, setBusquedaMateria] = useState("");
 
   // Los estados se inicializan al abrir (mismo modal para los 2 modos).
   const [initialized, setInitialized] = useState(false);
   if (open && !initialized) {
     setDatos(datosIniciales ?? EMPTY_FORM);
     setEnvio(false);
+    setBusquedaMateria("");
     setInitialized(true);
   }
   if (!open && initialized) {
     setInitialized(false);
     setEnvio(false);
     setRapidoAbierto(false);
+    setBusquedaMateria("");
   }
 
   const set = (patch: Partial<ProfesorFormData>) => setDatos((d) => ({ ...d, ...patch }));
@@ -167,6 +170,13 @@ export function ProfesorFormModal({
       });
     }
   };
+
+  /** Catálogo filtrado por el buscador (nombre, parcial, sin mayúsculas). */
+  const materiasFiltradas = useMemo(() => {
+    const q = busquedaMateria.trim().toLowerCase();
+    if (!q) return materiasCatalogo;
+    return materiasCatalogo.filter((m) => m.nombre.toLowerCase().includes(q));
+  }, [busquedaMateria, materiasCatalogo]);
 
   // La franja nace sin horas: primero se elige el inicio y recién ahí se
   // habilita el fin, que solo ofrece horarios posteriores.
@@ -360,58 +370,50 @@ export function ProfesorFormModal({
           </div>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          {/* BACKEND: profesor.titulo_especialidad (varchar 100) */}
-          <Input
-            id="titulo-profesor"
-            label="Título o Especialidad"
-            placeholder="Ej: Ing. Mecánica — Univ. Tecnológica"
-            maxLength={100}
-            value={datos.titulo}
-            onChange={(e) => set({ titulo: e.target.value })}
-          />
-          {/* BACKEND: profesor.telefono ^[0-9]{10,11}$ */}
-          <Input
-            id="telefono-profesor"
-            label="Teléfono Contacto"
-            requiredMark
-            inputMode="numeric"
-            placeholder="Ej: 1155555555"
-            maxLength={11}
-            error={errores.telefono}
-            value={datos.telefono}
-            onChange={(e) => set({ telefono: e.target.value.replace(/\D/g, "") })}
-          />
-        </div>
+        {/* BACKEND: profesor.titulo_especialidad (varchar 100) */}
+        <Input
+          id="titulo-profesor"
+          label="Título o Especialidad"
+          placeholder="Ej: Ing. Mecánica — Univ. Tecnológica"
+          maxLength={100}
+          value={datos.titulo}
+          onChange={(e) => set({ titulo: e.target.value })}
+        />
+
+        {/* BACKEND: profesor.telefono ^[0-9]{10,11}$ */}
+        <Input
+          id="telefono-profesor"
+          label="Teléfono Contacto"
+          requiredMark
+          inputMode="numeric"
+          placeholder="Ej: 1155555555"
+          maxLength={11}
+          error={errores.telefono}
+          value={datos.telefono}
+          onChange={(e) => set({ telefono: e.target.value.replace(/\D/g, "") })}
+        />
 
         {/* BACKEND: capacidad global del CHECK ck_profesor_capacidad (1-10);
             el front la refleja en profesor_materia.capacidad_maxima. */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-          <div className="sm:max-w-xs">
-            <label htmlFor="capacidad-default" className="text-sm font-bold text-on-surface">
-              <span className="text-error"> * </span>
-              Capacidad Máxima de Alumnos
-            </label>
-            <p className="mt-0.5 text-xs font-medium text-on-surface-variant">
-              Capacidad por bloque lectivo (1 = Clase individual,
-              <br />
-              2-10 = grupal)
-            </p>
-          </div>
-          <Select
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="capacidad-default" className="text-sm font-bold text-on-surface">
+            <span className="text-error"> * </span>
+            Capacidad por alumnos por clase
+          </label>
+          <Input
             id="capacidad-default"
-            aria-label="Capacidad Máxima de Alumnos"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={10}
+            aria-label="Capacidad por alumnos por clase"
             value={String(datos.capacidadDefault)}
-            onChange={(e) => set({ capacidadDefault: Number(e.target.value) })}
-            className="h-10 min-h-10 text-sm sm:w-56"
-          >
-            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-              <option key={n} value={n}>
-                {n} {n === 1 ? "alumno" : "alumnos"}
-                {n === datos.capacidadDefault ? " (Por defecto)" : ""}
-              </option>
-            ))}
-          </Select>
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (Number.isNaN(n)) return;
+              set({ capacidadDefault: Math.min(10, Math.max(1, n)) });
+            }}
+          />
         </div>
 
         <fieldset className="flex flex-col gap-2">
@@ -429,30 +431,93 @@ export function ProfesorFormModal({
               {errores.materias}
             </p>
           )}
-          <div className="grid gap-1.5 sm:grid-cols-2">
-            {materiasCatalogo.map((materia) => {
-              const marcada = seleccionadas.has(materia.id);
-              return (
-                <label
-                  key={materia.id}
-                  className={`flex cursor-pointer items-center gap-2.5 rounded-sm border px-3 py-2 transition-colors duration-fast ease-out ${
-                    marcada
-                      ? "border-secondary/50 bg-surface-container-low"
-                      : "border-outline-variant bg-surface-container-lowest hover:bg-surface-container-low"
-                  }`}
+          <div className="relative">
+            <Input
+              id="buscar-materia"
+              aria-label="Buscar materia"
+              placeholder="Buscar materia…"
+              value={busquedaMateria}
+              onChange={(e) => setBusquedaMateria(e.target.value)}
+              className="pl-10 pr-9"
+            />
+            <Icon
+              name="search"
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant"
+            />
+            {busquedaMateria && (
+              <button
+                type="button"
+                aria-label="Limpiar búsqueda de materias"
+                onClick={() => setBusquedaMateria("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full text-on-surface-variant transition-colors duration-fast ease-out hover:bg-surface-container-high focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
+              >
+                <Icon name="close" size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Materias ya elegidas: visibles sin depender del filtro. */}
+          {datos.materias.length > 0 && (
+            <div className="flex flex-wrap gap-1.5" aria-label="Materias seleccionadas">
+              {datos.materias.map((m) => (
+                <span
+                  key={m.materia.id}
+                  className="flex items-center gap-1 rounded-full bg-surface-container-high px-2.5 py-1 text-xs font-semibold text-on-surface"
                 >
-                  <input
-                    type="checkbox"
-                    className="h-5 w-5 shrink-0 cursor-pointer accent-secondary"
-                    checked={marcada}
-                    onChange={() => toggleMateria(materia)}
-                  />
-                  <span className="flex-1 text-sm font-semibold text-on-surface">
-                    {materia.nombre}
-                  </span>
-                </label>
-              );
-            })}
+                  {m.materia.nombre}
+                  <button
+                    type="button"
+                    aria-label={`Quitar ${m.materia.nombre}`}
+                    title={`Quitar ${m.materia.nombre}`}
+                    onClick={() => toggleMateria(m.materia)}
+                    className="flex h-4 w-4 items-center justify-center rounded-full text-on-surface-variant transition-colors duration-fast ease-out hover:bg-surface-container-lowest hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
+                  >
+                    <Icon name="close" size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="max-h-52 overflow-y-auto rounded-sm border border-outline-variant bg-surface-container-lowest">
+            <ul className="divide-y divide-outline-variant/60">
+              {materiasFiltradas.length === 0 ? (
+                <li className="px-3 py-2.5 text-sm font-medium text-on-surface-variant">
+                  {busquedaMateria.trim()
+                    ? `Sin resultados para «${busquedaMateria.trim()}».`
+                    : "No hay materias cargadas."}
+                </li>
+              ) : (
+                materiasFiltradas.map((materia) => {
+                  const marcada = seleccionadas.has(materia.id);
+                  return (
+                    <li key={materia.id}>
+                      <label
+                        className={`flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-colors duration-fast ease-out ${
+                          marcada
+                            ? "bg-surface-container-low"
+                            : "hover:bg-surface-container-low/60"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-5 w-5 shrink-0 cursor-pointer accent-secondary"
+                          checked={marcada}
+                          onChange={() => toggleMateria(materia)}
+                        />
+                        <span className="flex-1 text-sm font-semibold text-on-surface">
+                          {materia.nombre}
+                        </span>
+                        {marcada && (
+                          <Icon name="check_circle" size={16} className="shrink-0 text-secondary" />
+                        )}
+                      </label>
+                    </li>
+                  );
+                })
+              )}
+            </ul>
           </div>
           <p className="text-xs font-medium text-on-surface-variant">
             {modo === "EDICION"
