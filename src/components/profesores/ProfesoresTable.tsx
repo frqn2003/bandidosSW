@@ -1,8 +1,8 @@
 "use client";
 
 import type { Profesor } from "@/data/profesores";
-import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
+import { MenuAcciones } from "@/components/ui/MenuAcciones";
 import { EstadoProfesorBadge } from "@/components/profesores/EstadoProfesorBadge";
 import {
   cargaHorariaSemanal,
@@ -28,7 +28,7 @@ export function ProfesoresTable({
 }: ProfesoresTableProps) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[1000px] border-collapse text-left">
+      <table className="w-full min-w-[820px] border-collapse text-left">
         <caption className="sr-only">
           Listado de profesores con especialidad, contacto, materias asignadas, carga horaria y estado
         </caption>
@@ -52,8 +52,8 @@ export function ProfesoresTable({
             <th scope="col" className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
               Estado
             </th>
-            <th scope="col" className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
-              Acciones
+            <th scope="col" className="w-16 px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
+              <span className="sr-only">Acciones</span>
             </th>
           </tr>
         </thead>
@@ -88,16 +88,11 @@ export function ProfesoresTable({
                   </p>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex flex-col gap-1 text-xs font-medium text-on-surface-variant">
-                    <span className="flex items-center gap-1.5">
-                      <Icon name="call" size={14} className="text-secondary" />
-                      {formatearTelefono(profesor.telefono)}
-                    </span>
-                    <span className="flex max-w-[190px] items-center gap-1.5 truncate">
-                      <Icon name="mail" size={14} className="text-secondary" />
-                      {profesor.email}
-                    </span>
-                  </div>
+                  {/* El email ya se muestra bajo el nombre, en la columna Docente. */}
+                  <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-on-surface-variant">
+                    <Icon name="call" size={14} className="text-secondary" />
+                    {formatearTelefono(profesor.telefono)}
+                  </span>
                 </td>
                 <td className="px-4 py-3">
                   <ul className="flex flex-col gap-0.5">
@@ -128,43 +123,26 @@ export function ProfesoresTable({
                   <EstadoProfesorBadge estado={profesor.estado} />
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex items-center justify-end gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Ver ficha de ${profesor.nombre} ${profesor.apellido}`}
-                      onClick={() => onVer(profesor)}
-                    >
-                      <Icon name="visibility" size={16} />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Editar ${profesor.nombre} ${profesor.apellido}`}
-                      onClick={() => onEditar(profesor)}
-                    >
-                      <Icon name="edit" size={16} />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Agenda y disponibilidad de ${profesor.nombre} ${profesor.apellido}`}
-                      onClick={() => onVerAgenda(profesor)}
-                    >
-                      <Icon name="calendar_clock" size={16} />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Dar de baja ${profesor.nombre} ${profesor.apellido}`}
-                      onClick={() => onBaja(profesor)}
-                    >
-                      <Icon name="delete" size={16} className="text-status-danger" />
-                    </Button>
+                  <div className="flex justify-end">
+                    <MenuAcciones
+                      ariaLabel={`Acciones para ${profesor.nombre} ${profesor.apellido}`}
+                      acciones={[
+                        { label: "Ver ficha", icon: "visibility", onSelect: () => onVer(profesor) },
+                        { label: "Editar", icon: "edit", onSelect: () => onEditar(profesor) },
+                        {
+                          label: "Agenda y disponibilidad",
+                          icon: "calendar_clock",
+                          onSelect: () => onVerAgenda(profesor),
+                        },
+                        {
+                          label: "Dar de baja",
+                          icon: "delete",
+                          peligro: true,
+                          disabled: profesor.estado === "inactivo",
+                          onSelect: () => onBaja(profesor),
+                        },
+                      ]}
+                    />
                   </div>
                 </td>
               </tr>

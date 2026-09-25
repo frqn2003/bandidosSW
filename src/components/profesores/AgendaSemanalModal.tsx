@@ -277,25 +277,22 @@ export function AgendaSemanalModal({
             >
               Materia:
             </label>
-            {/* Las opciones son las materias que dicta el profesor (vienen en su ficha).
-                El wrapper con min-w-0 es el hijo flex: sin él, el ancho lo dicta la
-                opción más larga y el select se sale del modal. */}
-            <div className="min-w-0 flex-1">
-              <Select
-                id="filtro-material-agenda"
-                aria-label="Materia"
-                value={materia}
-                onChange={(e) => setMateria(e.target.value)}
-                className="w-full min-w-0 truncate"
-              >
-                <option value="">Todas las materias ({profesor.materias.length})</option>
-                {profesor.materias.map((m) => (
-                  <option key={m.materia.id} value={String(m.materia.id)}>
-                    {m.materia.nombre}
-                  </option>
-                ))}
-              </Select>
-            </div>
+            {/* Las opciones son las materias que dicta el profesor (vienen en su ficha). */}
+            <Select
+              id="filtro-material-agenda"
+              aria-label="Materia"
+              value={materia}
+              onChange={(e) => setMateria(e.target.value)}
+              wrapperClassName="min-w-0 flex-1"
+              className="w-full min-w-0 truncate"
+            >
+              <option value="">Todas las materias ({profesor.materias.length})</option>
+              {profesor.materias.map((m) => (
+                <option key={m.materia.id} value={String(m.materia.id)}>
+                  {m.materia.nombre}
+                </option>
+              ))}
+            </Select>
           </div>
         </div>
 

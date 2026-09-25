@@ -47,7 +47,6 @@ import { bloquesDesdeFranjas, capacidadMaxDe, franjasDesdeBloques } from "@/func
 const FILTROS_INICIALES: FiltrosProfesoresState = {
   busqueda: "",
   materiaId: "",
-  dia: "",
   estado: "activo",
 };
 const PAGE_SIZE_DEFAULT = 10;
@@ -117,10 +116,9 @@ function CuerpoDocenteContent() {
    */
   const cacheBloques = useRef(new Map<number, Record<number, string[]>>());
 
-  // Los filtros estructurales van al servidor (el día sale de agenda_profesional,
-  // que el listado no trae). La búsqueda por texto se resuelve abajo, en memoria.
+  // Los filtros estructurales van al servidor. La búsqueda por texto se
+  // resuelve abajo, en memoria.
   const materiaId = filtros.materiaId;
-  const dia = filtros.dia;
   const estadoFiltro = filtros.estado;
 
   // NO toca el estado de forma síncrona: solo dentro de los callbacks de la
@@ -129,7 +127,6 @@ function CuerpoDocenteContent() {
     let cancelado = false;
     listarProfesores({
       materiaId: materiaId ? Number(materiaId) : undefined,
-      diaSemana: dia ? Number(dia) : undefined,
       estado: estadoFiltro || undefined,
     })
       .then((lista) => {
@@ -143,7 +140,7 @@ function CuerpoDocenteContent() {
     return () => {
       cancelado = true;
     };
-  }, [materiaId, dia, estadoFiltro]);
+  }, [materiaId, estadoFiltro]);
 
   useEffect(traer, [traer]);
 
@@ -219,7 +216,6 @@ function CuerpoDocenteContent() {
   const hayFiltros =
     filtros.busqueda.trim() !== "" ||
     filtros.materiaId !== "" ||
-    filtros.dia !== "" ||
     filtros.estado !== "activo";
 
   const cambiarFiltros = (next: FiltrosProfesoresState) => {

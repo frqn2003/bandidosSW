@@ -7,12 +7,18 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   error?: string;
   hint?: string;
   id?: string;
+  /**
+   * Clases del contenedor (label + select + mensajes). `className` va al
+   * <select>; para dimensionarlo dentro de un flex/grid (flex-1, min-w-0,
+   * w-40…) hay que usar esta, porque el hijo del layout es el contenedor.
+   */
+  wrapperClassName?: string;
   children: React.ReactNode;
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   function Select(
-    { label, requiredMark = false, error, hint, id, children, className = "", ...props },
+    { label, requiredMark = false, error, hint, id, children, className = "", wrapperClassName = "", ...props },
     ref,
   ) {
     const selectId = id ?? label?.toLowerCase().replace(/\s+/g, "-");
@@ -23,7 +29,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       .join(" ");
 
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className={`flex flex-col gap-1.5 ${wrapperClassName}`}>
         {label && (
           <label
             htmlFor={selectId}
