@@ -65,7 +65,7 @@ const PASO_FRANJA_MIN = 30;
 /** Lo que el buscador necesita de cada alumno (subset de AlumnoResponse). */
 export type AlumnoBusqueda = Pick<
   AlumnoResponse,
-  "id" | "legajo" | "nombre" | "apellido" | "dni" | "email" | "responsable"
+  "id" | "legajo" | "nombre" | "apellido" | "dni" | "email" | "responsable" | "nivelEducativo"
 >;
 
 /**
@@ -233,6 +233,7 @@ export async function buscarAlumnosActivos(busqueda: string): Promise<AlumnoBusq
     dni: a.dni,
     email: a.email,
     responsable: a.responsable,
+    nivelEducativo: a.nivelEducativo,
   }));
 }
 

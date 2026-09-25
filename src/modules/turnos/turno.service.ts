@@ -141,6 +141,19 @@ export async function reservar(
         throw new ValidationError("MATERIA_INACTIVA", "La materia seleccionada está inactiva.", "materiaId");
       }
 
+      // 1b. Nivel educativo: el alumno solo puede cursar materias de su mismo nivel educativo
+      if (
+        estados.alumnoNivelEducativo &&
+        estados.materiaNivel &&
+        estados.alumnoNivelEducativo !== estados.materiaNivel
+      ) {
+        throw new ValidationError(
+          "NIVEL_EDUCATIVO_INCOMPATIBLE",
+          `El alumno (${estados.alumnoNivelEducativo}) no puede reservar clases de materias de nivel ${estados.materiaNivel}.`,
+          "materiaId",
+        );
+      }
+
       // 2. Profesor debe dictar la materia
       const pm = await repo.buscarProfesorMateria(input.profesorId, input.materiaId, client);
       if (!pm) {

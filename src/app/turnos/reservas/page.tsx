@@ -252,8 +252,11 @@ function ReservaContent() {
 
   const cambiarAlumno = (a: AlumnoBusqueda | null) => {
     setAlumno(a);
-    // Con otro alumno cambian las franjas donde ya tiene turno.
     if (!precarga.hora) setHora(null);
+    if (a && materia && materia.nivel !== a.nivelEducativo) {
+      setMateriaId("");
+      setHora(null);
+    }
     limpiarError("alumno");
   };
 
@@ -304,7 +307,11 @@ function ReservaContent() {
   // ── Envío ──
   const validar = (): Errores => ({
     alumno: alumno ? undefined : "Buscá y elegí un alumno activo.",
-    materia: materia ? undefined : "Elegí la materia.",
+    materia: !materia
+      ? "Elegí la materia."
+      : alumno && materia.nivel !== alumno.nivelEducativo
+        ? `La materia (${materia.nivel}) no corresponde al nivel del alumno (${alumno.nivelEducativo}).`
+        : undefined,
     profesor: profesor ? undefined : materia ? "Elegí el profesor." : "Elegí primero la materia.",
     fecha: validarFecha(fecha),
     horario: hora ? undefined : "Elegí un horario disponible.",
@@ -459,16 +466,23 @@ function ReservaContent() {
     ];
   })();
 
-  const opcionesMaterias =
+  const listaMateriasBase =
     profesorPrecargado && profesorPrecargado.materias.length > 0
       ? profesorPrecargado.materias.map((pm) => ({
-        value: String(pm.materia.id),
-        label: `${pm.materia.nombre} · ${pm.materia.nivel}`,
-      }))
-      : (materias?.lista ?? []).map((m) => ({
-        value: String(m.id),
-        label: `${m.nombre} · ${m.nivel}`,
-      }));
+          id: pm.materia.id,
+          nombre: pm.materia.nombre,
+          nivel: pm.materia.nivel,
+        }))
+      : (materias?.lista ?? []);
+
+  const materiasFiltradasPorNivel = alumno
+    ? listaMateriasBase.filter((m) => m.nivel === alumno.nivelEducativo)
+    : listaMateriasBase;
+
+  const opcionesMaterias = materiasFiltradasPorNivel.map((m) => ({
+    value: String(m.id),
+    label: `${m.nombre} · ${m.nivel}`,
+  }));
 
   const opcionesProfesores = (cargandoProfesores ? [] : (profesores?.lista ?? [])).map((p) => ({
     value: String(p.id),
@@ -606,15 +620,21 @@ function ReservaContent() {
                         onChange={cambiarMateria}
                         disabled={cargandoMaterias}
                         placeholder={cargandoMaterias ? "Cargando materias…" : "Elegí o escribí una materia"}
-                        noResultsText="No hay materias activas con ese nombre"
+                        noResultsText={
+                          alumno
+                            ? `No hay materias de nivel ${alumno.nivelEducativo} con ese nombre`
+                            : "No hay materias activas con ese nombre"
+                        }
                         maxResults={20}
                         error={errores.materia}
                         hint={
                           materia
-                            ? `Duración de la clase: ${materia.duracionClaseMinutos} min.`
-                            : profesorPrecargado
-                              ? "Materias que dicta el profesor seleccionado."
-                              : "Solo materias activas."
+                            ? `Duración de la clase: ${materia.duracionClaseMinutos} min · Nivel ${materia.nivel}.`
+                            : alumno
+                              ? `Solo materias de nivel ${alumno.nivelEducativo}.`
+                              : profesorPrecargado
+                                ? "Materias que dicta el profesor seleccionado."
+                                : "Solo materias activas."
                         }
                       />
                     </Paso>
