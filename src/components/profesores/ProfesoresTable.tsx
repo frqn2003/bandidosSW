@@ -19,6 +19,12 @@ interface ProfesoresTableProps {
   onBaja: (profesor: Profesor) => void;
 }
 
+function formatearCargaHoraria(horasDecimales: number): string {
+  const h = Math.floor(horasDecimales);
+  const m = Math.round((horasDecimales - h) * 60);
+  return `${String(h).padStart(2, "0")}.${String(m).padStart(2, "0")}`;
+}
+
 export function ProfesoresTable({
   profesores,
   onVer,
@@ -43,11 +49,11 @@ export function ProfesoresTable({
             <th scope="col" className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
               Contacto
             </th>
-            <th scope="col" className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
-              Materias
+            <th scope="col" className="w-20 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
+              H/Sem
             </th>
             <th scope="col" className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
-              Carga
+              Materias
             </th>
             <th scope="col" className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
               Estado
@@ -78,7 +84,6 @@ export function ProfesoresTable({
                       <p className="truncate text-sm font-bold text-on-surface">
                         {profesor.nombre} {profesor.apellido}
                       </p>
-                      <p className="truncate text-xs font-medium text-on-surface-variant">{profesor.email}</p>
                     </div>
                   </div>
                 </td>
@@ -88,11 +93,24 @@ export function ProfesoresTable({
                   </p>
                 </td>
                 <td className="px-4 py-3">
-                  {/* El email ya se muestra bajo el nombre, en la columna Docente. */}
-                  <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-on-surface-variant">
-                    <Icon name="call" size={14} className="text-secondary" />
-                    {formatearTelefono(profesor.telefono)}
-                  </span>
+                  <div className="flex flex-col gap-1">
+                    <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-on-surface-variant">
+                      <Icon name="call" size={14} className="text-secondary" />
+                      {formatearTelefono(profesor.telefono)}
+                    </span>
+                    <span
+                      className="flex items-center gap-1.5 text-xs font-medium text-on-surface-variant"
+                      title={profesor.email}
+                    >
+                      <Icon name="mail" size={14} className="shrink-0 text-secondary" />
+                      <span className="max-w-[180px] truncate">{profesor.email}</span>
+                    </span>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <p className="text-sm font-semibold text-on-surface">
+                    {formatearCargaHoraria(carga)}
+                  </p>
                 </td>
                 <td className="px-4 py-3">
                   <ul className="flex flex-col gap-0.5">
@@ -109,15 +127,6 @@ export function ProfesoresTable({
                       </li>
                     )}
                   </ul>
-                </td>
-                <td className="px-4 py-3">
-                  {carga > 0 ? (
-                    <p className="text-sm font-semibold text-on-surface">
-                      {carga.toFixed(1)} h sem
-                    </p>
-                  ) : (
-                    <p className="text-xs font-medium text-on-surface-variant">Sin horarios</p>
-                  )}
                 </td>
                 <td className="px-4 py-3">
                   <EstadoProfesorBadge estado={profesor.estado} />
