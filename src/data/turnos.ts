@@ -236,10 +236,24 @@ export async function buscarAlumnosActivos(busqueda: string): Promise<AlumnoBusq
   }));
 }
 
-/** Materias activas para el combo (GET /api/materias?estado=activo). */
+/** Materias activas que tienen al menos un profesor activo que las dicte. */
 export async function listarMateriasActivas(): Promise<MateriaOpcion[]> {
-  const lista = await listarMaterias({ estado: "activo" });
-  return lista
+  const [materias, profesores] = await Promise.all([
+    listarMaterias({ estado: "activo" }),
+    apiGet<ProfesorResponse[]>(`${RUTA_PROFESORES}?estado=activo`),
+  ]);
+
+  const materiasConProfesor = new Set<number>();
+  for (const p of profesores) {
+    if (p.estado === "activo") {
+      for (const pm of p.materias) {
+        materiasConProfesor.add(pm.materia.id);
+      }
+    }
+  }
+
+  return materias
+    .filter((m) => materiasConProfesor.has(m.id))
     .map((m) => ({ id: m.id, nombre: m.nombre, nivel: m.nivel, duracionClaseMinutos: m.duracionClaseMinutos }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
 }

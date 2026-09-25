@@ -37,6 +37,8 @@ import {
   type SugerenciaFranja,
   type TurnoResponse,
 } from "@/data/turnos";
+import { obtenerProfesor } from "@/data/profesores";
+import type { ProfesorResponse } from "@/contracts/profesor";
 
 // Reserva de turno para clase de apoyo (HU-TUR-01) · Mesa de Entrada.
 // Flujo encadenado: Alumno → Materia → Profesor → Fecha → Horario → Observaciones.
@@ -85,9 +87,10 @@ function ReservaContent() {
   // ── Formulario ──
   const [alumno, setAlumno] = useState<AlumnoBusqueda | null>(null);
   const [materiaId, setMateriaId] = useState("");
-  const [profesorId, setProfesorId] = useState("");
+  const [profesorId, setProfesorId] = useState(() => (precarga.profesorId ? String(precarga.profesorId) : ""));
+  const [profesorPrecargado, setProfesorPrecargado] = useState<ProfesorResponse | null>(null);
   const [fecha, setFecha] = useState(precarga.fecha);
-  const [hora, setHora] = useState<string | null>(null);
+  const [hora, setHora] = useState<string | null>(precarga.hora);
   /** Hora a seleccionar cuando lleguen las franjas (precarga o sugerencia). */
   const horaPendiente = useRef<string | null>(precarga.hora);
   const [observaciones, setObservaciones] = useState("");
@@ -111,7 +114,19 @@ function ReservaContent() {
   const [sugerencia, setSugerencia] = useState<{ clave: string; valor: SugerenciaFranja | null } | null>(null);
 
   const materia = materias?.lista.find((m) => String(m.id) === materiaId) ?? null;
-  const profesor = profesores?.lista.find((p) => String(p.id) === profesorId) ?? null;
+  const profesor =
+    profesores?.lista.find((p) => String(p.id) === profesorId) ??
+    (profesorPrecargado && String(profesorPrecargado.id) === profesorId
+      ? {
+        id: profesorPrecargado.id,
+        nombre: profesorPrecargado.usuario.nombre,
+        apellido: profesorPrecargado.usuario.apellido,
+        capacidadMaxima:
+          profesorPrecargado.materias.find((pm) => String(pm.materia.id) === materiaId)?.capacidadMaxima ?? 1,
+        precio:
+          profesorPrecargado.materias.find((pm) => String(pm.materia.id) === materiaId)?.precio ?? 0,
+      }
+      : null);
   const fechaValida = fecha !== "" && fecha >= hoy && fecha <= fechaMax;
 
   const claveMaterias = String(intentoMaterias);
@@ -128,6 +143,26 @@ function ReservaContent() {
   const cargandoFranjas = claveFranjas !== null && franjas?.clave !== claveFranjas;
   const franjasActuales = !cargandoFranjas && franjas ? franjas.lista : [];
   const sugerenciaActual = sugerencia?.clave === claveSugerencia ? sugerencia.valor : null;
+
+  // Carga de profesor precargado desde calendario (para mostrarlo antes de elegir materia)
+  useEffect(() => {
+    if (!precarga.profesorId) return;
+    let cancelado = false;
+    obtenerProfesor(precarga.profesorId)
+      .then((p) => {
+        if (cancelado) return;
+        setProfesorPrecargado(p);
+        if (p.materias.length === 1) {
+          setMateriaId(String(p.materias[0].materia.id));
+        }
+      })
+      .catch(() => {
+        // Si falla, el flujo normal continúa
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [precarga.profesorId]);
 
   // BACKEND: GET /api/materias?estado=activo
   useEffect(() => {
@@ -152,8 +187,10 @@ function ReservaContent() {
       .then((lista) => {
         if (cancelado) return;
         setProfesores({ clave: claveProfesores, lista, error: false });
-        // Precarga del calendario: si el profesor dicta la materia elegida, queda seleccionado.
-        if (precarga.profesorId && lista.some((p) => p.id === precarga.profesorId)) {
+        // Precarga del calendario o profesor seleccionado previamente
+        if (profesorId && lista.some((p) => String(p.id) === profesorId)) {
+          // Mantiene el profesor seleccionado
+        } else if (precarga.profesorId && lista.some((p) => p.id === precarga.profesorId)) {
           setProfesorId(String(precarga.profesorId));
         }
       })
@@ -163,7 +200,7 @@ function ReservaContent() {
     return () => {
       cancelado = true;
     };
-  }, [claveProfesores, precarga.profesorId]);
+  }, [claveProfesores, precarga.profesorId, profesorId]);
 
   // BACKEND: GET /api/turnos/franjas?profesorId=&materiaId=&fecha=&alumnoId= (PENDIENTE CONTRATO)
   useEffect(() => {
@@ -176,7 +213,9 @@ function ReservaContent() {
         setFranjas({ clave: claveFranjas, lista, error: false });
         const pendiente = horaPendiente.current;
         if (pendiente) {
-          if (lista.some((fr) => fr.horaInicio === pendiente && fr.disponible)) setHora(pendiente);
+          if (lista.some((fr) => fr.horaInicio === pendiente && fr.disponible)) {
+            setHora(pendiente);
+          }
           horaPendiente.current = null;
         }
       })
@@ -214,15 +253,16 @@ function ReservaContent() {
   const cambiarAlumno = (a: AlumnoBusqueda | null) => {
     setAlumno(a);
     // Con otro alumno cambian las franjas donde ya tiene turno.
-    setHora(null);
+    if (!precarga.hora) setHora(null);
     limpiarError("alumno");
   };
 
   const cambiarMateria = (id: string) => {
     if (id === materiaId) return;
     setMateriaId(id);
-    setProfesorId("");
-    setHora(null);
+    if (precarga.hora) {
+      horaPendiente.current = precarga.hora;
+    }
     limpiarError("materia");
   };
 
@@ -357,6 +397,27 @@ function ReservaContent() {
   // ── Resumen (panel lateral y modal) ──
   const datosResumen: DatoReserva[] = (() => {
     const franja = franjasActuales.find((f) => f.horaInicio === hora);
+    const nombreProfesor = profesor
+      ? `${profesor.apellido}, ${profesor.nombre}`
+      : profesorPrecargado
+        ? `${profesorPrecargado.usuario.apellido}, ${profesorPrecargado.usuario.nombre}`
+        : null;
+    const duracionClase =
+      materia?.duracionClaseMinutos ??
+      profesorPrecargado?.materias.find((pm) => String(pm.materia.id) === materiaId)?.materia.duracionClaseMinutos ??
+      null;
+    const precioClase =
+      profesor?.precio ??
+      profesorPrecargado?.materias.find((pm) => String(pm.materia.id) === materiaId)?.precio ??
+      (profesorPrecargado && profesorPrecargado.materias.length === 1 ? profesorPrecargado.materias[0].precio : null);
+    const horarioTexto = franja
+      ? `${franja.horaInicio} – ${franja.horaFin}`
+      : hora
+        ? `${hora} hs`
+        : precarga.hora
+          ? `${precarga.hora} hs`
+          : null;
+
     return [
       {
         label: "Alumno",
@@ -370,41 +431,72 @@ function ReservaContent() {
           </>
         ) : null,
       },
-      { label: "Materia", icon: "menu_book", valor: materia?.nombre ?? null },
-      { label: "Profesor", icon: "school", valor: profesor ? `${profesor.apellido}, ${profesor.nombre}` : null },
+      {
+        label: "Materia",
+        icon: "menu_book",
+        valor:
+          materia?.nombre ??
+          profesorPrecargado?.materias.find((pm) => String(pm.materia.id) === materiaId)?.materia.nombre ??
+          null,
+      },
+      { label: "Profesor", icon: "school", valor: nombreProfesor },
       { label: "Fecha", icon: "event", valor: fechaValida ? formatearFecha(fecha) : null },
       {
         label: "Horario",
         icon: "schedule",
-        valor: franja ? `${franja.horaInicio} – ${franja.horaFin}` : null,
+        valor: horarioTexto,
       },
       {
         label: "Duración",
         icon: "timer",
-        valor: materia ? `${materia.duracionClaseMinutos} min` : null,
+        valor: duracionClase ? `${duracionClase} min` : null,
       },
-      { label: "Valor de la clase", icon: "payments", valor: profesor ? formatearPesos(profesor.precio) : null },
+      {
+        label: "Valor de la clase",
+        icon: "payments",
+        valor: precioClase !== null && precioClase !== undefined ? formatearPesos(precioClase) : null,
+      },
     ];
   })();
 
-  const opcionesMaterias = (materias?.lista ?? []).map((m) => ({
-    value: String(m.id),
-    label: `${m.nombre} · ${m.nivel}`,
-  }));
+  const opcionesMaterias =
+    profesorPrecargado && profesorPrecargado.materias.length > 0
+      ? profesorPrecargado.materias.map((pm) => ({
+        value: String(pm.materia.id),
+        label: `${pm.materia.nombre} · ${pm.materia.nivel}`,
+      }))
+      : (materias?.lista ?? []).map((m) => ({
+        value: String(m.id),
+        label: `${m.nombre} · ${m.nivel}`,
+      }));
+
   const opcionesProfesores = (cargandoProfesores ? [] : (profesores?.lista ?? [])).map((p) => ({
     value: String(p.id),
     label: `${p.apellido}, ${p.nombre}`,
   }));
+  if (
+    opcionesProfesores.length === 0 &&
+    profesorPrecargado &&
+    String(profesorPrecargado.id) === profesorId
+  ) {
+    opcionesProfesores.push({
+      value: String(profesorPrecargado.id),
+      label: `${profesorPrecargado.usuario.apellido}, ${profesorPrecargado.usuario.nombre}`,
+    });
+  }
 
-  const hintProfesor = !materiaId
-    ? "Elegí primero la materia."
-    : cargandoProfesores
-      ? "Cargando profesores…"
-      : profesores?.error
-        ? "No pudimos cargar los profesores."
-        : opcionesProfesores.length === 0
-          ? "Ningún profesor activo dicta esta materia."
-          : "Solo profesores activos que dictan la materia.";
+  const hintProfesor =
+    profesorPrecargado && String(profesorPrecargado.id) === profesorId
+      ? "Profesor seleccionado desde el calendario."
+      : !materiaId
+        ? "Elegí primero la materia."
+        : cargandoProfesores
+          ? "Cargando profesores…"
+          : profesores?.error
+            ? "No pudimos cargar los profesores."
+            : opcionesProfesores.length === 0
+              ? "Ningún profesor activo dicta esta materia."
+              : "Solo profesores activos que dictan la materia.";
 
   const mostrarSugerencia =
     sugerenciaActual !== null &&
@@ -461,8 +553,8 @@ function ReservaContent() {
                   <p className="text-sm font-medium text-on-surface">
                     {precarga.fueraDeRango
                       ? "Venís del calendario, pero ese día ya no se puede reservar: elegí otra fecha. "
-                      : "Venís del calendario: la fecha y el horario ya están cargados. "}
-                    Elegí el alumno y la materia; si el profesor la dicta, queda seleccionado.
+                      : `Venís del calendario: profesor${profesorPrecargado ? ` (${profesorPrecargado.usuario.apellido}, ${profesorPrecargado.usuario.nombre})` : ""}, fecha (${formatearFecha(fecha)}) y horario (${precarga.hora ?? ""}) ya están cargados. `}
+                    Completá el alumno, la materia y observaciones para confirmar el turno.
                   </p>
                 </div>
               )}
@@ -517,7 +609,13 @@ function ReservaContent() {
                         noResultsText="No hay materias activas con ese nombre"
                         maxResults={20}
                         error={errores.materia}
-                        hint={materia ? `Duración de la clase: ${materia.duracionClaseMinutos} min.` : "Solo materias activas."}
+                        hint={
+                          materia
+                            ? `Duración de la clase: ${materia.duracionClaseMinutos} min.`
+                            : profesorPrecargado
+                              ? "Materias que dicta el profesor seleccionado."
+                              : "Solo materias activas."
+                        }
                       />
                     </Paso>
 
@@ -529,8 +627,10 @@ function ReservaContent() {
                         value={profesorId}
                         options={opcionesProfesores}
                         onChange={cambiarProfesor}
-                        disabled={!materiaId || cargandoProfesores}
-                        placeholder={materiaId ? "Elegí un profesor" : "Primero elegí la materia"}
+                        disabled={(!materiaId && !profesorPrecargado) || cargandoProfesores}
+                        placeholder={
+                          profesorId ? "Profesor seleccionado" : materiaId ? "Elegí un profesor" : "Primero elegí la materia"
+                        }
                         noResultsText="Ningún profesor coincide"
                         error={errores.profesor}
                         hint={hintProfesor}
@@ -562,6 +662,7 @@ function ReservaContent() {
                         franjas={franjasActuales}
                         duracion={materia?.duracionClaseMinutos ?? null}
                         hora={hora}
+                        horaPrecargada={precarga.hora}
                         onHora={(h) => {
                           setHora(h);
                           limpiarError("horario");
@@ -705,6 +806,7 @@ function SeccionHorario({
   franjas,
   duracion,
   hora,
+  horaPrecargada,
   onHora,
   errorCampo,
   sugerencia,
@@ -716,6 +818,7 @@ function SeccionHorario({
   franjas: FranjaTurnoResponse[];
   duracion: number | null;
   hora: string | null;
+  horaPrecargada?: string | null;
   onHora: (h: string) => void;
   errorCampo?: string;
   sugerencia: ReactNode;
@@ -731,9 +834,18 @@ function SeccionHorario({
       <div className="flex flex-col gap-2">
         {titulo}
         {sugerencia}
-        <p className="rounded-sm border border-dashed border-outline-variant px-4 py-4 text-sm font-medium text-on-surface-variant">
-          Completá materia, profesor y fecha para ver los horarios libres.
-        </p>
+        {horaPrecargada ? (
+          <div className="flex items-center gap-2 rounded-sm border border-secondary/30 bg-secondary/5 px-4 py-3 text-sm font-medium text-on-surface">
+            <Icon name="schedule" size={18} className="text-secondary" />
+            <span>
+              Horario seleccionado del calendario: <strong className="font-bold">{horaPrecargada} hs</strong>. Elegí la materia para confirmar la disponibilidad.
+            </span>
+          </div>
+        ) : (
+          <p className="rounded-sm border border-dashed border-outline-variant px-4 py-4 text-sm font-medium text-on-surface-variant">
+            Completá materia, profesor y fecha para ver los horarios libres.
+          </p>
+        )}
         {errorCampo && (
           <p role="alert" className="text-sm font-semibold text-error">
             {errorCampo}
