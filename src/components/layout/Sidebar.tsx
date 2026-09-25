@@ -186,9 +186,13 @@ export function Sidebar() {
             : "flex items-center gap-2.5 border-b border-outline-variant px-5 py-5"
         }
       >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary">
-          <Icon name="school" size={24} className="text-on-primary" />
-        </div>
+        <img
+          src="/logo-centro-academico.png"
+          alt="Logo de Centro Académico"
+          width={40}
+          height={40}
+          className="h-10 w-10 shrink-0 rounded-md object-cover"
+        />
 
         {!rail && (
           <div className="min-w-0">

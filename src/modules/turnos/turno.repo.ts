@@ -237,38 +237,50 @@ export async function buscarEstadoEntidades(
   ejecutor: Ejecutor = pool,
 ): Promise<{
   alumnoEstado: string | null;
+  alumnoNivelEducativo: string | null;
   profesorEstado: string | null;
   materiaEstado: string | null;
+  materiaNivel: string | null;
 }> {
   const sql = `
     SELECT
       (SELECT estado FROM alumno WHERE id = $1) AS alumno_estado,
+      (SELECT nivel_educativo FROM alumno WHERE id = $1) AS alumno_nivel_educativo,
       (SELECT estado FROM profesor WHERE id = $2) AS profesor_estado,
-      (SELECT estado FROM materia WHERE id = $3) AS materia_estado
+      (SELECT estado FROM materia WHERE id = $3) AS materia_estado,
+      (SELECT nivel FROM materia WHERE id = $3) AS materia_nivel
   `;
 
   const params = [alumnoId, profesorId, materiaId];
   if ("query" in ejecutor && ejecutor !== pool) {
     const { rows } = await ejecutor.query<{
       alumno_estado: string | null;
+      alumno_nivel_educativo: string | null;
       profesor_estado: string | null;
       materia_estado: string | null;
+      materia_nivel: string | null;
     }>(sql, params);
     return {
       alumnoEstado: rows[0]?.alumno_estado ?? null,
+      alumnoNivelEducativo: rows[0]?.alumno_nivel_educativo ?? null,
       profesorEstado: rows[0]?.profesor_estado ?? null,
       materiaEstado: rows[0]?.materia_estado ?? null,
+      materiaNivel: rows[0]?.materia_nivel ?? null,
     };
   }
   const filas = await query<{
     alumno_estado: string | null;
+    alumno_nivel_educativo: string | null;
     profesor_estado: string | null;
     materia_estado: string | null;
+    materia_nivel: string | null;
   }>(sql, params);
   return {
     alumnoEstado: filas[0]?.alumno_estado ?? null,
+    alumnoNivelEducativo: filas[0]?.alumno_nivel_educativo ?? null,
     profesorEstado: filas[0]?.profesor_estado ?? null,
     materiaEstado: filas[0]?.materia_estado ?? null,
+    materiaNivel: filas[0]?.materia_nivel ?? null,
   };
 }
 
