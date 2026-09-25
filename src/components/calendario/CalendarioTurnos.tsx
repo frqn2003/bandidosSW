@@ -7,11 +7,13 @@ import { Icon } from "@/components/ui/Icon";
 import { Select } from "@/components/ui/Select";
 import {
   limiteAtencion,
+  listarTurnosEnRango,
   verAgendaDia,
   verAgendaSemana,
   verProximoTurno,
   type AgendaDiaResponse,
   type ProfesorCalendario,
+  type TurnoResponse,
 } from "@/data/calendario";
 import { TurnoCalendarioBadge } from "./TurnoCalendarioBadge";
 import { TurnoDetalleModal } from "./TurnoDetalleModal";
@@ -41,6 +43,9 @@ const ROW_HEIGHT = 56;
 type Vista = "semana" | "dia";
 type Zoom = 30 | 60;
 type EstadoCarga = "cargando" | "error" | "listo";
+
+/** Valor del select "Todos los profesores": lista de turnos sin disponibilidad. */
+const TODOS = "todos";
 
 // ─── Helpers de fecha/hora ───────────────────────────────────────────────
 
@@ -133,14 +138,20 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
   const profesorId = profesorFijo ? String(profesorFijo.id) : rol === "Profesor" ? "" : profesorElegido;
   // El rol Profesor entra con su ficha ya aplicada: el selector queda bloqueado.
   const filtroBloqueado = rol === "Profesor" || profesorFijo !== null;
+  // "todos" no es un id: la grilla no aplica, se muestra la lista consolidada.
+  const todosActivo = profesorId === TODOS;
 
   // Límites de la grilla: horario de atención del CENTRO, no del profesor.
   const [limites, setLimites] = useState<{ min: number; max: number } | null>(null);
 
   const [agenda, setAgenda] = useState<AgendaDiaResponse[]>([]);
+  const [turnosTodos, setTurnosTodos] = useState<TurnoResponse[]>([]);
   const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>("cargando");
   const [intento, setIntento] = useState(0);
   const solicitudProximo = useRef(0);
+  // Al seleccionar "todos", si el rango visible está vacío, saltar a la primera
+  // fecha con turnos. La navegación manual (◀ ▶ Hoy o cambiar vista) lo desactiva.
+  const saltarPrimeraSemana = useRef(false);
   const [busquedaProximo, setBusquedaProximo] = useState<{
     profesorId: string;
     estado: "buscando" | "listo" | "error";
@@ -166,8 +177,9 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
       });
       if (!turno) return;
       setEstadoCarga("cargando");
-      setVista("dia");
-      setLunes(turno.fecha);
+      // Siempre muestra la semana que contiene al turno (contexto de días).
+      setVista("semana");
+      setLunes(lunesDe(turno.fecha));
       setIntento((i) => i + 1);
     } catch {
       if (solicitud !== solicitudProximo.current) return;
@@ -204,7 +216,7 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
   // Mismo patrón que las demás pantallas: el estado solo se toca dentro de las
   // promesas; el efecto devuelve la cancelación. `intento` fuerza reintentos.
   const traer = useCallback(() => {
-    if (!profesorId) return;
+    if (!profesorId || todosActivo) return;
     let cancelado = false;
     const p = Number(profesorId);
     const cargar =
@@ -223,9 +235,41 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
     return () => {
       cancelado = true;
     };
-  }, [profesorId, vista, lunes]);
+  }, [profesorId, vista, lunes, todosActivo]);
 
   useEffect(traer, [traer, intento]);
+
+  // Todos los turnos del rango visible, sin huecos disponibles (opción "todos").
+  useEffect(() => {
+    if (!todosActivo) return;
+    let cancelado = false;
+    const desde = vista === "semana" ? lunesDe(lunes) : lunes;
+    const hasta = vista === "semana" ? sumarDias(lunesDe(lunes), 5) : lunes;
+    listarTurnosEnRango(desde, hasta)
+      .then(async (turnos) => {
+        if (cancelado) return;
+        // Al entrar a "todos": si el rango visible no tiene turnos, saltar a la
+        // primera fecha con turnos (búsqueda hacia adelante, 90 días).
+        if (turnos.length === 0 && saltarPrimeraSemana.current) {
+          saltarPrimeraSemana.current = false;
+          const proximos = await listarTurnosEnRango(desde, sumarDias(desde, 90));
+          if (cancelado) return;
+          const primera = proximos[0];
+          if (primera) {
+            setLunes(vista === "semana" ? lunesDe(primera.fecha) : primera.fecha);
+            return; // el cambio de `lunes` recarga el rango con datos
+          }
+        }
+        setTurnosTodos(turnos);
+        setEstadoCarga("listo");
+      })
+      .catch(() => {
+        if (!cancelado) setEstadoCarga("error");
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [todosActivo, vista, lunes, intento]);
 
   const reintentar = () => {
     setEstadoCarga("cargando");
@@ -248,21 +292,26 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
     return filas;
   }, [limites, zoom]);
 
-  const turnosTotales = useMemo(
-    () => agenda.reduce((acc, d) => acc + d.turnos.length, 0),
-    [agenda],
-  );
+  const turnosTotales = useMemo(() => {
+    if (todosActivo) return turnosTodos.length;
+    return agenda.reduce((acc, d) => acc + d.turnos.length, 0);
+  }, [agenda, turnosTodos, todosActivo]);
 
   const irHoy = () => {
-    setLunes(vista === "semana" ? lunesDe(hoyISO) : hoyISO);
+    saltarPrimeraSemana.current = false;
+    setVista("semana");
+    setLunes(lunesDe(hoyISO));
   };
   const irAnterior = () => {
+    saltarPrimeraSemana.current = false;
     setLunes((l) => sumarDias(l, vista === "semana" ? -7 : -1));
   };
   const irSiguiente = () => {
+    saltarPrimeraSemana.current = false;
     setLunes((l) => sumarDias(l, vista === "semana" ? 7 : 1));
   };
   const cambiarVista = (v: Vista) => {
+    saltarPrimeraSemana.current = false;
     setVista(v);
     // Al volver a semana, el ancla se normaliza a lunes.
     if (v === "semana") setLunes((l) => lunesDe(l));
@@ -323,11 +372,13 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
               onChange={(e) => {
                 solicitudProximo.current += 1;
                 setBusquedaProximo(null);
+                saltarPrimeraSemana.current = e.target.value === TODOS;
                 setProfesorId(e.target.value);
                 setEstadoCarga("cargando");
               }}
             >
               <option value="">Seleccione un profesor…</option>
+              <option value={TODOS}>Todos los profesores</option>
               {profesores.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.apellido}, {p.nombre}
@@ -341,7 +392,7 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
           <div className="flex items-center gap-2" role="group" aria-label="Vista del calendario">
             <Button
               variant={vista === "semana" ? "primary" : "outline"}
-              size="sm"
+              size="md"
               type="button"
               onClick={() => cambiarVista("semana")}
             >
@@ -349,32 +400,29 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
             </Button>
             <Button
               variant={vista === "dia" ? "primary" : "outline"}
-              size="sm"
+              size="md"
               type="button"
               onClick={() => cambiarVista("dia")}
             >
               Día
             </Button>
           </div>
-          <div className="flex items-center gap-2" role="group" aria-label="Zoom de la grilla">
-            <span className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Zoom</span>
-            <Button
-              variant={zoom === 30 ? "primary" : "outline"}
-              size="sm"
-              type="button"
-              onClick={() => setZoom(30)}
-            >
-              30&apos;
-            </Button>
-            <Button
-              variant={zoom === 60 ? "primary" : "outline"}
-              size="sm"
-              type="button"
-              onClick={() => setZoom(60)}
-            >
-              60&apos;
-            </Button>
-          </div>
+          {!todosActivo && (
+            <div className="flex items-center gap-2" role="group" aria-label="Zoom de la grilla">
+              <span className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Zoom</span>
+              <Button variant={zoom === 30 ? "primary" : "outline"} size="md" type="button" onClick={() => setZoom(30)}>
+                30&apos;
+              </Button>
+              <Button variant={zoom === 60 ? "primary" : "outline"} size="md" type="button" onClick={() => setZoom(60)}>
+                60&apos;
+              </Button>
+            </div>
+          )}
+          {todosActivo && (
+            <p className="text-sm font-medium text-on-surface-variant">
+              Vista consolidada: todos los turnos del período, sin disponibilidad.
+            </p>
+          )}
         </div>
       </div>
 
@@ -384,35 +432,35 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
         </p>
       )}
 
-      {busquedaActual && (
-        <p
-          role={busquedaActual.estado === "error" ? "alert" : "status"}
-          className="text-sm font-medium text-on-surface print:hidden"
-        >
-          {busquedaActual.mensaje}
-        </p>
-      )}
-
       {sinProfesor && !filtroBloqueado && (
         <p className="-mt-2 text-sm font-medium text-on-surface-variant print:hidden">
-          Elegí un profesor para ver su calendario.
+          Elegí un profesor para ver su calendario, o «Todos los profesores» para ver todos los turnos.
         </p>
       )}
 
       {/* Encabezado del calendario: rango + navegación en la esquina derecha */}
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <div className="flex min-w-0 items-center gap-2">
-          <Icon name="calendar_view_month" size={20} className="shrink-0 text-on-surface-variant" />
-          <h2 className="truncate font-display text-lg font-bold text-on-surface">
-            {vista === "semana" ? formatearSemana(lunes) : formatearDia(lunes)}
-          </h2>
-          <span
-            className="inline-flex h-7 shrink-0 items-center rounded-full border border-outline-variant bg-surface-container-low px-3 text-xs font-bold text-on-surface"
-            aria-label={`${turnosTotales} turnos en esta ${vista}`}
-          >
-            {turnosTotales} turnos
-          </span>
-        </div>
+        <div className="flex min-w-0 flex-col gap-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <h2 className="truncate font-display text-lg font-bold text-on-surface">
+                {vista === "semana" ? formatearSemana(lunes) : formatearDia(lunes)}
+              </h2>
+              <span
+                className="inline-flex h-7 shrink-0 items-center rounded-full border border-outline bg-surface-container-lowest px-3 text-xs font-bold text-on-surface"
+                aria-label={`${turnosTotales} turnos en esta ${vista}`}
+              >
+                {turnosTotales} turnos
+              </span>
+            </div>
+            {busquedaActual && (
+              <div
+                role={busquedaActual.estado === "error" ? "alert" : "status"}
+                className="flex items-center gap-2 text-sm font-medium text-on-surface-variant"
+              >
+                {busquedaActual.mensaje}
+              </div>
+            )}
+          </div>
 
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Navegación del calendario">
           <Button
@@ -420,7 +468,7 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
             size="md"
             type="button"
             onClick={irProximoTurno}
-            disabled={sinProfesor || busquedaActual?.estado === "buscando"}
+            disabled={sinProfesor || todosActivo || busquedaActual?.estado === "buscando"}
           >
             <Icon name="event_upcoming" size={20} />
             {busquedaActual?.estado === "buscando" ? "Buscando…" : "Próximo turno"}
@@ -464,6 +512,72 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
             Reintentar
           </Button>
         </section>
+      ) : todosActivo ? (
+        <div
+          className={`overflow-auto rounded-md border border-outline-variant bg-surface-container-lowest print:max-h-none print:overflow-visible ${estadoCarga === "cargando" ? "opacity-60" : ""}`}
+          style={{ maxHeight: "calc(100vh - 17rem)" }}
+        >
+          {estadoCarga === "cargando" && turnosTodos.length === 0 ? (
+            <p role="status" aria-live="polite" className="px-4 py-16 text-center text-sm font-semibold text-on-surface-variant">
+              Cargando turnos…
+            </p>
+          ) : turnosTodos.length === 0 ? (
+            <p className="px-4 py-16 text-center text-sm font-medium text-on-surface-variant">
+              No hay turnos asignados{" "}
+              {vista === "semana"
+                ? `en la ${formatearSemana(lunes).toLowerCase()}`
+                : `el ${formatearDia(lunes).toLowerCase()}`}
+              . Probá navegar con ◀ ▶ o volver a Hoy.
+            </p>
+          ) : (
+            <table className="w-full border-collapse" aria-label="Todos los turnos asignados en el período">
+              <thead>
+                <tr className="border-b border-outline-variant">
+                  <th scope="col" className="sticky top-0 z-10 bg-surface-container-lowest px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-on-surface-variant">Fecha</th>
+                  <th scope="col" className="sticky top-0 z-10 bg-surface-container-lowest px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-on-surface-variant">Horario</th>
+                  <th scope="col" className="sticky top-0 z-10 bg-surface-container-lowest px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-on-surface-variant">Código</th>
+                  <th scope="col" className="sticky top-0 z-10 bg-surface-container-lowest px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-on-surface-variant">Alumno</th>
+                  <th scope="col" className="sticky top-0 z-10 bg-surface-container-lowest px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-on-surface-variant">Profesor</th>
+                  <th scope="col" className="sticky top-0 z-10 bg-surface-container-lowest px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-on-surface-variant">Materia</th>
+                  <th scope="col" className="sticky top-0 z-10 bg-surface-container-lowest px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-on-surface-variant">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {turnosTodos.map((t) => {
+                  const [, mes, dia] = t.fecha.split("-");
+                  return (
+                    <tr
+                      key={t.id}
+                      className="border-b border-outline-variant last:border-b-0 hover:bg-surface-container-low/50"
+                    >
+                      <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-on-surface">
+                        {DIAS_CORTOS[nuevoDia(t.fecha)]} {dia}/{mes}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-bold text-on-surface-variant">
+                        {t.horaInicio} – {t.horaFin}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-bold text-on-surface-variant">
+                        {t.codigo}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-on-surface">
+                        {t.alumno.apellido}, {t.alumno.nombre}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-on-surface">
+                        {t.profesor.apellido}, {t.profesor.nombre}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-on-surface-variant">
+                        {t.materia.nombre}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <TurnoCalendarioBadge estado={t.estado} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
       ) : (
         <div
           className={`overflow-auto rounded-md border border-outline-variant bg-surface-container-lowest print:max-h-none print:overflow-visible ${estadoCarga === "cargando" ? "opacity-60" : ""}`}
@@ -475,12 +589,12 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
             </p>
           )}
 
-          <table className="w-full border-collapse" aria-label="Calendario de turnos por día">
+          <table className="w-full border-collapse table-fixed" aria-label="Calendario de turnos por día">
             <thead>
               <tr className="border-b border-outline-variant">
                 <th
                   scope="col"
-                  className="sticky left-0 top-0 z-20 border-r border-outline-variant bg-surface-container-lowest px-3 py-3 text-left text-xs font-bold uppercase tracking-wide text-on-surface-variant"
+                  className="sticky left-0 top-0 z-20 w-24 border-r border-outline-variant bg-surface-container-lowest px-3 py-3 text-left text-xs font-bold uppercase tracking-wide text-on-surface-variant"
                 >
                   Hora
                 </th>
@@ -513,12 +627,17 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
                 const bandaFin = banda + zoom;
                 const esHoraActual =
                   visibleContieneHoy && ahora.min >= banda && ahora.min < bandaFin;
+                const tieneContenido = agenda.some(d => d.bloques.some(
+                  (b) => aMin(b.horaInicio) <= banda && banda < aMin(b.horaFin)
+                ));
                 return (
                   <tr key={banda} className="border-b border-outline-variant last:border-b-0">
                     <th
                       scope="row"
                       className={`sticky left-0 z-10 whitespace-nowrap border-r border-outline-variant px-3 text-xs font-bold ${
-                        esHoraActual ? "bg-secondary/10 text-primary" : "bg-surface-container-lowest text-on-surface-variant"
+                        esHoraActual ? "bg-secondary/10 text-primary" :
+                        tieneContenido ? "bg-surface-container text-primary" :
+                        "bg-surface-container-lowest text-on-surface-variant"
                       }`}
                       style={{ height: ROW_HEIGHT }}
                     >
@@ -567,13 +686,13 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
                                   type="button"
                                   onClick={() => setReserva({ fecha: d.fecha, hueco: huecoCelda })}
                                   aria-label={`Reservar ${huecoCelda.horaInicio} a ${huecoCelda.horaFin}, ${huecoCelda.profesor.apellido} ${huecoCelda.profesor.nombre}`}
-                                  className="flex min-h-12 w-full cursor-pointer items-center justify-center gap-1 rounded-sm border border-dashed border-outline-variant bg-surface-container-low/60 px-2 text-xs font-semibold text-on-surface-variant transition-colors duration-fast ease-out hover:border-secondary/50 hover:bg-secondary/10 hover:text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
+                                  className="flex min-h-12 w-full cursor-pointer items-center justify-center gap-1 rounded-sm border border-dashed border-status-success/50 bg-status-success/10 px-2 text-xs font-semibold text-status-success transition-colors duration-fast ease-out hover:border-status-success/70 hover:bg-status-success/20 hover:text-status-success/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-success/20"
                                 >
                                   <Icon name="add_circle" size={16} />
                                   Disponible
                                 </button>
-                              ) : (
-                                <div className="flex min-h-12 w-full items-center justify-center rounded-sm border border-dashed border-outline-variant bg-surface-container-low/60 px-2 text-xs font-semibold text-on-surface">
+) : (
+                                <div className="flex min-h-12 w-full items-center justify-center rounded-sm border border-dashed border-status-success/50 bg-status-success/10 px-2 text-xs font-semibold text-status-success">
                                   Disponible
                                 </div>
                               ))}
@@ -583,10 +702,10 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
                                   type="button"
                                   onClick={() => setDetalle({ turno: t, fecha: d.fecha })}
                                   aria-label={`${t.codigo} · ${t.alumno.apellido}, ${t.alumno.nombre} · ${t.materia.nombre} · ${t.horaInicio} a ${t.horaFin}`}
-                                  className={`flex w-full cursor-pointer flex-col items-start gap-0.5 rounded-sm border-l-4 bg-surface-container-lowest px-2 py-1.5 text-left shadow-sm transition-colors duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-1 ${
+                                  className={`flex w-full cursor-pointer flex-col items-start gap-0.5 rounded-sm border-l-4 px-2 py-1.5 text-left shadow-sm transition-colors duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-1 ${
                                     t.estado === "Cancelado"
-                                      ? "border-l-error bg-error/5 hover:bg-error/10"
-                                      : "border-l-secondary hover:bg-secondary/5"
+                                      ? "border-l-error bg-error/15 hover:bg-error/20"
+                                      : "border-l-secondary bg-secondary/15 hover:bg-secondary/20"
                                   }`}
                                 >
                                   <span className="flex w-full items-center justify-between gap-1">
@@ -599,7 +718,7 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
                                     {t.alumno.apellido}, {t.alumno.nombre}
                                   </span>
                                   <span className="truncate text-[11px] font-medium leading-none text-on-surface-variant">
-                                    {t.materia.nombre}
+                                    {d.profesor.apellido} · {t.materia.nombre}
                                   </span>
                                 </button>
                               ))}
@@ -620,7 +739,7 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
       <header className="hidden print:block">
         <h2 className="text-center font-display text-lg font-bold">Centro Académico</h2>
         <p className="text-center text-sm font-semibold">
-          Calendario de turnos · {profesorSeleccionado ? `${profesorSeleccionado.apellido}, ${profesorSeleccionado.nombre}` : ""}
+          Calendario de turnos · {todosActivo ? "Todos los profesores" : profesorSeleccionado ? `${profesorSeleccionado.apellido}, ${profesorSeleccionado.nombre}` : ""}
         </p>
         <p className="text-center text-sm font-medium text-on-surface-variant">
           {vista === "semana"

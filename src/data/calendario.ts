@@ -19,7 +19,7 @@ import {
 import { RUTA as RUTA_TURNOS, type TurnoResponse } from "@/contracts/turno";
 import { apiGet } from "@/lib/api-client";
 
-export type { AgendaDiaResponse, HuecoResponse, TurnoCalendarioResponse };
+export type { AgendaDiaResponse, HuecoResponse, TurnoCalendarioResponse, TurnoResponse };
 
 // ─── Helpers de fecha/hora ────────────────────────────────────────────────
 
@@ -127,4 +127,15 @@ export async function verProximoTurno(profesorId: number): Promise<TurnoResponse
     .sort((a, b) =>
       a.fecha.localeCompare(b.fecha) || a.horaInicio.localeCompare(b.horaInicio) || a.id - b.id,
     )[0] ?? null;
+}
+
+/** Todos los turnos del rango [desde, hasta], de TODOS los profesores, sin
+ *  huecos disponibles. Lo usa la opción "Todos los profesores" del filtro.
+ *  BACKEND: GET /api/turnos?desde=&hasta= (contrato listarTurnosQuery). */
+export async function listarTurnosEnRango(desde: string, hasta: string): Promise<TurnoResponse[]> {
+  const params = new URLSearchParams({ desde, hasta });
+  const turnos = await apiGet<TurnoResponse[]>(`${RUTA_TURNOS}?${params.toString()}`);
+  return turnos.sort(
+    (a, b) => a.fecha.localeCompare(b.fecha) || a.horaInicio.localeCompare(b.horaInicio) || a.id - b.id,
+  );
 }
