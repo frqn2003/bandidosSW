@@ -370,29 +370,28 @@ export function ProfesorFormModal({
           </div>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          {/* BACKEND: profesor.titulo_especialidad (varchar 100) */}
-          <Input
-            id="titulo-profesor"
-            label="Título o Especialidad"
-            placeholder="Ej: Ing. Mecánica — Univ. Tecnológica"
-            maxLength={100}
-            value={datos.titulo}
-            onChange={(e) => set({ titulo: e.target.value })}
-          />
-          {/* BACKEND: profesor.telefono ^[0-9]{10,11}$ */}
-          <Input
-            id="telefono-profesor"
-            label="Teléfono Contacto"
-            requiredMark
-            inputMode="numeric"
-            placeholder="Ej: 1155555555"
-            maxLength={11}
-            error={errores.telefono}
-            value={datos.telefono}
-            onChange={(e) => set({ telefono: e.target.value.replace(/\D/g, "") })}
-          />
-        </div>
+        {/* BACKEND: profesor.titulo_especialidad (varchar 100) */}
+        <Input
+          id="titulo-profesor"
+          label="Título o Especialidad"
+          placeholder="Ej: Ing. Mecánica — Univ. Tecnológica"
+          maxLength={100}
+          value={datos.titulo}
+          onChange={(e) => set({ titulo: e.target.value })}
+        />
+
+        {/* BACKEND: profesor.telefono ^[0-9]{10,11}$ */}
+        <Input
+          id="telefono-profesor"
+          label="Teléfono Contacto"
+          requiredMark
+          inputMode="numeric"
+          placeholder="Ej: 1155555555"
+          maxLength={11}
+          error={errores.telefono}
+          value={datos.telefono}
+          onChange={(e) => set({ telefono: e.target.value.replace(/\D/g, "") })}
+        />
 
         {/* BACKEND: capacidad global del CHECK ck_profesor_capacidad (1-10);
             el front la refleja en profesor_materia.capacidad_maxima. */}
