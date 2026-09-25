@@ -15,8 +15,7 @@ interface AlumnosTableProps {
  * Listado de alumnos (HU-ALU-01).
  *
  * Columnas exactas del criterio: N° de legajo · Apellido y Nombre · DNI ·
- * Nivel educativo · Teléfono. El badge de estado va junto al nombre (criterio
- * opcional incluido).
+ * Nivel educativo · Teléfono · Estado (badge en su propia columna).
  *
  * El orden (Apellido y luego Nombre, A-Z) lo resuelve la capa de datos, igual
  * que lo hará el back con el índice `(apellido, nombre)`: la tabla solo pinta.
@@ -32,7 +31,7 @@ export function AlumnosTable({ alumnos, onVer }: AlumnosTableProps) {
         </caption>
         <thead>
           <tr className="border-b border-outline-variant bg-surface-container-low">
-            {["N° de legajo", "Apellido y Nombre", "DNI", "Nivel educativo", "Teléfono"].map(
+            {["N° de legajo", "Apellido y Nombre", "DNI", "Nivel educativo", "Teléfono", "Estado"].map(
               (col) => (
                 <th
                   key={col}
@@ -74,7 +73,6 @@ export function AlumnosTable({ alumnos, onVer }: AlumnosTableProps) {
                     <p className="text-sm font-bold text-on-surface">
                       {alumno.apellido}, {alumno.nombre}
                     </p>
-                    <EstadoAlumnoBadge estado={alumno.estado} />
                   </div>
                 </div>
               </td>
@@ -86,6 +84,9 @@ export function AlumnosTable({ alumnos, onVer }: AlumnosTableProps) {
               </td>
               <td className="px-4 py-3 text-sm font-medium tabular-nums text-on-surface">
                 {formatearTelefono(alumno.telefono)}
+              </td>
+              <td className="px-4 py-3">
+                <EstadoAlumnoBadge estado={alumno.estado} />
               </td>
               <td className="px-4 py-3">
                 <div className="flex items-center justify-end">
