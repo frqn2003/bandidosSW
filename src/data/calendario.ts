@@ -27,7 +27,7 @@ function aDate(iso: string): Date {
   return new Date(`${iso}T00:00:00`);
 }
 
-function aISO(fecha: Date): string {
+export function aISO(fecha: Date): string {
   const y = fecha.getFullYear();
   const m = String(fecha.getMonth() + 1).padStart(2, "0");
   const d = String(fecha.getDate()).padStart(2, "0");
@@ -39,9 +39,16 @@ function aMin(hora: string): number {
   return h * 60 + m;
 }
 
-function sumarDias(iso: string, dias: number): string {
+export function sumarDias(iso: string, dias: number): string {
   const f = aDate(iso);
   f.setDate(f.getDate() + dias);
+  return aISO(f);
+}
+
+/** Lunes de la semana de `iso` ("yyyy-mm-dd"). */
+export function lunesDe(iso: string): string {
+  const f = aDate(iso);
+  f.setDate(f.getDate() - ((f.getDay() + 6) % 7));
   return aISO(f);
 }
 

@@ -51,6 +51,9 @@ export function UsuarioRapidoModal({ open, onClose, onUsuarioCreado }: UsuarioRa
     setErrorGeneral(null);
   };
 
+  /** Bloquea dígitos en campos de texto (nombre, apellido): solo letras. */
+  const soloLetras = (v: string) => v.replace(/[0-9]/g, "");
+
   const guardar = async () => {
     // Mismo schema que valida el back: los mensajes ya vienen en español.
     const validacion = crearCandidatoBody.safeParse(datos);
@@ -181,7 +184,7 @@ export function UsuarioRapidoModal({ open, onClose, onUsuarioCreado }: UsuarioRa
               requiredMark
               maxLength={80}
               value={datos.nombre}
-              onChange={(e) => set("nombre", e.target.value)}
+              onChange={(e) => set("nombre", soloLetras(e.target.value))}
               error={errores.nombre}
               autoComplete="off"
             />
@@ -191,7 +194,7 @@ export function UsuarioRapidoModal({ open, onClose, onUsuarioCreado }: UsuarioRa
               requiredMark
               maxLength={80}
               value={datos.apellido}
-              onChange={(e) => set("apellido", e.target.value)}
+              onChange={(e) => set("apellido", soloLetras(e.target.value))}
               error={errores.apellido}
               autoComplete="off"
             />

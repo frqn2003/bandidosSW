@@ -167,8 +167,8 @@ export function MateriasTable({
                     >
                       <Icon name="edit" size={16} />
                     </Button>
-                    {/* Baja LÓGICA: el ícono es "block", no un tacho — la
-                        materia no se borra, queda inactiva. */}
+                    {/* Baja LÓGICA: el ícono es el tacho (delete), como en
+                        Profesores — la materia no se borra, queda inactiva. */}
                     <Button
                       type="button"
                       variant="ghost"
@@ -183,7 +183,7 @@ export function MateriasTable({
                       onClick={() => onBaja(materia)}
                     >
                       <Icon
-                        name="block"
+                        name="delete"
                         size={16}
                         className={inactiva ? undefined : "text-status-danger"}
                       />

@@ -6,19 +6,9 @@ import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 
-const DIAS_FILTRO = [
-  { value: "1", label: "Lunes" },
-  { value: "2", label: "Martes" },
-  { value: "3", label: "Miércoles" },
-  { value: "4", label: "Jueves" },
-  { value: "5", label: "Viernes" },
-  { value: "6", label: "Sábado" },
-];
-
 export interface FiltrosProfesoresState {
   busqueda: string;
   materiaId: string;
-  dia: string; // "" | "1".."6"
   estado: "" | "activo" | "inactivo";
 }
 
@@ -39,7 +29,7 @@ export function FiltrosProfesores({
 
   // Limpia los selectores; la búsqueda se mantiene (no depende de este botón).
   const borrarFiltros = () =>
-    onChange({ ...estado, materiaId: "", dia: "", estado: "activo" });
+    onChange({ ...estado, materiaId: "", estado: "activo" });
 
   return (
     <form
@@ -71,30 +61,12 @@ export function FiltrosProfesores({
             label="Materia"
             value={estado.materiaId}
             onChange={(e) => set({ materiaId: e.target.value })}
-            className="text-sm"
+            className="w-full min-w-0 truncate text-sm"
           >
             <option value="">Todas las materias</option>
             {materiasCatalogo.map((m) => (
               <option key={m.id} value={String(m.id)}>
                 {m.nombre}
-              </option>
-            ))}
-          </Select>
-        </div>
-
-        <div className="w-full md:w-36">
-          {/* BACKEND: filtro por dia_semana (1-6) de agenda_profesional */}
-          <Select
-            id="filtro-dia"
-            label="Día"
-            value={estado.dia}
-            onChange={(e) => set({ dia: e.target.value })}
-            className="text-sm"
-          >
-            <option value="">Cualquier día</option>
-            {DIAS_FILTRO.map((d) => (
-              <option key={d.value} value={d.value}>
-                {d.label}
               </option>
             ))}
           </Select>
@@ -107,7 +79,7 @@ export function FiltrosProfesores({
             label="Estado"
             value={estado.estado}
             onChange={(e) => set({ estado: e.target.value as FiltrosProfesoresState["estado"] })}
-            className="text-sm"
+            className="w-full min-w-0 truncate text-sm"
           >
             <option value="activo">Solo activos</option>
             <option value="inactivo">Solo inactivos</option>

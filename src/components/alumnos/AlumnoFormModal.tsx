@@ -48,6 +48,22 @@ const EMPTY_FORM: AlumnoFormData = {
 const MAX_NOMBRE = 50;
 const FECHA_OK = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Edad mínima para registrarse: 6 años (ingreso a primaria en Argentina). */
+const EDAD_MINIMA_ANIOS = 6;
+
+/**
+ * Máximo admitido para la fecha de nacimiento: hoy menos 6 años. Un alumno
+ * debe tener al menos 6 años cumplidos para poder registrarse; también queda
+ * bloqueada la fecha actual y cualquier fecha futura.
+ */
+function fechaNacimientoMaxima(): string {
+  const limite = new Date();
+  limite.setFullYear(limite.getFullYear() - EDAD_MINIMA_ANIOS);
+  return `${limite.getFullYear()}-${String(limite.getMonth() + 1).padStart(2, "0")}-${String(
+    limite.getDate(),
+  ).padStart(2, "0")}`;
+}
+
 type CamposConError = Partial<Record<keyof AlumnoFormData, string>>;
 
 /** Los datos del formulario, con la forma que pide el contrato. */
@@ -82,6 +98,14 @@ function validar(datos: AlumnoFormData): CamposConError {
 
   // El enum de zod diría "Invalid enum value"; el combo vacío es "elegí uno".
   if (datos.nivelEducativo === "") errores.nivelEducativo = "Elegí el nivel educativo.";
+
+  // Regla del producto (no está en el contrato): mínimo 6 años para registrarse.
+  if (
+    FECHA_OK.test(datos.fechaNacimiento) &&
+    datos.fechaNacimiento > fechaNacimientoMaxima()
+  ) {
+    errores.fechaNacimiento = "El alumno debe tener al menos 6 años.";
+  }
 
   const resultado = crearAlumnoBody.safeParse(aBody(datos));
   if (!resultado.success) {
@@ -163,6 +187,8 @@ export function AlumnoFormModal({
   }
 
   const set = (patch: Partial<AlumnoFormData>) => setDatos((d) => ({ ...d, ...patch }));
+  /** Bloquea dígitos en campos de texto (nombre, apellido): solo letras y espacios. */
+  const soloLetras = (v: string) => v.replace(/[0-9]/g, "");
   const tocar = (campo: keyof AlumnoFormData) => setTocados((t) => ({ ...t, [campo]: true }));
 
   const fechaValida = FECHA_OK.test(datos.fechaNacimiento);
@@ -314,7 +340,7 @@ export function AlumnoFormModal({
                 maxLength={MAX_NOMBRE}
                 {...soloLectura}
                 value={datos.nombre}
-                onChange={(e) => set({ nombre: e.target.value })}
+                onChange={(e) => set({ nombre: soloLetras(e.target.value) })}
                 onBlur={() => tocar("nombre")}
                 error={errores.nombre}
                 placeholder="Julieta"
@@ -333,7 +359,7 @@ export function AlumnoFormModal({
                 maxLength={MAX_NOMBRE}
                 {...soloLectura}
                 value={datos.apellido}
-                onChange={(e) => set({ apellido: e.target.value })}
+                onChange={(e) => set({ apellido: soloLetras(e.target.value) })}
                 onBlur={() => tocar("apellido")}
                 error={errores.apellido}
                 placeholder="Acosta"
@@ -381,10 +407,15 @@ export function AlumnoFormModal({
               label="Fecha de nacimiento"
               requiredMark
               type="date"
-              max={new Date().toISOString().slice(0, 10)}
+              max={fechaNacimientoMaxima()}
               {...soloLectura}
               value={datos.fechaNacimiento}
-              onChange={(e) => set({ fechaNacimiento: e.target.value })}
+              onChange={(e) => {
+                const v = e.target.value;
+                // Bloqueo real: si se escribe a mano una fecha con menos de 6
+                // años, no se acepta (el atributo `max` solo limita el picker).
+                if (!v || v <= fechaNacimientoMaxima()) set({ fechaNacimiento: v });
+              }}
               onBlur={() => tocar("fechaNacimiento")}
               error={errores.fechaNacimiento}
               hint={edad !== null && edad >= 0 ? `${edad} años` : undefined}
@@ -473,7 +504,7 @@ export function AlumnoFormModal({
             maxLength={100}
             {...soloLectura}
             value={datos.responsableNombre}
-            onChange={(e) => set({ responsableNombre: e.target.value })}
+            onChange={(e) => set({ responsableNombre: soloLetras(e.target.value) })}
             onBlur={() => tocar("responsableNombre")}
             error={errores.responsableNombre}
             placeholder="Marta Acosta"

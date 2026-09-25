@@ -369,37 +369,6 @@ export function turnosFuturosDe(profesorId?: number): number {
 }
 
 
-// ─── Datos demo que todavía no tienen endpoint ───────────────────────────
-// La grilla de AgendaSemanalModal muestra los turnos de la semana. El contrato
-// de turnos existe (src/contracts/turno.ts) pero la ruta /api/turnos no, así que
-// esta parte sigue hardcodeada hasta HU-TUR-01.
-
-export interface TurnoSemana {
-  id: number; // turno.id
-  profesorId: number; // FK → profesor.id
-  dia: number; // 1-6 (ISO, Lun-Sáb)
-  horaInicio: string; // "HH:MM"
-  alumno: string;
-  materia: string;
-  cuposUsados: number;
-  cuposMax: number;
-}
-
-export const TURNOS_SEMANA: TurnoSemana[] = [
-  { id: 1, profesorId: 1, dia: 1, horaInicio: "08:30", alumno: "Camila Ross", materia: "Análisis Matemático I", cuposUsados: 3, cuposMax: 4 },
-  { id: 2, profesorId: 1, dia: 2, horaInicio: "08:30", alumno: "M. Fernández", materia: "Física II", cuposUsados: 1, cuposMax: 4 },
-  { id: 3, profesorId: 1, dia: 3, horaInicio: "14:00", alumno: "Martina Paz", materia: "Análisis Matemático I", cuposUsados: 2, cuposMax: 4 },
-  { id: 4, profesorId: 1, dia: 4, horaInicio: "08:30", alumno: "Joaquín Soler", materia: "Física I", cuposUsados: 4, cuposMax: 4 },
-  { id: 5, profesorId: 1, dia: 5, horaInicio: "10:00", alumno: "L. Gutiérrez", materia: "Análisis Matemático I", cuposUsados: 3, cuposMax: 4 },
-  { id: 6, profesorId: 1, dia: 5, horaInicio: "16:00", alumno: "Facundo Ortiz", materia: "Física II", cuposUsados: 2, cuposMax: 4 },
-];
-
-export const SEMANA_DEMO = {
-  fechas: "21 al 26 de Octubre, 2025",
-  horasDisponibles: 11.5, // horas reservables expuestas por la grilla demo
-};
-
-
 // ─── Copys de los estados vacíos ─────────────────────────────────────────
 
 export const VACIO_COPY = {
