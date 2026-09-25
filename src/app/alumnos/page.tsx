@@ -218,8 +218,7 @@ function AlumnosContent() {
               <div>
                 <h1 className="font-display text-2xl font-bold text-on-surface">Alumnos</h1>
                 <p className="text-sm font-medium text-on-surface-variant">
-                  Registrá alumnos y consultá su ficha. Cada alta genera el legajo con el que se
-                  reservan las clases de apoyo.
+                  Registrá alumnos y consultá su ficha
                 </p>
               </div>
             </div>

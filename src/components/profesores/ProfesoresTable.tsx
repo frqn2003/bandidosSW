@@ -1,11 +1,10 @@
 "use client";
 
 import type { Profesor } from "@/data/profesores";
+import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
-import { MenuAcciones } from "@/components/ui/MenuAcciones";
 import { EstadoProfesorBadge } from "@/components/profesores/EstadoProfesorBadge";
 import {
-  cargaHorariaSemanal,
   formatearTelefono,
   inicialesDe,
   tonoAvatarDe,
@@ -19,12 +18,6 @@ interface ProfesoresTableProps {
   onBaja: (profesor: Profesor) => void;
 }
 
-function formatearCargaHoraria(horasDecimales: number): string {
-  const h = Math.floor(horasDecimales);
-  const m = Math.round((horasDecimales - h) * 60);
-  return `${String(h).padStart(2, "0")}.${String(m).padStart(2, "0")}`;
-}
-
 export function ProfesoresTable({
   profesores,
   onVer,
@@ -36,7 +29,7 @@ export function ProfesoresTable({
     <div className="overflow-x-auto">
       <table className="w-full min-w-[820px] border-collapse text-left">
         <caption className="sr-only">
-          Listado de profesores con especialidad, contacto, materias asignadas, carga horaria y estado
+          Listado de profesores con especialidad, contacto, materias asignadas y estado
         </caption>
         <thead>
           <tr className="border-b border-outline-variant bg-surface-container-low">
@@ -49,23 +42,22 @@ export function ProfesoresTable({
             <th scope="col" className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
               Contacto
             </th>
-            <th scope="col" className="w-20 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
-              H/Sem
-            </th>
             <th scope="col" className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
               Materias
             </th>
             <th scope="col" className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
               Estado
             </th>
-            <th scope="col" className="w-16 px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
-              <span className="sr-only">Acciones</span>
+            <th
+              scope="col"
+              className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-on-surface-variant print:hidden"
+            >
+              Acciones
             </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-outline-variant/60">
           {profesores.map((profesor) => {
-            const carga = cargaHorariaSemanal(profesor);
             const restantesMaterias = profesor.materias.length - 2;
             return (
               <tr
@@ -108,11 +100,6 @@ export function ProfesoresTable({
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <p className="text-sm font-semibold text-on-surface">
-                    {formatearCargaHoraria(carga)}
-                  </p>
-                </td>
-                <td className="px-4 py-3">
                   <ul className="flex flex-col gap-0.5">
                     {profesor.materias.slice(0, 2).map((m) => (
                       <li key={m.materia.id} className="text-sm font-medium text-on-surface">
@@ -131,27 +118,57 @@ export function ProfesoresTable({
                 <td className="px-4 py-3">
                   <EstadoProfesorBadge estado={profesor.estado} />
                 </td>
-                <td className="px-4 py-3">
-                  <div className="flex justify-end">
-                    <MenuAcciones
-                      ariaLabel={`Acciones para ${profesor.nombre} ${profesor.apellido}`}
-                      acciones={[
-                        { label: "Ver ficha", icon: "visibility", onSelect: () => onVer(profesor) },
-                        { label: "Editar", icon: "edit", onSelect: () => onEditar(profesor) },
-                        {
-                          label: "Agenda y disponibilidad",
-                          icon: "calendar_clock",
-                          onSelect: () => onVerAgenda(profesor),
-                        },
-                        {
-                          label: "Dar de baja",
-                          icon: "delete",
-                          peligro: true,
-                          disabled: profesor.estado === "inactivo",
-                          onSelect: () => onBaja(profesor),
-                        },
-                      ]}
-                    />
+                <td className="px-4 py-3 print:hidden">
+                  <div className="flex items-center justify-end gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Ver la ficha de ${profesor.nombre} ${profesor.apellido}`}
+                      title="Ver ficha"
+                      onClick={() => onVer(profesor)}
+                    >
+                      <Icon name="visibility" size={16} />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Editar a ${profesor.nombre} ${profesor.apellido}`}
+                      title="Editar"
+                      onClick={() => onEditar(profesor)}
+                    >
+                      <Icon name="edit" size={16} />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Agenda y disponibilidad de ${profesor.nombre} ${profesor.apellido}`}
+                      title="Agenda y disponibilidad"
+                      onClick={() => onVerAgenda(profesor)}
+                    >
+                      <Icon name="calendar_clock" size={16} />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      disabled={profesor.estado === "inactivo"}
+                      aria-label={
+                        profesor.estado === "inactivo"
+                          ? `${profesor.nombre} ${profesor.apellido} ya está inactivo`
+                          : `Dar de baja a ${profesor.nombre} ${profesor.apellido}`
+                      }
+                      title={profesor.estado === "inactivo" ? "Ya está inactivo" : "Dar de baja"}
+                      onClick={() => onBaja(profesor)}
+                    >
+                      <Icon
+                        name="delete"
+                        size={16}
+                        className={profesor.estado === "inactivo" ? undefined : "text-status-danger"}
+                      />
+                    </Button>
                   </div>
                 </td>
               </tr>

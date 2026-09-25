@@ -46,7 +46,6 @@ import { bloquesDesdeFranjas, capacidadMaxDe, franjasDesdeBloques } from "@/func
 
 const FILTROS_INICIALES: FiltrosProfesoresState = {
   busqueda: "",
-  materiaId: "",
   estado: "activo",
 };
 const PAGE_SIZE_DEFAULT = 10;
@@ -117,8 +116,7 @@ function CuerpoDocenteContent() {
   const cacheBloques = useRef(new Map<number, Record<number, string[]>>());
 
   // Los filtros estructurales van al servidor. La búsqueda por texto se
-  // resuelve abajo, en memoria.
-  const materiaId = filtros.materiaId;
+  // resuelve abajo, en memoria (incluye el nombre de las materias).
   const estadoFiltro = filtros.estado;
 
   // NO toca el estado de forma síncrona: solo dentro de los callbacks de la
@@ -126,7 +124,6 @@ function CuerpoDocenteContent() {
   const traer = useCallback(() => {
     let cancelado = false;
     listarProfesores({
-      materiaId: materiaId ? Number(materiaId) : undefined,
       estado: estadoFiltro || undefined,
     })
       .then((lista) => {
@@ -140,7 +137,7 @@ function CuerpoDocenteContent() {
     return () => {
       cancelado = true;
     };
-  }, [materiaId, estadoFiltro]);
+  }, [estadoFiltro]);
 
   useEffect(traer, [traer]);
 
@@ -168,11 +165,16 @@ function CuerpoDocenteContent() {
 
   const activos = useMemo(() => profesores.filter((p) => p.estado === "activo").length, [profesores]);
 
-  // Búsqueda por nombre y apellido + orden fijo Apellido, Nombre A-Z (HU-PRO-01).
+  // Búsqueda por nombre, apellido o materia + orden fijo Apellido, Nombre A-Z (HU-PRO-01).
   const filas = useMemo(() => {
     const q = filtros.busqueda.trim().toLowerCase();
     return profesores
-      .filter((p) => !q || `${p.nombre} ${p.apellido}`.toLowerCase().includes(q))
+      .filter(
+        (p) =>
+          !q ||
+          `${p.nombre} ${p.apellido}`.toLowerCase().includes(q) ||
+          p.materias.some((m) => m.materia.nombre.toLowerCase().includes(q)),
+      )
       .sort((a, b) => `${a.apellido} ${a.nombre}`.localeCompare(`${b.apellido} ${b.nombre}`));
   }, [profesores, filtros.busqueda]);
 
@@ -215,7 +217,6 @@ function CuerpoDocenteContent() {
 
   const hayFiltros =
     filtros.busqueda.trim() !== "" ||
-    filtros.materiaId !== "" ||
     filtros.estado !== "activo";
 
   const cambiarFiltros = (next: FiltrosProfesoresState) => {
@@ -396,17 +397,6 @@ function CuerpoDocenteContent() {
                 <Icon name="groups" size={24} className="text-primary" />
               </span>
               <div>
-                <nav aria-label="Ruta de navegación" className="mb-1">
-                  <ol className="flex items-center gap-1 text-xs font-semibold text-on-surface-variant">
-                    <li>Gestión Académica</li>
-                    <li aria-hidden="true" className="flex items-center">
-                      <Icon name="chevron_right" size={14} />
-                    </li>
-                    <li aria-current="page" className="text-on-surface">
-                      Cuerpo Docente
-                    </li>
-                  </ol>
-                </nav>
                 <h1 className="font-display text-2xl font-bold text-on-surface">Cuerpo Docente</h1>
                 <p className="text-sm font-medium text-on-surface-variant">
                   Gestión de profesores, materias asignadas y disponibilidad
@@ -422,7 +412,6 @@ function CuerpoDocenteContent() {
           <FiltrosProfesores
             estado={filtros}
             onChange={cambiarFiltros}
-            materiasCatalogo={materiasCatalogo}
             totalActivos={activos}
           />
 

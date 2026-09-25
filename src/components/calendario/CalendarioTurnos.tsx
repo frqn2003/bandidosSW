@@ -709,16 +709,13 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
                                       : "border-l-secondary bg-secondary/15 hover:bg-secondary/20"
                                   }`}
                                 >
-                                  <span className="flex w-full items-center justify-between gap-1">
-                                    <span className="truncate font-mono text-[11px] font-bold leading-none text-on-surface-variant">
-                                      {t.codigo} · {t.horaInicio}–{t.horaFin}
-                                    </span>
+                                  <span className="flex w-full items-center justify-start">
                                     <TurnoCalendarioBadge estado={t.estado} />
                                   </span>
-                                  <span className="truncate text-xs font-bold leading-tight text-on-surface">
+                                  <span className="truncate pl-2.5 text-xs font-bold leading-tight text-on-surface">
                                     {t.alumno.apellido}, {t.alumno.nombre}
                                   </span>
-                                  <span className="truncate text-[11px] font-medium leading-none text-on-surface-variant">
+                                  <span className="truncate pl-2.5 text-[11px] font-medium leading-none text-on-surface-variant">
                                     {d.profesor.apellido} · {t.materia.nombre}
                                   </span>
                                 </button>
