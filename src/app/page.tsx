@@ -105,9 +105,13 @@ export default function LoginPage() {
     <div className="flex min-h-screen flex-1 items-center justify-center bg-surface px-4 py-10">
       <div className="flex w-full max-w-md flex-col gap-6">
         <header className="flex flex-col items-center gap-3 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-md bg-primary">
-            <Icon name="school" size={32} className="text-on-primary" />
-          </span>
+          <img
+            src="/logo-centro-academico.png"
+            alt="Logo de Centro Académico"
+            width={56}
+            height={56}
+            className="h-14 w-14 shrink-0 rounded-md object-cover"
+          />
           <div>
             <h1 className="font-display text-2xl font-bold text-on-surface">Centro Académico</h1>
             <p className="text-sm font-medium text-on-surface-variant">
