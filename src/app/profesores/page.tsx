@@ -134,6 +134,12 @@ function CuerpoDocenteContent() {
    */
   const cacheBloques = useRef(new Map<number, Record<number, string[]>>());
 
+  // Baja pedida desde el form de edición (switch apagado): no inactiva de una,
+  // guarda los datos del form y abre la confirmación con motivo. Al confirmar
+  // se re-ejecuta el guardado con `bajaConfirmada` para no volver a preguntar.
+  const datosBajaPendiente = useRef<ProfesorFormData | null>(null);
+  const bajaConfirmada = useRef(false);
+
   // Los filtros estructurales van al servidor. La búsqueda por texto se
   // resuelve abajo, en memoria (incluye el nombre de las materias).
   const estadoFiltro = filtros.estado;
@@ -286,6 +292,15 @@ function CuerpoDocenteContent() {
   const guardarProfesor = async (datos: ProfesorFormData) => {
     const enEdicion = modalForm?.modo === "EDICION" ? modalForm.profesor : null;
 
+    // El switch es la vía de baja en edición: apagarlo no inactiva de una,
+    // pide confirmación y motivo antes de seguir (el diálogo re-ejecuta este
+    // guardado con `bajaConfirmada` en true).
+    if (enEdicion && enEdicion.estado === "activo" && !datos.estado && !bajaConfirmada.current) {
+      datosBajaPendiente.current = datos;
+      abrirBaja(enEdicion);
+      return;
+    }
+
     // No hay endpoint de reactivación (POST /api/profesores/:id/activar no
     // existe): mejor avisar que guardar la mitad.
     if (enEdicion && enEdicion.estado === "inactivo" && datos.estado) {
@@ -318,13 +333,20 @@ function CuerpoDocenteContent() {
         const body: EditarProfesorBody = ficha;
         let actualizado = await editarProfesor(enEdicion.id, body);
         // El estado no va en el body: la baja tiene su propio endpoint.
+        let seInactivo = false;
         if (!datos.estado && actualizado.estado === "activo") {
           actualizado = await inactivarProfesor(enEdicion.id);
+          seInactivo = true;
         }
         const editado = aProfesor(actualizado, enEdicion.bloquesPorDia);
         vista = editado;
         setProfesores((prev) => prev.map((p) => (p.id === editado.id ? editado : p)));
-        showToast("success", `Ficha de ${editado.nombre} ${editado.apellido} actualizada.`);
+        showToast(
+          "success",
+          seInactivo
+            ? `Ficha de ${editado.nombre} ${editado.apellido} guardada y profesor dado de baja.`
+            : `Ficha de ${editado.nombre} ${editado.apellido} actualizada.`,
+        );
       } else {
         const body: CrearProfesorBody = { usuarioId: Number(datos.usuarioId), ...ficha };
         let creado = await crearProfesor(body);
@@ -366,6 +388,23 @@ function CuerpoDocenteContent() {
 
   const confirmarBaja = async () => {
     if (!bajaDe) return;
+    // Viene del form de edición (switch apagado): re-ejecuta el guardado
+    // completo (editarProfesor + inactivarProfesor + bloques + cierre del
+    // form) en lugar de inactivar aislado.
+    const pendientes = datosBajaPendiente.current;
+    if (pendientes) {
+      bajaConfirmada.current = true;
+      setConfirmandoBaja(true);
+      try {
+        await guardarProfesor(pendientes);
+      } finally {
+        bajaConfirmada.current = false;
+        datosBajaPendiente.current = null;
+        setBajaDe(null);
+        setConfirmandoBaja(false);
+      }
+      return;
+    }
     const profesor = bajaDe;
     // BACKEND: el motivo y las observaciones todavía no viajan — POST
     // /api/profesores/:id/inactivar no los recibe y la auditoría la escribe el
@@ -549,7 +588,6 @@ function CuerpoDocenteContent() {
         titulo={modalForm?.modo === "EDICION" ? "Editar Profesor" : "Nuevo Profesor"}
         onClose={cerrarForm}
         profesor={modalForm?.profesor ?? null}
-        onBaja={abrirBaja}
         datosIniciales={
           modalForm?.profesor
             ? {

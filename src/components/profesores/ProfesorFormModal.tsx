@@ -60,9 +60,8 @@ interface ProfesorFormModalProps {
   usuariosSinFicha: UsuarioSinFicha[];
   materiasCatalogo: MateriaRef[];
   onGuardar: (datos: ProfesorFormData) => void;
-  /** Profesor en edición: identidad bloqueada + disparador de baja lógica. */
+  /** Profesor en edición: identidad bloqueada. La baja se decide con el switch de estado. */
   profesor?: Profesor | null;
-  onBaja?: (profesor: Profesor) => void;
   /**
    * Error que devolvió la API (código del contrato ya traducido a mensaje).
    * Si trae `campo`, se pinta debajo de ese input igual que una validación
@@ -98,7 +97,6 @@ export function ProfesorFormModal({
   materiasCatalogo,
   onGuardar,
   profesor,
-  onBaja,
   errorRemoto,
   guardando = false,
   puedeCrearUsuario = false,
@@ -257,17 +255,7 @@ export function ProfesorFormModal({
       maxWidth="max-w-2xl"
       footer={
         <>
-          {modo === "EDICION" ? (
-            <Button
-              type="button"
-              variant="destructive"
-              className="sm:mr-auto"
-              onClick={() => profesor && onBaja?.(profesor)}
-            >
-              <Icon name="person_off" size={16} />
-              Dar de baja profesor…
-            </Button>
-          ) : (
+          {modo === "INSERCION" && (
             <p className="mr-auto text-xs font-medium text-on-surface-variant">
               <span className="text-error">*</span> Campos obligatorios
             </p>
