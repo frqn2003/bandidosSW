@@ -120,6 +120,19 @@
   --radius-lg: 12px; /* badges, pills no redondas */
 }
 
+/* ── Utilidades custom ──────────────────────────────────────────────────── */
+
+/* Oculta la barra de scroll pero conserva el desplazamiento (ruedita,
+   trackpad, teclado). Se usa en paneles fijos, como el nav del Sidebar. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 :root {
   background: var(--color-background);
   color: var(--color-on-surface);
