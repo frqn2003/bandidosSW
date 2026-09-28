@@ -174,6 +174,14 @@ export interface DbTables {
     usuario_id: number;
     created_at: Date;  // auto (default)
   };
+  motivo_baja: {
+    id: number;
+    nombre: string;
+    requiere_detalle: boolean;
+    estado: EstadoActivoInactivo;
+    created_at: Date;
+    updated_at: Date;
+  };
   usuario: {
     id: number;  // auto (identity)
     rol_id: number;
@@ -183,9 +191,16 @@ export interface DbTables {
     dni: string;
     email: string;
     estado: EstadoActivoInactivo;  // auto (default)
-    fecha_creacion: Date;  // auto (default)
+    auth_id: string;
     intentos_fallidos: number;  // auto (default)
     bloqueado_hasta: Date | null;
+    fecha_creacion: Date;  // auto (default)
+    cambiar_contraseña: boolean | null;
+    telefono: string | null;
+    motivo_baja_id: number | null;
+    detalle_motivo_baja: string | null;
+    fecha_baja: Date | null;
+    debe_cambiar_password: boolean;
   };
 }
 
