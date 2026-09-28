@@ -1,6 +1,7 @@
 import type {
   CrearTurnoInput,
   EditarTurnoInput,
+  CancelarTurnoInput,
   ListarTurnosQuery,
   EstadoTurno,
   NivelMateria,
@@ -13,6 +14,7 @@ export type TurnoDetalleRow = {
   alumno_legajo: string | null;
   alumno_nombre: string;
   alumno_apellido: string;
+  alumno_dni: string;
   profesor_id: number;
   profesor_nombre: string;
   profesor_apellido: string;
@@ -26,6 +28,13 @@ export type TurnoDetalleRow = {
   valor_clase_congelado: string;
   estado: EstadoTurno;
   observaciones: string | null;
+  cantidad_modificaciones: number;
+  motivo_cancelacion_id: number | null;
+  motivo_cancelacion_nombre: string | null;
+  detalle_cancelacion: string | null;
+  fecha_cancelacion: Date | string | null;
+  cancelacion_tardia: boolean;
+  pagado: boolean;
   usuario_id: number;
   usuario_nombre: string;
   usuario_apellido: string;
@@ -43,3 +52,4 @@ export type ProfesorMateriaInfo = {
 export type FiltrosTurno = ListarTurnosQuery;
 export type CrearTurnoInputDto = CrearTurnoInput;
 export type EditarTurnoInputDto = EditarTurnoInput;
+export type CancelarTurnoInputDto = CancelarTurnoInput;

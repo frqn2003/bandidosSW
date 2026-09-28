@@ -16,6 +16,7 @@ const COLUMNAS_TURNO = `
   a.legajo AS alumno_legajo,
   a.nombre AS alumno_nombre,
   a.apellido AS alumno_apellido,
+  a.dni AS alumno_dni,
   t.profesor_id,
   up.nombre AS profesor_nombre,
   up.apellido AS profesor_apellido,
@@ -29,6 +30,13 @@ const COLUMNAS_TURNO = `
   t.valor_clase_congelado::text AS valor_clase_congelado,
   t.estado,
   t.observaciones,
+  t.cantidad_modificaciones,
+  t.motivo_cancelacion_id,
+  mc.nombre AS motivo_cancelacion_nombre,
+  t.detalle_cancelacion,
+  t.fecha_cancelacion,
+  t.cancelacion_tardia,
+  t.pagado,
   t.usuario_id,
   ur.nombre AS usuario_nombre,
   ur.apellido AS usuario_apellido,
@@ -42,6 +50,7 @@ const FROM_TURNO = `
   JOIN usuario up ON up.id = p.usuario_id
   JOIN materia m ON m.id = t.materia_id
   JOIN usuario ur ON ur.id = t.usuario_id
+  LEFT JOIN motivo_cancelacion mc ON mc.id = t.motivo_cancelacion_id
 `;
 
 export async function findAll(
@@ -59,6 +68,7 @@ export async function findAll(
       OR a.legajo ILIKE ${p}
       OR a.apellido ILIKE ${p}
       OR a.nombre ILIKE ${p}
+      OR a.dni ILIKE ${p}
     )`);
   }
 
@@ -80,6 +90,8 @@ export async function findAll(
   if (filtros.estado) {
     params.push(filtros.estado);
     condiciones.push(`t.estado = $${params.length}`);
+  } else if (!filtros.verCancelados) {
+    condiciones.push(`t.estado = 'Reservado'`);
   }
 
   if (filtros.desde) {
@@ -333,15 +345,37 @@ export async function updateReprogramar(
   horaFin: string,
   observaciones: string | null,
   client: PoolClient,
+  profesorId?: number,
+  valorClaseCongelado?: number,
 ): Promise<TurnoDetalleRow> {
+  const updates: string[] = [
+    "fecha = $2::date",
+    "hora_inicio = $3::time",
+    "hora_fin = $4::time",
+    "observaciones = $5",
+  ];
+  const params: unknown[] = [
+    id,
+    fecha,
+    horaInicio,
+    horaFin,
+    observaciones ? observaciones.trim() : null,
+  ];
+
+  if (profesorId !== undefined) {
+    params.push(profesorId);
+    updates.push(`profesor_id = $${params.length}`);
+  }
+  if (valorClaseCongelado !== undefined) {
+    params.push(valorClaseCongelado);
+    updates.push(`valor_clase_congelado = $${params.length}`);
+  }
+
   await client.query(
     `UPDATE turno
-     SET fecha = $2::date,
-         hora_inicio = $3::time,
-         hora_fin = $4::time,
-         observaciones = $5
+     SET ${updates.join(", ")}
      WHERE id = $1`,
-    [id, fecha, horaInicio, horaFin, observaciones ? observaciones.trim() : null],
+    params,
   );
 
   const row = await findById(id, client);
@@ -353,11 +387,17 @@ export async function updateReprogramar(
 
 export async function cancelar(
   id: number,
+  motivoCancelacionId: number,
+  detalleCancelacion: string | null,
   client: PoolClient,
 ): Promise<TurnoDetalleRow> {
   await client.query(
-    `UPDATE turno SET estado = 'Cancelado' WHERE id = $1`,
-    [id],
+    `UPDATE turno
+     SET estado = 'Cancelado',
+         motivo_cancelacion_id = $2,
+         detalle_cancelacion = $3
+     WHERE id = $1`,
+    [id, motivoCancelacionId, detalleCancelacion ? detalleCancelacion.trim() : null],
   );
 
   const row = await findById(id, client);
@@ -365,6 +405,23 @@ export async function cancelar(
     throw new Error("No se pudo recuperar el turno cancelado.");
   }
   return row;
+}
+
+export async function buscarMotivoCancelacion(
+  id: number,
+  ejecutor: Ejecutor = pool,
+): Promise<{ id: number; nombre: string; requiere_detalle: boolean; estado: string } | null> {
+  const sql = `
+    SELECT id, nombre, requiere_detalle, estado
+    FROM motivo_cancelacion
+    WHERE id = $1
+  `;
+  if ("query" in ejecutor && ejecutor !== pool) {
+    const { rows } = await ejecutor.query<{ id: number; nombre: string; requiere_detalle: boolean; estado: string }>(sql, [id]);
+    return rows[0] ?? null;
+  }
+  const filas = await query<{ id: number; nombre: string; requiere_detalle: boolean; estado: string }>(sql, [id]);
+  return filas[0] ?? null;
 }
 
 export async function obtenerProfesorPorUsuarioId(

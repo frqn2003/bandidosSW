@@ -4,6 +4,7 @@ import type {
   ListarTurnosQuery,
   CrearTurnoInput,
   EditarTurnoInput,
+  CancelarTurnoInput,
 } from "@/contracts/turno";
 import { withTransaction } from "@/lib/db/tx";
 import { withAuditUser } from "@/lib/audit/audit";
@@ -40,6 +41,7 @@ function yaOcurrio(fecha: string, hora: string): boolean {
   const fechaTurno = new Date(y, m - 1, d, hh, mm, 0);
   return fechaTurno.getTime() < ahora.getTime();
 }
+
 
 /**
  * Lista los turnos aplicando filtros y restricciones por rol (§HU-CAL-01).
@@ -226,7 +228,8 @@ export async function reservar(
 }
 
 /**
- * Reprograma un turno existente (§HU-TUR-01).
+ * Modifica o reprograma un turno existente (§HU-TUR-02).
+ * Permite cambiar profesor (para la misma materia), fecha, horario y observaciones.
  */
 export async function reprogramar(
   id: number,
@@ -236,7 +239,7 @@ export async function reprogramar(
 ): Promise<TurnoResponse> {
   const rolesPermitidos = ["Gerente", "Mesa de Entrada"];
   if (!rolesPermitidos.includes(session.rol)) {
-    throw new ForbiddenError("Los profesores no pueden reprogramar turnos.");
+    throw new ForbiddenError("Los profesores no pueden modificar turnos.");
   }
 
   return withTransaction(async (client) => {
@@ -248,30 +251,83 @@ export async function reprogramar(
     }
 
     if (actual.estado === "Cancelado") {
-      throw new ConflictError("TURNO_YA_CANCELADO", "No se puede reprogramar un turno cancelado.");
+      throw new ConflictError("TURNO_YA_CANCELADO", "No se puede modificar un turno cancelado.");
+    }
+
+    if (actual.pagado) {
+      throw new ConflictError("TURNO_YA_PAGADO", "No se puede modificar un turno que ya fue abonado.");
     }
 
     if (yaOcurrio(actual.fecha, actual.hora_inicio)) {
-      throw new ConflictError("TURNO_PASADO", "No se puede reprogramar un turno que ya ocurrió.");
+      throw new ConflictError("TURNO_PASADO", "No se puede modificar un turno que ya ocurrió.");
     }
 
-    const pm = await repo.buscarProfesorMateria(actual.profesor_id, actual.materia_id, client);
-    if (!pm) {
-      throw new ValidationError("PROFESOR_NO_DICTA_MATERIA", "El profesor no dicta esa materia.", "horaInicio");
+    if (actual.cantidad_modificaciones >= 2) {
+      throw new ConflictError(
+        "MAX_MODIFICACIONES_ALCANZADO",
+        "El turno alcanzó el máximo de 2 modificaciones permitidas. Debe cancelarlo y reservar nuevamente.",
+      );
     }
 
-    const horaFin = sumarMinutos(input.horaInicio, pm.duracion_clase_minutos);
-
-    if (faltanMenosDe(2, input.fecha, input.horaInicio)) {
+    if (faltanMenosDe(2, actual.fecha, actual.hora_inicio)) {
       throw new ValidationError(
         "ANTICIPACION_INSUFICIENTE",
-        "El turno se tiene que reprogramar con al menos 2 horas de anticipación.",
+        "El turno original se tiene que modificar con al menos 2 horas de anticipación.",
         "horaInicio",
       );
     }
 
+    if (faltanMenosDe(2, input.fecha, input.horaInicio)) {
+      throw new ValidationError(
+        "ANTICIPACION_INSUFICIENTE",
+        "El nuevo horario se tiene que programar con al menos 2 horas de anticipación.",
+        "horaInicio",
+      );
+    }
+
+    const profesorId = input.profesorId ?? actual.profesor_id;
+
+    if (input.profesorId !== undefined && input.profesorId !== actual.profesor_id) {
+      const estados = await repo.buscarEstadoEntidades(
+        actual.alumno_id,
+        input.profesorId,
+        actual.materia_id,
+        client,
+      );
+      if (estados.profesorEstado === null) {
+        throw new ValidationError("REFERENCIA_INVALIDA", "El profesor seleccionado no existe.", "profesorId");
+      }
+      if (estados.profesorEstado !== "activo") {
+        throw new ValidationError("PROFESOR_INACTIVO", "El profesor seleccionado está inactivo.", "profesorId");
+      }
+    }
+
+    const pm = await repo.buscarProfesorMateria(profesorId, actual.materia_id, client);
+    if (!pm) {
+      throw new ValidationError(
+        "PROFESOR_NO_DICTA_MATERIA",
+        "El profesor no dicta esa materia.",
+        "profesorId",
+      );
+    }
+
+    let nuevoPrecio: number | undefined;
+    if (profesorId !== actual.profesor_id) {
+      const precio = await repo.precioVigente(pm.id, client);
+      if (precio === null) {
+        throw new ValidationError(
+          "PRECIO_NO_DEFINIDO",
+          "No hay precio cargado para ese profesor y esa materia.",
+          "profesorId",
+        );
+      }
+      nuevoPrecio = precio;
+    }
+
+    const horaFin = sumarMinutos(input.horaInicio, pm.duracion_clase_minutos);
+
     const enDisponibilidad = await repo.hayDisponibilidad(
-      actual.profesor_id,
+      profesorId,
       input.fecha,
       input.horaInicio,
       horaFin,
@@ -286,7 +342,7 @@ export async function reprogramar(
     }
 
     const ocupados = await repo.contarOcupadosBloqueando(
-      actual.profesor_id,
+      profesorId,
       input.fecha,
       input.horaInicio,
       horaFin,
@@ -304,6 +360,8 @@ export async function reprogramar(
       horaFin,
       input.observaciones,
       client,
+      profesorId,
+      nuevoPrecio,
     );
 
     return mapper.toApi(row);
@@ -311,10 +369,11 @@ export async function reprogramar(
 }
 
 /**
- * Cancela un turno (§HU-TUR-01 / §HU-CAL-01). No se borra físicamente.
+ * Cancela un turno con motivo (§HU-TUR-02). No se borra físicamente.
  */
 export async function cancelar(
   id: number,
+  input: CancelarTurnoInput,
   usuarioId: number,
   session: Session,
 ): Promise<TurnoResponse> {
@@ -335,11 +394,43 @@ export async function cancelar(
       throw new ConflictError("TURNO_YA_CANCELADO", "El turno ya se encuentra cancelado.");
     }
 
+    if (actual.pagado) {
+      throw new ConflictError("TURNO_YA_PAGADO", "No se puede cancelar un turno que ya fue abonado.");
+    }
+
     if (yaOcurrio(actual.fecha, actual.hora_inicio)) {
       throw new ConflictError("TURNO_PASADO", "No se puede cancelar un turno que ya ocurrió.");
     }
 
-    const row = await repo.cancelar(id, client);
+    const motivo = await repo.buscarMotivoCancelacion(input.motivoCancelacionId, client);
+    if (!motivo) {
+      throw new ValidationError(
+        "REFERENCIA_INVALIDA",
+        "El motivo de cancelación seleccionado no existe.",
+        "motivoCancelacionId",
+      );
+    }
+    if (motivo.estado !== "activo") {
+      throw new ValidationError(
+        "MOTIVO_CANCELACION_INACTIVO",
+        `El motivo de cancelación "${motivo.nombre}" está inactivo.`,
+        "motivoCancelacionId",
+      );
+    }
+    if (motivo.requiere_detalle && (!input.detalleCancelacion || !input.detalleCancelacion.trim())) {
+      throw new ValidationError(
+        "DETALLE_CANCELACION_REQUERIDO",
+        `El motivo de cancelación "${motivo.nombre}" requiere especificar un detalle.`,
+        "detalleCancelacion",
+      );
+    }
+
+    const row = await repo.cancelar(
+      id,
+      input.motivoCancelacionId,
+      input.detalleCancelacion ?? null,
+      client,
+    );
     return mapper.toApi(row);
   });
 }
