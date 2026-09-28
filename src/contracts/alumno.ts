@@ -1,30 +1,48 @@
 // src/contracts/alumno.ts
 //
-// CONTRATO DE ALUMNO.
+// CONTRATO DE ALUMNO (HU-ALU-01 / HU-ALU-02).
 //
-// Dos cosas propias de este módulo:
-//  · Menor de 18 ⇒ los tres datos del responsable son obligatorios. La base lo
-//    fuerza (ck_alumno_responsable_menor) y acá se valida igual, porque los dos
-//    datos (fecha de nacimiento y responsable) están en el mismo body: el front
-//    puede avisar sin ir al servidor.
-//  · El posible duplicado (mismo nombre + apellido + fecha de nacimiento) NO es
-//    un error: es un aviso de UX. Por eso tiene endpoint propio y no un código
-//    de error — el alta se puede confirmar igual.
+// Reglas de negocio del módulo:
+//  · Menor de 18 (calculado según hora argentina) ⇒ los tres datos del responsable son obligatorios.
+//  · Mayor de 18 ⇒ regla "todo o nada": o los tres datos del responsable son nulos, o los tres se completan.
+//  · Posible duplicado (mismo nombre + apellido + fecha de nacimiento): aviso de UX.
+//  · Ficha completa (HU-ALU-02): institución de origen, observaciones generales y materias de interés.
+//    Al editar, el backend valida que solo las materias de interés *nuevas* estén activas (las ya asignadas
+//    se pueden conservar aunque queden inactivas en el catálogo).
+//  · Baja lógica (HU-ALU-02):
+//    - Bloqueo duro si el alumno tiene turnos futuros reservados: `ALUMNO_CON_TURNOS_FUTUROS`
+//      (devuelve `{ cantidadTurnosFuturos: number }` en el campo `datos` del error).
+//    - Si el alumno tiene deuda pendiente (clases pasadas no abonadas), `deudaPendiente` es true.
+//      Al inactivar, si no se envió `confirmarConDeuda: true`, se devuelve `ALUMNO_CON_DEUDA` para advertir.
+//  · Reactivación (HU-ALU-02): vuelve el estado a 'activo' revalidando DNI único.
+//  · Listado (Precedencia de filtros):
+//    - Si se especifica `estado`, filtra por ese estado.
+//    - Si `verInactivos=true` (y sin `estado`), devuelve activos e inactivos.
+//    - Por defecto (`verInactivos` ausente o false), devuelve ÚNICAMENTE activos.
 
 import { z } from "zod";
+import { booleanQuery } from "./catalogo";
+
+export { booleanQuery };
+
+/** Fecha de hoy en huso horario de Argentina (America/Argentina/Buenos_Aires). */
+export const hoyAR = () =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires" }).format(new Date());
 
 
 // ─── 1. Rutas ────────────────────────────────────────────────────────────
-//   GET    RUTA                    → listar (acepta los filtros de abajo)
-//   POST   RUTA                    → crear
-//   GET    rutaAlumno(id)          → detalle
-//   PUT    rutaAlumno(id)          → editar
-//   POST   rutaInactivar(id)       → baja lógica (estado = 'inactivo')
-//   GET    RUTA_POSIBLES_DUPLICADOS→ aviso antes de confirmar el alta
+//   GET    RUTA                     → listar alumnos (activos por defecto)
+//   POST   RUTA                     → crear alumno
+//   GET    rutaAlumno(id)           → detalle / ficha completa
+//   PUT    rutaAlumno(id)           → editar ficha
+//   POST   rutaInactivar(id)        → baja lógica
+//   POST   rutaReactivar(id)        → reactivación lógica (estado = 'activo')
+//   GET    RUTA_POSIBLES_DUPLICADOS → advertencia antes de confirmar alta
 
 export const RUTA = "/api/alumnos";
 export const rutaAlumno = (id: number) => `${RUTA}/${id}`;
 export const rutaInactivar = (id: number) => `${RUTA}/${id}/inactivar`;
+export const rutaReactivar = (id: number) => `${RUTA}/${id}/reactivar`;
 export const RUTA_POSIBLES_DUPLICADOS = "/api/alumnos/posibles-duplicados";
 
 
@@ -32,16 +50,16 @@ export const RUTA_POSIBLES_DUPLICADOS = "/api/alumnos/posibles-duplicados";
 
 export const listarAlumnosQuery = z
   .object({
-    busqueda: z.string().trim().optional(),          // legajo, nombre, apellido o dni
+    busqueda: z.string().trim().optional(), // legajo, nombre, apellido o dni
     nivelEducativo: z.enum(["Primario", "Secundario", "Universitario"]).optional(),
+    materiaInteresId: z.coerce.number().int().positive().optional(),
     estado: z.enum(["activo", "inactivo"]).optional(),
+    verInactivos: booleanQuery.optional(),
   })
   .strict();
 
 
 // ─── 2b. Request: aviso de posible duplicado ─────────────────────────────
-// Se llama antes de confirmar el alta. Devuelve los alumnos que coinciden; si
-// el array viene vacío, no hay nada que avisar.
 
 export const posiblesDuplicadosQuery = z
   .object({
@@ -52,25 +70,23 @@ export const posiblesDuplicadosQuery = z
   .strict();
 
 
-// ─── 2c. Request: alta y edición ─────────────────────────────────────────
-// `fechaNacimiento` viaja como "yyyy-mm-dd" (lo que produce un <input
-// type="date">), no como timestamp: es una fecha, no un instante.
-// Los tres campos del responsable son nullable: el front manda null cuando el
-// alumno es mayor y el formulario ni siquiera muestra esa sección.
+// ─── 2c. Request: alta, edición y baja ───────────────────────────────────
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const TELEFONO = /^\d{10,11}$/;
 const DOCUMENTO = /^\d{7,8}$/;
 
-/** Años cumplidos a la fecha de hoy. Misma cuenta que `age()` en la base. */
+/** Años cumplidos a la fecha de hoy en huso horario de Argentina. */
 function edad(fechaNacimiento: string): number {
-  const nacimiento = new Date(`${fechaNacimiento}T00:00:00`);
-  const hoy = new Date();
-  let anios = hoy.getFullYear() - nacimiento.getFullYear();
-  const mes = hoy.getMonth() - nacimiento.getMonth();
-  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) anios--;
+  const [anioNac, mesNac, diaNac] = fechaNacimiento.split("-").map(Number);
+  const [anioHoy, mesHoy, diaHoy] = hoyAR().split("-").map(Number);
+  let anios = anioHoy - anioNac;
+  if (mesHoy < mesNac || (mesHoy === mesNac && diaHoy < diaNac)) anios--;
   return anios;
 }
+
+const emptyToNull = (val: unknown) =>
+  typeof val === "string" && val.trim() === "" ? null : val;
 
 const camposAlumno = z
   .object({
@@ -80,52 +96,91 @@ const camposAlumno = z
     fechaNacimiento: z
       .string()
       .regex(FECHA, "La fecha debe tener formato aaaa-mm-dd.")
-      .refine((v) => v <= new Date().toISOString().slice(0, 10), {
+      .refine((v) => v <= hoyAR(), {
         message: "La fecha de nacimiento no puede ser futura.",
       }),
     telefono: z
       .string()
       .trim()
       .regex(TELEFONO, "El teléfono debe tener 10 u 11 dígitos, sin guiones."),
-    email: z.string().trim().max(120).email().nullable().default(null),
+    email: z.preprocess(
+      emptyToNull,
+      z.string().trim().max(120).email("Email inválido.").nullable().optional().default(null)
+    ),
     nivelEducativo: z.enum(["Primario", "Secundario", "Universitario"]),
-    responsableNombre: z.string().trim().max(100).nullable().default(null),
-    responsableDni: z
-      .string()
-      .trim()
-      .regex(DOCUMENTO, "El DNI del responsable debe tener 7 u 8 dígitos.")
-      .nullable()
-      .default(null),
-    responsableTelefono: z
-      .string()
-      .trim()
-      .regex(TELEFONO, "El teléfono del responsable debe tener 10 u 11 dígitos, sin guiones.")
-      .nullable()
-      .default(null),
+    responsableNombre: z.preprocess(
+      emptyToNull,
+      z.string().trim().max(100).nullable().optional().default(null)
+    ),
+    responsableDni: z.preprocess(
+      emptyToNull,
+      z.string().trim().regex(DOCUMENTO, "El DNI del responsable debe tener 7 u 8 dígitos.").nullable().optional().default(null)
+    ),
+    responsableTelefono: z.preprocess(
+      emptyToNull,
+      z.string().trim().regex(TELEFONO, "El teléfono del responsable debe tener 10 u 11 dígitos.").nullable().optional().default(null)
+    ),
+    institucionOrigen: z.preprocess(
+      emptyToNull,
+      z.string().trim().max(100, "La institución no puede superar 100 caracteres.").nullable().optional().default(null)
+    ),
+    observacionesGenerales: z.preprocess(
+      emptyToNull,
+      z.string().trim().max(250, "Las observaciones no pueden superar 250 caracteres.").nullable().optional().default(null)
+    ),
+    materiasInteresIds: z
+      .array(z.number().int().positive())
+      .optional()
+      .default([]),
   })
   .strict()
-  // ck_alumno_responsable_menor, del lado del front. El `path` hace que el
-  // error caiga en el input que falta, no en el formulario entero.
   .superRefine((v, ctx) => {
-    if (edad(v.fechaNacimiento) >= 18) return;
-    const obligatorios = [
+    const esMenor = edad(v.fechaNacimiento) < 18;
+    const resp = [
       ["responsableNombre", v.responsableNombre],
       ["responsableDni", v.responsableDni],
       ["responsableTelefono", v.responsableTelefono],
     ] as const;
-    for (const [campo, valor] of obligatorios) {
-      if (!valor) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [campo],
-          message: "Dato obligatorio para un alumno menor de edad.",
-        });
+
+    if (esMenor) {
+      // Menor de 18: los tres datos son obligatorios
+      for (const [campo, valor] of resp) {
+        if (!valor) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [campo],
+            message: "Dato obligatorio para un alumno menor de 18 años.",
+          });
+        }
+      }
+    } else {
+      // Mayor de 18: regla "todo o nada"
+      const completados = resp.filter(([, val]) => Boolean(val)).length;
+      if (completados > 0 && completados < 3) {
+        for (const [campo, valor] of resp) {
+          if (!valor) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: [campo],
+              message: "Si se cargan datos del responsable, deben completarse nombre, DNI y teléfono.",
+            });
+          }
+        }
       }
     }
   });
 
 export const crearAlumnoBody = camposAlumno;
 export const editarAlumnoBody = camposAlumno;
+
+/** Body opcional para confirmar la baja lógica aun cuando el alumno posee deuda pendiente. */
+export const inactivarAlumnoBody = z
+  .object({
+    confirmarConDeuda: z.boolean().optional().default(false),
+  })
+  .strict();
+
+export const reactivarAlumnoBody = z.object({}).strict();
 
 
 // ─── 3. Tipos derivados ──────────────────────────────────────────────────
@@ -134,15 +189,13 @@ export type CrearAlumnoBody = z.input<typeof crearAlumnoBody>;
 export type CrearAlumnoInput = z.output<typeof crearAlumnoBody>;
 export type EditarAlumnoBody = z.input<typeof editarAlumnoBody>;
 export type EditarAlumnoInput = z.output<typeof editarAlumnoBody>;
+export type InactivarAlumnoBody = z.input<typeof inactivarAlumnoBody>;
+export type InactivarAlumnoInput = z.output<typeof inactivarAlumnoBody>;
 export type ListarAlumnosQuery = z.output<typeof listarAlumnosQuery>;
 export type PosiblesDuplicadosQuery = z.output<typeof posiblesDuplicadosQuery>;
 
 
 // ─── 4. Response ─────────────────────────────────────────────────────────
-// `legajo` lo genera la base (ALU-000123): no se manda en el body, vuelve en la
-// response. Por eso el front pinta lo que devolvió la API y no su borrador.
-// El responsable viaja agrupado en un objeto (o null): las tres columnas de la
-// base son un solo concepto en pantalla.
 
 export type NivelEducativo = "Primario" | "Secundario" | "Universitario";
 export type EstadoAlumno = "activo" | "inactivo";
@@ -161,6 +214,12 @@ export type AlumnoResponse = {
   nivelEducativo: NivelEducativo;
   responsable: { nombre: string; dni: string; telefono: string } | null;
   estado: EstadoAlumno;
+  /** Ficha ampliada (HU-ALU-02) */
+  institucionOrigen: string | null;
+  observacionesGenerales: string | null;
+  materiasInteres: { id: number; nombre: string }[];
+  /** Indica si posee clases dictadas impagas (HU-ALU-02: advertencia previa a la baja). */
+  deudaPendiente: boolean;
   /** ISO 8601. */
   fechaCreacion: string;
   /** ISO 8601. */
@@ -175,8 +234,12 @@ export type AlumnoOpcion = Pick<AlumnoResponse, "id" | "legajo" | "nombre" | "ap
 
 export type ErrorAlumno =
   | "DNI_DUPLICADO"              // 409, uq_alumno_dni_activo
-  | "RESPONSABLE_REQUERIDO"      // 422, menor de 18 sin datos del responsable
+  | "RESPONSABLE_REQUERIDO"      // 422, menor de 18 sin datos completos del responsable
   | "FECHA_NACIMIENTO_INVALIDA"  // 422, futura
-  | "ALUMNO_CON_TURNOS_FUTUROS"  // 409, al inactivar
+  | "ALUMNO_CON_TURNOS_FUTUROS"  // 409, al inactivar si tiene reservas futuras (datos: { cantidadTurnosFuturos })
+  | "ALUMNO_CON_DEUDA"           // 409, al inactivar con deuda si no envió confirmarConDeuda: true
+  | "MATERIA_INTERES_INACTIVA"   // 422, al intentar agregar una nueva materia dada de baja
+  | "ALUMNO_YA_INACTIVO"         // 409
+  | "ALUMNO_YA_ACTIVO"           // 409
   | "NO_ENCONTRADO"              // 404
   | "DATOS_INVALIDOS";           // 422
