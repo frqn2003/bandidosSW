@@ -82,9 +82,16 @@ export interface DbTables {
     responsable_nombre: string | null;
     responsable_dni: string | null;
     responsable_telefono: string | null;
+    institucion_origen: string | null;
+    observaciones_generales: string | null;
     estado: EstadoActivoInactivo;  // auto (default)
     created_at: Date | string;  // auto (default)
     updated_at: Date | string;  // auto (default)
+  };
+  alumno_materia_interes: {
+    id: number;  // auto (identity)
+    alumno_id: number;
+    materia_id: number;
   };
   auditoria: {
     id: string;  // auto (default)

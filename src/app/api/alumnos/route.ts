@@ -13,8 +13,18 @@ export const GET = withRoute(async ({ req }) => {
   const nivelEducativo = sp.get("nivelEducativo")?.trim();
   if (nivelEducativo && nivelEducativo !== "Todos") raw.nivelEducativo = nivelEducativo;
 
+  const materiaInteresId = sp.get("materiaInteresId")?.trim();
+  if (materiaInteresId && materiaInteresId !== "todas" && materiaInteresId !== "0") {
+    raw.materiaInteresId = materiaInteresId;
+  }
+
   const estado = sp.get("estado")?.trim().toLowerCase();
   if (estado && estado !== "todos") raw.estado = estado;
+
+  const verInactivos = sp.get("verInactivos");
+  if (verInactivos !== null && verInactivos !== undefined) {
+    raw.verInactivos = verInactivos;
+  }
 
   const filtros = listarAlumnosQuery.parse(raw);
   return ok(await service.listar(filtros));
