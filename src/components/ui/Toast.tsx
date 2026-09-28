@@ -1,7 +1,6 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { CheckCircle2, AlertCircle, X } from "lucide-react";
 import {
   createContext,
   useCallback,
@@ -11,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { Icon } from "@/components/ui/Icon";
 
 export type ToastType = "success" | "error";
 
@@ -70,31 +70,25 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               transition={{ duration: reduceMotion ? 0 : 0.25, ease: "easeOut" }}
               className={`pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-md border px-4 py-3 ${
                 toast.type === "success"
-                  ? "border-brand-700 bg-brand-900 shadow-[0_8px_24px_rgba(17,79,60,0.28)]"
-                  : "border-red-700 bg-destructive shadow-[0_8px_24px_rgba(220,38,38,0.28)]"
+                  ? "border-status-success-strong bg-status-success-strong"
+                  : "border-error bg-error"
               }`}
             >
               {toast.type === "success" ? (
-                <CheckCircle2
-                  className="mt-0.5 h-5 w-5 shrink-0 text-accent-500"
-                  aria-hidden="true"
-                />
+                <Icon name="check_circle" size={20} className="mt-0.5 shrink-0 text-on-primary" />
               ) : (
-                <AlertCircle
-                  className="mt-0.5 h-5 w-5 shrink-0 text-cream-50"
-                  aria-hidden="true"
-                />
+                <Icon name="error" size={20} className="mt-0.5 shrink-0 text-on-error" />
               )}
-              <p className="flex-1 text-sm font-bold text-cream-50">
+              <p className="flex-1 text-sm font-bold text-on-primary">
                 {toast.message}
               </p>
               <button
                 type="button"
                 onClick={() => dismiss(toast.id)}
                 aria-label="Cerrar notificación"
-                className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-pill text-cream-50/70 transition-colors duration-fast ease-out hover:bg-cream-50/15 hover:text-cream-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream-50"
+                className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-primary/70 transition-colors duration-fast ease-out hover:bg-on-primary/15 hover:text-on-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-primary"
               >
-                <X className="h-4 w-4" aria-hidden="true" />
+                <Icon name="close" size={16} />
               </button>
             </motion.div>
           ))}

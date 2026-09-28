@@ -8,16 +8,16 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
-# AGENTS.md — Huellitas Felices
+# AGENTS.md — Centro Académico
 
 Guía de trabajo para agentes de IA en este repositorio. Es el acuerdo del equipo de diseño (Scrum) antes de pasar a backend.
 
 ## Proyecto
 
-- **Producto:** Huellitas Felices — sistema ERP de gestión veterinaria (consultas, turnos, fichas clínicas, vacunación, stock, facturación).
+- **Producto:** Centro Académico — sistema de gestión académica (alumnos, docentes, turnos, asistencia, cobranzas, reportes).
 - **Rol del equipo:** diseñadores UI/UX. Las interfaces se construyen **hardcodeadas** en el front para pasarlas después al equipo de backend.
 - **Stack:** Next.js + React (frontend), SQL (backend/datos, lo maneja el equipo de back).
-- **Control de versiones:** Git + GitHub (repo `huellitas-felices`).
+- **Control de versiones:** Git + GitHub (repo `bandidosSW`).
 
 ## Estilo de respuesta
 
@@ -26,24 +26,22 @@ Guía de trabajo para agentes de IA en este repositorio. Es el acuerdo del equip
 
 ## Documentación de referencia
 
-- `docs/COMO-USAR.md` — guía del equipo: comandos OpenCode (`/brief`, `/disenar`, `/subir`), instalación de Engram + Gentle AI en una PC nueva, y comandos rápidos de memoria.
+- `docs/COMO-USAR.md` — guía del equipo: comandos OpenCode (`/brief`, `/disenar`, `/subir`).
 - `docs/briefs/` (base `_plantilla.md`) — briefs por pantalla (HU + wireframe + datos + criterios de aceptación); son el insumo de `/disenar`.
-- `docs/design-system-pet-bliss-style.md` — design system "Pet Bliss Style": tokens de color, tipografía, spacing, grid, radius, motion y reglas de composición. **Es la fuente de verdad del lenguaje visual (versión humana).**
-- `design-system/huellitas-felices/MASTER.md` — design system "Pet Bliss" en el formato de la skill ui-ux-pro-max (**versión para la skill**). Ver "Regla de tokens" abajo.
-- `design-system/huellitas-felices/componentes.md` — inventario de componentes de `src/components/`. Consultarlo **antes de crear componentes** y actualizarlo al crear/extender.
-- `docs/errores-comunes.md` — log de errores/lecciones del equipo. Leer sus "Reglas activas" al diseñar; se alimenta **automáticamente** durante `/disenar` (ya no existe el comando `/error`).
+- `design-system/bandidossw/MASTER.md` — design system Material Design 3 (tokens de color, tipografía, spacing, radius, motion).
+- `design-system/bandidossw/componentes.md` — inventario de componentes de `src/components/`. Consultarlo **antes de crear componentes** y actualizarlo al crear/extender.
+- `docs/capa-de-datos-front.md` — cómo se conectan las pantallas a los datos (`src/data/<entidad>.ts`) para que el día que existan los endpoints no haya que reescribir la pantalla. Léelo antes de codear una pantalla nueva.
+- `docs/errores-comunes.md` — log de errores/lecciones del equipo.
 
 ## Workflow obligatorio (comando `/disenar`)
 
-El flujo completo diseño → código → verificación corre con el comando **`/disenar <brief>`** (`.opencode/command/disenar.md`) sobre un brief de `docs/briefs/`. En resumen:
+El flujo completo diseño → código → verificación corre con el comando **`/disenar <brief>`** (`.opencode/commands/disenar.md`) sobre un brief de `docs/briefs/`. En resumen:
 
-1. **Wondel.ai (skill UX)** → auditar wireframe/flujo antes de visual: usabilidad, jerarquía, heurísticas de Nielsen/Norman/Krug.
-2. **UI/UX Pro Max (skill visual)** → generar y pulir visualmente los componentes.
-3. **Verificación técnica** → `npm run lint` + `npx tsc --noEmit` + checklist de accesibilidad sobre el código (sin navegador).
+1. **Audit UX** → evaluar wireframe/flujo antes de visual: usabilidad, jerarquía, heurísticas de Nielsen/Krug.
+2. **Visual MD3** → generar y pulir visualmente los componentes con tokens Material Design 3.
+3. **Verificación técnica** → `npm run lint` + `npx tsc --noEmit` + checklist de accesibilidad sobre el código.
 
-> Regla del equipo: **ui-ux-pro-max** es la skill visual que genera. La verificación de que la pantalla funciona se hace con la skill **browser-automation** (headless browser) en el paso 6b de `/disenar` — sin instalar nuevas dependencias.
-> Antes de codear: **buscar y reusar componentes** existentes (ver inventario en `design-system/huellitas-felices/componentes.md`); extender antes que duplicar.
-> Las skills se activan cuando el pedido coincide con su descripción: para activación garantizada, nombrarlas explícitamente (ej: "usá la skill ux-heuristics").
+> Antes de codear: **buscar y reusar componentes** existentes (ver inventario en `design-system/bandidossw/componentes.md`); extender antes que duplicar.
 
 ## Control de versiones
 
@@ -53,28 +51,28 @@ El flujo completo diseño → código → verificación corre con el comando **`
 ## Log de errores
 
 - Los errores/lecciones del equipo viven en `docs/errores-comunes.md`. El agente los consulta al diseñar y verifica las "Reglas activas" en la verificación técnica.
-- El log se alimenta **automáticamente** durante `/disenar` (pasos 6/7): si se detecta un error, el agente lo registra sin esperar a que el usuario lo haga. Ya no existe el comando `/error`.
+- El log se alimenta **automáticamente** durante `/disenar` (pasos 6/7): si se detecta un error, el agente lo registra sin esperar a que el usuario lo haga.
 
-## Regla de tokens (IMPORTANTE)
+## Design System (resumen ejecutivo)
 
-Cuando se use la skill `ui-ux-pro-max`, leer SIEMPRE `design-system/huellitas-felices/MASTER.md`. Sus reglas **reemplazan** a los catálogos genéricos de las skills (paletas, tipografías, estilos de sus catálogos NO se usan). Los tokens Pet Bliss del MASTER son obligatorios.
+Tokens y reglas completos en `design-system/bandidossw/MASTER.md`. En resumen:
 
-- Si existe `design-system/huellitas-felices/pages/[página].md`, ese archivo tiene prioridad sobre el MASTER para esa página.
-- Para el razonamiento completo detrás de cada token, ver `docs/design-system-pet-bliss-style.md` (la versión humana).
-- La paleta vive en 2 lugares sincronizados: `docs/` (humana) y `design-system/huellitas-felices/` (para la skill). Si cambia una, actualizar la otra.
-
-## Design system (resumen ejecutivo)
-
-Tokens y reglas completos en `design-system/huellitas-felices/MASTER.md` (operativo, el que usa la skill) y `docs/design-system-pet-bliss-style.md` (razonamiento humano, 50 secciones). En resumen: fondo crema `#FFF9EB`, brand verde bosque `#114F3C`, acción amarillo `#F9A900` (**solo CTAs y highlights, debe ser escaso**), headings Baloo 2 pesados/uppercase + body Nunito, radios 8/12/16px + pill, sombras discretas, motion 150/250/500ms respetando `prefers-reduced-motion`.
+- **Primary:** `#00236f` (azul oscuro navy) → CTAs, sidebar activo, headers
+- **Secondary:** `#0058be` (azul medio) → links, acentos, CTAs secundarios
+- **Tertiary:** `#340081` (púrpura) → acentos
+- **Background:** `#f8f9ff` (fondo general)
+- **Font:** Inter (400-700)
+- **Icons:** Material Symbols Outlined
+- **Spacing:** custom (2xs a 2xl + gutter + margin)
+- **Border radius:** 2px / 4px / 8px / 12px
 
 ## Reglas técnicas
 
 - Componentes **reutilizables** (pensados 1 a 1 para React), no pantallas sueltas.
 - Usar los tokens del design system vía Tailwind (`src/app/globals.css`, tema `@theme`) — no colores hardcodeados en componentes.
-- Iconografía: **Lucide** (outline, stroke medio, esquinas redondeadas).
-- Animaciones: **Framer Motion**.
+- Iconografía: **Material Symbols Outlined** (outline, stroke medio, esquinas redondeadas).
 - Accesibilidad: contraste verificado, focus visible, touch targets ≥ 44×44px, `alt` en imágenes.
-- Verificación: `npm run lint` (cubre solo `src/`; `.opencode/skills/` y `.agents/skills/` quedan fuera de alcance) + `npx tsc --noEmit` (no hay scripts de `typecheck` ni test runner; `tsconfig.json` ya tiene `noEmit: true`).
+- Verificación: `npm run lint` + `npx tsc --noEmit`.
 - Antes de subir: comprimir imágenes (TinyPNG).
 - Idioma de la UI: español.
 - **Preparación para backend**: los datos placeholder llevan `id` numérico (la PK que mandará la base). Cada punto de integración (fetch, POST/PUT/PATCH/DELETE, selects de catálogos) lleva un comentario `// BACKEND:` con el endpoint y qué reemplazar. El equipo de back los busca con `grep -rn "BACKEND" src/`.

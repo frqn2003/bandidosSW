@@ -47,10 +47,10 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         {label && (
           <label
             htmlFor={textareaId}
-            className="text-sm font-bold text-text-primary"
+            className="text-sm font-bold text-on-surface"
           >
             {label}
-            {requiredMark && <span className="text-destructive"> *</span>}
+            {requiredMark && <span className="text-error"> *</span>}
           </label>
         )}
         <textarea
@@ -59,15 +59,15 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           rows={rows}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy || undefined}
-          className={`min-h-11 resize-none overflow-y-auto rounded-sm border bg-surface px-4 py-2.5 text-base text-text-primary transition-colors duration-fast ease-out placeholder:text-text-secondary focus:border-brand-900 focus:outline-none focus:ring-2 focus:ring-brand-900/20 disabled:cursor-not-allowed disabled:bg-cream-100 disabled:opacity-70 ${error ? "border-destructive" : "border-border"} ${className}`}
+          className={`min-h-11 resize-none overflow-y-auto rounded-sm border bg-surface-container-low px-4 py-2.5 text-base text-on-surface transition-colors duration-fast ease-out placeholder:text-on-surface-variant focus:border-secondary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-secondary/20 disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:opacity-70 ${error ? "border-error" : "border-outline-variant"} ${className}`}
           {...props}
         />
         {error ? (
-          <p id={errorId} role="alert" className="text-sm font-semibold text-destructive">
+          <p id={errorId} role="alert" className="text-sm font-semibold text-error">
             {error}
           </p>
         ) : hint ? (
-          <p id={hintId} className="text-xs font-medium text-text-secondary">
+          <p id={hintId} className="text-xs font-medium text-on-surface-variant">
             {hint}
           </p>
         ) : null}

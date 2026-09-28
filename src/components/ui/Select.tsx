@@ -7,12 +7,18 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   error?: string;
   hint?: string;
   id?: string;
+  /**
+   * Clases del contenedor (label + select + mensajes). `className` va al
+   * <select>; para dimensionarlo dentro de un flex/grid (flex-1, min-w-0,
+   * w-40…) hay que usar esta, porque el hijo del layout es el contenedor.
+   */
+  wrapperClassName?: string;
   children: React.ReactNode;
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   function Select(
-    { label, requiredMark = false, error, hint, id, children, className = "", ...props },
+    { label, requiredMark = false, error, hint, id, children, className = "", wrapperClassName = "", ...props },
     ref,
   ) {
     const selectId = id ?? label?.toLowerCase().replace(/\s+/g, "-");
@@ -23,14 +29,14 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       .join(" ");
 
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className={`flex flex-col gap-1.5 ${wrapperClassName}`}>
         {label && (
           <label
             htmlFor={selectId}
-            className="text-sm font-bold text-text-primary"
+            className="text-sm font-bold text-on-surface"
           >
             {label}
-            {requiredMark && <span className="text-destructive"> *</span>}
+            {requiredMark && <span className="text-error"> *</span>}
           </label>
         )}
         <select
@@ -38,18 +44,18 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           id={selectId}
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy || undefined}
-          className={`h-11 min-h-11 cursor-pointer rounded-sm border bg-surface px-4 text-base text-text-primary transition-colors duration-fast ease-out focus:border-brand-900 focus:outline-none focus:ring-2 focus:ring-brand-900/20 disabled:cursor-not-allowed disabled:bg-cream-100 disabled:opacity-70 ${error ? "border-destructive" : "border-border"} ${className}`}
+          className={`h-11 min-h-11 cursor-pointer rounded-sm border bg-surface-container-low px-4 text-base text-on-surface transition-colors duration-fast ease-out focus:border-secondary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-secondary/20 disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:opacity-70 ${error ? "border-error" : "border-outline-variant"} ${className}`}
           {...props}
         >
           {children}
         </select>
         {error && (
-          <p id={errorId} role="alert" className="text-sm font-semibold text-destructive">
+          <p id={errorId} role="alert" className="text-sm font-semibold text-error">
             {error}
           </p>
         )}
         {!error && hint && (
-          <p id={hintId} className="text-xs font-medium text-text-secondary">
+          <p id={hintId} className="text-xs font-medium text-on-surface-variant">
             {hint}
           </p>
         )}

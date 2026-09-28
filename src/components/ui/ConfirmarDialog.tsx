@@ -1,8 +1,8 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
+import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 
 // Dialog de confirmación (regla Pet Bliss: acciones destructivas y cambios
@@ -23,6 +23,17 @@ interface ConfirmarDialogProps {
   tone?: ConfirmarTone;
   onClose: () => void;
   onConfirm: () => void;
+  /** Contenido opcional adicional (ej: aviso de cantidad de turnos en la baja). */
+  children?: ReactNode;
+  /**
+   * true mientras se envía la confirmación: deshabilita los dos botones para no
+   * mandar la operación dos veces (ej: reserva de turno, HU-TUR-01). Opcional.
+   */
+  confirmando?: boolean;
+  /** Texto del botón mientras `confirmando` es true. Default: `confirmLabel`. */
+  confirmandoLabel?: string;
+  /** Deshabilita el botón de confirmar sin estado de envío (ej: falta completar un campo del `children`). */
+  confirmDisabled?: boolean;
 }
 
 const TONES: Record<
@@ -30,19 +41,19 @@ const TONES: Record<
   { icon: ReactNode; variant: "destructive" | "primary" | "secondary"; iconClass: string }
 > = {
   danger: {
-    icon: <AlertTriangle className="h-5 w-5" aria-hidden="true" />,
+    icon: <Icon name="warning" size={20} />,
     variant: "destructive",
-    iconClass: "text-destructive",
+    iconClass: "text-error",
   },
   success: {
-    icon: <CheckCircle2 className="h-5 w-5" aria-hidden="true" />,
+    icon: <Icon name="check_circle" size={20} />,
     variant: "primary",
     iconClass: "text-status-success-strong",
   },
   neutral: {
-    icon: <Info className="h-5 w-5" aria-hidden="true" />,
+    icon: <Icon name="info" size={20} />,
     variant: "secondary",
-    iconClass: "text-text-secondary",
+    iconClass: "text-on-surface-variant",
   },
 };
 
@@ -51,27 +62,47 @@ export function ConfirmarDialog({
   title,
   description,
   confirmLabel,
-  cancelLabel = "Volver",
+  cancelLabel = "Cancelar",
   tone = "danger",
   onClose,
   onConfirm,
+  children,
+  confirmando = false,
+  confirmandoLabel,
+  confirmDisabled = false,
 }: ConfirmarDialogProps) {
   const style = TONES[tone];
+  // Mientras se envía no se puede cerrar (Escape / fondo): el resultado tiene
+  // que llegar a una pantalla que lo muestre.
+  const cerrar = () => {
+    if (!confirmando) onClose();
+  };
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={cerrar}
       title={title}
       icon={<span className={style.iconClass}>{style.icon}</span>}
       maxWidth="max-w-md"
       footer={
         <>
-          <Button type="button" variant="outline" onClick={onClose}>{cancelLabel}</Button>
-          <Button type="button" variant={style.variant} onClick={onConfirm}>{confirmLabel}</Button>
+          <Button type="button" variant="outline" onClick={cerrar} disabled={confirmando}>
+            {cancelLabel}
+          </Button>
+          <Button
+            type="button"
+            variant={style.variant}
+            onClick={onConfirm}
+            disabled={confirmando || confirmDisabled}
+            aria-busy={confirmando || undefined}
+          >
+            {confirmando ? (confirmandoLabel ?? confirmLabel) : confirmLabel}
+          </Button>
         </>
       }
     >
-      <p className="text-sm text-text-secondary">{description}</p>
+      <p className="text-sm text-on-surface-variant">{description}</p>
+      {children}
     </Modal>
   );
 }
