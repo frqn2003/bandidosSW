@@ -24,7 +24,7 @@
  * Solo lee. No modifica la base.
  */
 
-import { writeFile } from "node:fs/promises";
+import { writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
@@ -280,6 +280,7 @@ ${v.definition.trim()}
     partes.push("");
   }
 
+  await mkdir(dirname(SALIDA), { recursive: true });
   await writeFile(SALIDA, partes.join("\n"), "utf8");
 
   console.log(`✓ db/schema.sql actualizado`);
