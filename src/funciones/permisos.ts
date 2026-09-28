@@ -45,7 +45,7 @@ export type Modulo = {
 
 /** El orden de este array es el orden del menú. */
 export const MODULOS: Modulo[] = [
-  { id: "dashboard", label: "Dashboard", href: "#", icon: "dashboard", construido: false },
+  { id: "dashboard", label: "Dashboard", href: "/reportes", icon: "dashboard", construido: true },
   { id: "sedes", label: "Sedes", href: "#", icon: "location_city", construido: false },
   {
     id: "calendario",
@@ -73,7 +73,7 @@ export const MODULOS: Modulo[] = [
   { id: "materias", label: "Materias", href: "/materias", icon: "menu_book", construido: true },
   { id: "cobranzas", label: "Cobranzas", href: "#", icon: "receipt_long", construido: false },
   { id: "usuarios", label: "Usuarios", href: "/usuarios", icon: "manage_accounts", construido: true },
-  { id: "reportes", label: "Reportes", href: "#", icon: "settings", construido: false },
+  { id: "reportes", label: "Reportes", href: "/reportes", icon: "analytics", construido: true },
 ];
 
 /**
