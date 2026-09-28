@@ -132,7 +132,7 @@ export function DeactivateUserModal({ open, user, onClose, onConfirm }: Deactiva
             maxLength={200}
             className="min-h-[100px] rounded-sm border border-outline-variant bg-surface-container-lowest p-3 text-sm text-on-surface focus:border-secondary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-secondary/20"
           />
-          <p className="text-xs text-on-surface-variant">Obligatorio solo cuando el motivo es "Otro".</p>
+          <p className="text-xs text-on-surface-variant">Obligatorio solo cuando el motivo es &quot;Otro&quot;.</p>
         </div>
 
         <label className="flex items-center gap-3 mt-1 cursor-pointer">

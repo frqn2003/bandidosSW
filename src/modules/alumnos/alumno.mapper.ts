@@ -34,6 +34,10 @@ export function toApi(row: AlumnoRow): AlumnoResponse {
     nivelEducativo: row.nivel_educativo,
     responsable,
     estado: row.estado,
+    institucionOrigen: (row as unknown as { institucion_origen?: string }).institucion_origen ?? null,
+    observacionesGenerales: (row as unknown as { observaciones_generales?: string }).observaciones_generales ?? null,
+    materiasInteres: [],
+    deudaPendiente: false,
     fechaCreacion:
       row.created_at instanceof Date
         ? row.created_at.toISOString()

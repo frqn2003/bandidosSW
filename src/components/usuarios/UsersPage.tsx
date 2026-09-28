@@ -82,7 +82,7 @@ export function UsersPage() {
 
   const handleSaveUser = (userData: Omit<User, "id" | "status">) => {
     if (formModal.modo === "INSERCION") {
-      addUser({ ...userData });
+      addUser({ ...userData, status: "Activo" });
       const tempPass = Math.random().toString(36).slice(-8).toUpperCase();
       setCreatedUserAuth({ email: userData.email, tempPass });
     } else if (formModal.modo === "EDICION" && formModal.user) {
@@ -202,8 +202,9 @@ export function UsersPage() {
               <button
                 type="button"
                 onClick={handleLimpiarFiltros}
-                className="flex h-11 items-center px-4 text-sm font-semibold text-secondary transition-colors hover:bg-secondary/10 hover:text-primary rounded-sm"
+                className="flex h-11 cursor-pointer items-center gap-2 rounded-sm border border-secondary bg-white px-3.5 text-sm font-bold text-secondary shadow-xs transition-colors hover:bg-secondary/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
               >
+                <Icon name="filter_alt_off" size={18} className="text-secondary" />
                 Limpiar filtros
               </button>
             </div>
