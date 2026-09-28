@@ -9,6 +9,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { FranjasHorarias } from "@/components/turnos/FranjasHorarias";
+import { BarraModificaciones } from "@/components/turnos/BarraModificaciones";
 import { hoyAR } from "@/contracts/alumno";
 import { ApiError, mensajeDeError } from "@/lib/api-client";
 import { formatearFecha } from "@/funciones/formato";
@@ -46,6 +47,8 @@ type Errores = Partial<Record<CampoError, string>>;
 interface EditarTurnoModalProps {
   turno: TurnoResponse | null;
   open: boolean;
+  /** Tope de modificaciones (`parametro.max_modificaciones_turno`) para la barra. */
+  maxModificaciones: number;
   onClose: () => void;
   /** El turno que devolvió modificarTurno (ya con el contador +1). */
   onGuardado: (turno: TurnoResponse) => void;
@@ -58,7 +61,13 @@ function diffVacio() {
 const DIAS_CORTOS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
 const diaCorto = (iso: string) => DIAS_CORTOS[new Date(`${iso}T00:00:00`).getDay()];
 
-export function EditarTurnoModal({ turno, open, onClose, onGuardado }: EditarTurnoModalProps) {
+export function EditarTurnoModal({
+  turno,
+  open,
+  maxModificaciones,
+  onClose,
+  onGuardado,
+}: EditarTurnoModalProps) {
   const [profesores, setProfesores] = useState<Carga<ProfesorEdicionOpcion> | null>(null);
   const [franjas, setFranjas] = useState<Carga<FranjaTurnoResponse> | null>(null);
   const [sugerencia, setSugerencia] = useState<{ clave: string; valor: SugerenciaFranja | null } | null>(null);
@@ -287,6 +296,13 @@ export function EditarTurnoModal({ turno, open, onClose, onGuardado }: EditarTur
         }
       >
         <div className="flex flex-col gap-5">
+          {/* Arriba del todo: la restricción se ve ANTES de tocar los campos. */}
+          <BarraModificaciones
+            cantidad={turno.cantidadModificaciones}
+            maxModificaciones={maxModificaciones}
+            leyenda="El horario original se libera recién al confirmar."
+          />
+
           {cargandoProfesores || profesores?.error ? (
             <div className="rounded-sm border border-outline-variant bg-surface-container px-4 py-3 text-sm">
               {profesores?.error

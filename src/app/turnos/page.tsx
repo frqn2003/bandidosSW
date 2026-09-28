@@ -302,6 +302,7 @@ function TurnosContent() {
       <EditarTurnoModal
         open={editar !== null}
         turno={editar}
+        maxModificaciones={maxModificaciones}
         onClose={() => setEditar(null)}
         onGuardado={(t) => {
           guardado(t, `Turno ${t.codigo} modificado.`);

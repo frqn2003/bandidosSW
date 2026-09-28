@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
-import { ContadorModificaciones } from "@/components/turnos/ContadorModificaciones";
+import { BarraModificaciones } from "@/components/turnos/BarraModificaciones";
 import { EstadoTurnoBadge } from "@/components/turnos/EstadoTurnoBadge";
 import { ResumenReserva, type DatoReserva } from "@/components/turnos/ResumenReserva";
 import { estadoVisibleDe } from "@/funciones/estado-turno";
@@ -75,7 +75,12 @@ export function DetalleTurnoModal({ turno, open, onClose, maxModificaciones }: D
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-on-surface-variant">
             Historial de modificaciones
           </p>
-          <ContadorModificaciones cantidad={turno.cantidadModificaciones} maxModificaciones={maxModificaciones} />
+          {/* Mismo componente que en EditarTurnoModal: el contador y la barra
+              salen de la misma fuente, así que acá no se duplica el "1/2". */}
+          <BarraModificaciones
+            cantidad={turno.cantidadModificaciones}
+            maxModificaciones={maxModificaciones}
+          />
         </div>
       </div>
     </Modal>
