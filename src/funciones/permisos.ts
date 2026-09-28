@@ -72,7 +72,7 @@ export const MODULOS: Modulo[] = [
   { id: "mi-ficha", label: "Mi ficha", href: "#", icon: "badge", construido: false },
   { id: "materias", label: "Materias", href: "/materias", icon: "menu_book", construido: true },
   { id: "cobranzas", label: "Cobranzas", href: "#", icon: "receipt_long", construido: false },
-  { id: "usuarios", label: "Usuarios", href: "#", icon: "school", construido: false },
+  { id: "usuarios", label: "Usuarios", href: "/usuarios", icon: "manage_accounts", construido: true },
   { id: "reportes", label: "Reportes", href: "#", icon: "settings", construido: false },
 ];
 
