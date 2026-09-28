@@ -44,12 +44,12 @@ export function rangoMinimo() {
   return sumarDias(hoyAR(), -DIAS_HISTORIA_RANGO);
 }
 export function rangoMaximo() {
-  return sumarDias(hoyAR(), 60);
+  return sumarDias(hoyAR(), 90);
 }
 
 export function FILTROS_TURNOS_INICIALES(): FiltrosTurnosState {
   const hoy = hoyAR();
-  return { busqueda: "", estado: "", desde: sumarDias(hoy, -7), hasta: sumarDias(hoy, 7) };
+  return { busqueda: "", estado: "Reservado", desde: hoy, hasta: hoy };
 }
 
 interface FiltrosTurnosProps {
@@ -99,7 +99,7 @@ export function FiltrosTurnos({ estado, conteo, onChange, onLimpiar }: FiltrosTu
             <option value="Reservado">Reservado</option>
             <option value="Finalizado">Finalizado</option>
             <option value="Cancelado">Cancelado</option>
-            <option value="">Todos</option>
+            <option value="">Todos (incluye cancelados)</option>
           </Select>
         </div>
 

@@ -11,6 +11,7 @@ export interface AccionMenu {
   /** Acción destructiva (baja, eliminar): se pinta en rojo y va separada. */
   peligro?: boolean;
   disabled?: boolean;
+  title?: string;
 }
 
 interface MenuAccionesProps {
@@ -115,6 +116,7 @@ export function MenuAcciones({ acciones, ariaLabel }: MenuAccionesProps) {
       type="button"
       role="menuitem"
       disabled={a.disabled}
+      title={a.title}
       onClick={() => {
         cerrar();
         a.onSelect();

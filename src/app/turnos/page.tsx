@@ -304,6 +304,10 @@ function TurnosContent() {
         turno={editar}
         maxModificaciones={maxModificaciones}
         onClose={() => setEditar(null)}
+        onCancelarTurno={(t) => {
+          setEditar(null);
+          setCancelar(t);
+        }}
         onGuardado={(t) => {
           guardado(t, `Turno ${t.codigo} modificado.`);
           setEditar(null);

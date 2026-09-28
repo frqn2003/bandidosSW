@@ -72,9 +72,14 @@ export function DetalleTurnoModal({ turno, open, onClose, maxModificaciones }: D
         <ResumenReserva datos={datos} variante="grid" />
 
         <div className="border-t border-outline-variant pt-4">
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-on-surface-variant">
-            Historial de modificaciones
-          </p>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">
+              Historial de modificaciones
+            </p>
+            <span className="text-xs font-semibold text-on-surface-variant">
+              Modificado {turno.cantidadModificaciones} {turno.cantidadModificaciones === 1 ? "vez" : "veces"}
+            </span>
+          </div>
           {/* Mismo componente que en EditarTurnoModal: el contador y la barra
               salen de la misma fuente, así que acá no se duplica el "1/2". */}
           <BarraModificaciones

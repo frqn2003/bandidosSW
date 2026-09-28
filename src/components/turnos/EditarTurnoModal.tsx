@@ -30,14 +30,13 @@ import {
 // Modificación de turno en 2 pasos (HU-TUR-02).
 //
 // Paso 1 — formulario con los datos editables (profesor de la misma materia,
-// fecha, horario y observaciones).
-// Paso 2 — ConfirmarDialog con el resumen del cambio (caja "Antes → Después",
-// el "antes" lleva ícono de reloj y tachado) antes de ejecutar; en el paso 1 el
-// diff NO se muestra, solo se calcula para la confirmación.
+// fecha, horario y observaciones) + recuadro "Datos anteriores" a la derecha
+// que muestra el estado previo y se actualiza en vivo.
+// Paso 2 — ConfirmarDialog con el resumen del cambio (caja "Antes → Después")
+// antes de ejecutar.
 //
-// Profesor/fecha/horario, otras reglas de negocio (estado, pago, vencimiento,
-// tope de modificaciones) las revalida la capa de datos (modificarTurno)
-// como lo hará el back; la fila ya viene con `puedeModificar` off en esos casos.
+// Alumno y materia no se tocan (inmutables, criterio obligatorio).
+// La barra de modificaciones indica el cupo restante y la leyenda informativa.
 
 type Carga<T> = { clave: string; lista: T[]; error: boolean };
 
@@ -52,6 +51,8 @@ interface EditarTurnoModalProps {
   onClose: () => void;
   /** El turno que devolvió modificarTurno (ya con el contador +1). */
   onGuardado: (turno: TurnoResponse) => void;
+  /** Permite cancelar el turno directamente desde el modo edición (criterio HU-TUR-02). */
+  onCancelarTurno?: (turno: TurnoResponse) => void;
 }
 
 function diffVacio() {
@@ -67,6 +68,7 @@ export function EditarTurnoModal({
   maxModificaciones,
   onClose,
   onGuardado,
+  onCancelarTurno,
 }: EditarTurnoModalProps) {
   const [profesores, setProfesores] = useState<Carga<ProfesorEdicionOpcion> | null>(null);
   const [franjas, setFranjas] = useState<Carga<FranjaTurnoResponse> | null>(null);
@@ -133,7 +135,7 @@ export function EditarTurnoModal({
     };
   }, [claveFranjas, turno]);
 
-  // BACKEND: GET /api/turnos/proxima-franja?profesorId=&materiaId=&desde= (PENDIENTE CONTRATO)
+  // BACKEND: GET /api/turnos/proxima-franja?profesorId=&materiaId=&desde=
   useEffect(() => {
     if (!turno || !claveSugerencia) return;
     let cancelado = false;
@@ -171,7 +173,16 @@ export function EditarTurnoModal({
         ...franjasBase,
       ];
 
-  const profesorElegido = profesores?.lista.find((p) => String(p.id) === profesorId) ?? null;
+  const baseProfesores = profesores?.lista ?? [];
+  const listaProfesores =
+    turno && turno.profesor && !baseProfesores.some((p) => p.id === turno.profesor.id)
+      ? [
+          { id: turno.profesor.id, nombre: turno.profesor.nombre, apellido: turno.profesor.apellido },
+          ...baseProfesores,
+        ].sort((a, b) => a.apellido.localeCompare(b.apellido))
+      : baseProfesores;
+
+  const profesorElegido = listaProfesores.find((p) => String(p.id) === profesorId) ?? null;
   const franjasLibres = franjasMostrables.filter((f) => f.disponible).length;
   const sugerenciaActual = sugerencia?.clave === claveSugerencia ? sugerencia.valor : null;
   const hintFranjas =
@@ -179,7 +190,8 @@ export function EditarTurnoModal({
       ? "Elegí el profesor y la fecha para ver los horarios."
       : cargandoFranjas || franjas?.error || franjasBase.length === 0
         ? undefined
-        : `${franjasLibres} de ${franjasMostrables.length} franjas con cupo · clase de ${turno.materia.duracionClaseMinutos} min. Las franjas en gris no se pueden elegir.`;
+        : `${franjasLibres} de ${franjasMostrables.length} franjas con cupo · clase de ${turno.materia.duracionClaseMinutos} min.`;
+
   const diff = diffVacio();
   if (turno) {
     diff.profesor = profesorElegido !== null && profesorElegido.id !== turno.profesor.id;
@@ -207,6 +219,11 @@ export function EditarTurnoModal({
     const e = validar();
     setErrores(e);
     if (Object.values(e).some(Boolean)) return;
+    const hayCambios = diff.profesor || diff.fecha || diff.horario || diff.observaciones;
+    if (!hayCambios) {
+      setErrores({ global: "No se registraron cambios en el turno. Modificá al menos un dato o descartá." });
+      return;
+    }
     setConfirmarOpen(true);
   };
 
@@ -245,31 +262,52 @@ export function EditarTurnoModal({
 
   const filasCambio = () => {
     if (!turno) return [];
-    const filas: Array<{ label: string; antes: string; despues: string }> = [];
-    if (diff.horario) {
-      filas.push({
-        label: "Horario",
-        antes: `${turno.horaInicio} – ${turno.horaFin}`,
-        despues: `${hora} – ${franjasMostrables.find((f) => f.horaInicio === hora)?.horaFin ?? hora}`,
-      });
-    }
-    if (diff.fecha) filas.push({ label: "Fecha", antes: formatearFecha(turno.fecha), despues: formatearFecha(fecha) });
-    if (diff.profesor && profesorElegido) {
-      filas.push({
-        label: "Profesor",
-        antes: `${turno.profesor.apellido}, ${turno.profesor.nombre}`,
-        despues: `${profesorElegido.apellido}, ${profesorElegido.nombre}`,
-      });
-    }
-    if (diff.observaciones) {
-      filas.push({
-        label: "Observaciones",
-        antes: turno.observaciones ?? "—",
-        despues: observaciones.trim() || "—",
-      });
-    }
+    const filas: Array<{ label: string; antes: string; despues: string; cambiado: boolean }> = [];
+
+    // Profesor
+    const profCambiado = diff.profesor && Boolean(profesorElegido);
+    filas.push({
+      label: "Profesor",
+      antes: `${turno.profesor.apellido}, ${turno.profesor.nombre}`,
+      despues: profesorElegido
+        ? `${profesorElegido.apellido}, ${profesorElegido.nombre}`
+        : `${turno.profesor.apellido}, ${turno.profesor.nombre}`,
+      cambiado: profCambiado,
+    });
+
+    // Fecha
+    const fechaCambiado = diff.fecha;
+    filas.push({
+      label: "Fecha",
+      antes: formatearFecha(turno.fecha),
+      despues: fecha ? formatearFecha(fecha) : formatearFecha(turno.fecha),
+      cambiado: fechaCambiado,
+    });
+
+    // Horario
+    const horarioCambiado = diff.horario;
+    const horaFinCalculada = hora ? franjasMostrables.find((f) => f.horaInicio === hora)?.horaFin ?? hora : turno.horaFin;
+    filas.push({
+      label: "Horario",
+      antes: `${turno.horaInicio} – ${turno.horaFin}`,
+      despues: hora ? `${hora} – ${horaFinCalculada}` : `${turno.horaInicio} – ${turno.horaFin}`,
+      cambiado: horarioCambiado,
+    });
+
+    // Observaciones
+    const obsCambiado = diff.observaciones;
+    filas.push({
+      label: "Observaciones",
+      antes: turno.observaciones || "—",
+      despues: observaciones.trim() || "—",
+      cambiado: obsCambiado,
+    });
+
     return filas;
   };
+
+  const listaFilas = filasCambio();
+  const cambiosActivos = listaFilas.filter((f) => f.cambiado);
 
   return (
     <>
@@ -278,134 +316,241 @@ export function EditarTurnoModal({
         onClose={onClose}
         title={`Modificar turno ${turno.codigo}`}
         icon={<Icon name="edit_calendar" size={22} className="text-primary" />}
-        maxWidth="max-w-2xl"
+        maxWidth="max-w-4xl"
         footer={
-          <>
-            <p className="mr-auto text-xs font-medium text-on-surface-variant sm:self-center">
-              <span className="text-error">*</span> Campos obligatorios. Antes de guardar vas a ver el resumen del
-              cambio.
-            </p>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancelar
-            </Button>
-            <Button type="button" onClick={continuar}>
-              Continuar
-              <Icon name="arrow_forward" size={16} />
-            </Button>
-          </>
+          <div className="flex w-full flex-wrap items-center justify-between gap-3">
+            <div>
+              {onCancelarTurno && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-status-danger hover:bg-status-danger/10"
+                  disabled={!turno.puedeCancelar}
+                  title={!turno.puedeCancelar ? (turno.motivoDeshabilitado ?? "No se puede cancelar este turno") : undefined}
+                  onClick={() => onCancelarTurno(turno)}
+                >
+                  <Icon name="event_busy" size={16} />
+                  Cancelar turno
+                </Button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" onClick={onClose}>
+                Descartar
+              </Button>
+              <Button type="button" onClick={continuar}>
+                Continuar
+                <Icon name="arrow_forward" size={16} />
+              </Button>
+            </div>
+          </div>
         }
       >
         <div className="flex flex-col gap-5">
-          {/* Arriba del todo: la restricción se ve ANTES de tocar los campos. */}
+          {/* Arriba del todo: contador y tope de modificaciones */}
           <BarraModificaciones
             cantidad={turno.cantidadModificaciones}
             maxModificaciones={maxModificaciones}
             leyenda="El horario original se libera recién al confirmar."
           />
 
-          {cargandoProfesores || profesores?.error ? (
-            <div className="rounded-sm border border-outline-variant bg-surface-container px-4 py-3 text-sm">
-              {profesores?.error
-                ? "No pudimos cargar los profesores. Volvé a abrir el modal para reintentar."
-                : "Cargando profesores…"}
-            </div>
-          ) : (
-            <Select
-              id="editar-profesor"
-              label="Profesor"
-              requiredMark
-              value={profesorId}
-              error={errores.profesor}
-              hint="Solo profesores activos que dictan la materia."
-              onChange={(e) => {
-                setProfesorId(e.target.value);
-                setHora(null);
-                limpiarError("profesor");
-              }}
-            >
-              {profesores?.lista.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.apellido}, {p.nombre}
-                </option>
-              ))}
-            </Select>
-          )}
-
-          <Input
-            id="editar-fecha"
-            type="date"
-            label="Fecha"
-            requiredMark
-            min={hoy}
-            max={fechaMax}
-            value={fecha}
-            error={errores.fecha}
-            onChange={(e) => {
-              setFecha(e.target.value);
-              setHora(null);
-              limpiarError("fecha");
-            }}
-          />
-
-          <div className="flex min-w-0 flex-col gap-3">
-            <FranjasHorarias
-              name="editar-horario"
-              legend="Horario"
-              requiredMark
-              franjas={franjasMostrables}
-              value={hora}
-              error={errores.horario}
-              hint={hintFranjas}
-              onChange={(h) => {
-                setHora(h);
-                limpiarError("horario");
-              }}
-            />
-
-            {sugerenciaActual && hora === null && !cargandoFranjas ? (
-              <div className="flex flex-wrap items-center gap-3 rounded-sm border border-tertiary/40 bg-tertiary/5 px-3 py-2">
-                <Icon name="bolt" size={18} className="text-tertiary" />
-                <p className="flex-1 text-sm font-medium text-on-surface">
-                  Próximo horario libre:{" "}
-                  <strong className="font-bold">
-                    {diaCorto(sugerenciaActual.fecha)} {formatearFecha(sugerenciaActual.fecha)} ·{" "}
-                    {sugerenciaActual.horaInicio} – {sugerenciaActual.horaFin}
-                  </strong>{" "}
-                  <span className="text-on-surface-variant">
-                    ({sugerenciaActual.cuposDisponibles} de {sugerenciaActual.capacidad} cupos)
+          {/* Grilla principal con formulario a la izquierda y recuadro 'Datos anteriores' a la derecha */}
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
+            {/* Columna Izquierda: Formulario de edición */}
+            <div className="flex flex-col gap-4 md:col-span-8">
+              {/* Alumno y Materia en modo solo lectura (gris), según criterio obligatorio de HU-TUR-02 */}
+              <div className="grid grid-cols-1 gap-3 rounded-sm border border-outline-variant bg-surface-container-high/40 p-3 sm:grid-cols-2">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
+                    Alumno (solo lectura)
                   </span>
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="min-h-11"
-                  onClick={() => usarSugerencia(sugerenciaActual)}
-                >
-                  Usar este horario
-                </Button>
+                  <p className="text-sm font-bold text-on-surface">
+                    {turno.alumno.apellido}, {turno.alumno.nombre}
+                  </p>
+                  <p className="text-xs text-on-surface-variant">
+                    Legajo: {turno.alumno.legajo} {turno.alumno.dni ? `· DNI ${turno.alumno.dni}` : ""}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
+                    Materia (solo lectura)
+                  </span>
+                  <p className="text-sm font-bold text-on-surface">
+                    {turno.materia.nombre}
+                  </p>
+                  <p className="text-xs text-on-surface-variant">
+                    Nivel {turno.materia.nivel} · {turno.materia.duracionClaseMinutos} min de duración
+                  </p>
+                </div>
               </div>
-            ) : null}
+
+              {cargandoProfesores || profesores?.error ? (
+                <div className="rounded-sm border border-outline-variant bg-surface-container px-4 py-3 text-sm">
+                  {profesores?.error
+                    ? "No pudimos cargar los profesores. Volvé a abrir el modal para reintentar."
+                    : "Cargando profesores…"}
+                </div>
+              ) : (
+                <Select
+                  id="editar-profesor"
+                  label="Profesor"
+                  requiredMark
+                  value={profesorId}
+                  error={errores.profesor}
+                  hint="Solo profesores activos que dictan la materia."
+                  onChange={(e) => {
+                    setProfesorId(e.target.value);
+                    setHora(null);
+                    limpiarError("profesor");
+                  }}
+                >
+                  {listaProfesores.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.apellido}, {p.nombre}
+                    </option>
+                  ))}
+                </Select>
+              )}
+
+              <Input
+                id="editar-fecha"
+                type="date"
+                label="Fecha"
+                requiredMark
+                min={hoy}
+                max={fechaMax}
+                value={fecha}
+                error={errores.fecha}
+                onChange={(e) => {
+                  setFecha(e.target.value);
+                  setHora(null);
+                  limpiarError("fecha");
+                }}
+              />
+
+              <div className="flex min-w-0 flex-col gap-3">
+                <FranjasHorarias
+                  name="editar-horario"
+                  legend="Horario"
+                  requiredMark
+                  franjas={franjasMostrables}
+                  value={hora}
+                  error={errores.horario}
+                  hint={hintFranjas}
+                  onChange={(h) => {
+                    setHora(h);
+                    limpiarError("horario");
+                  }}
+                />
+
+                {sugerenciaActual && hora === null && !cargandoFranjas ? (
+                  <div className="flex flex-wrap items-center gap-3 rounded-sm border border-tertiary/40 bg-tertiary/5 px-3 py-2">
+                    <Icon name="bolt" size={18} className="text-tertiary" />
+                    <p className="flex-1 text-sm font-medium text-on-surface">
+                      Próximo horario libre:{" "}
+                      <strong className="font-bold">
+                        {diaCorto(sugerenciaActual.fecha)} {formatearFecha(sugerenciaActual.fecha)} ·{" "}
+                        {sugerenciaActual.horaInicio} – {sugerenciaActual.horaFin}
+                      </strong>{" "}
+                      <span className="text-on-surface-variant">
+                        ({sugerenciaActual.cuposDisponibles} de {sugerenciaActual.capacidad} cupos)
+                      </span>
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="min-h-11"
+                      onClick={() => usarSugerencia(sugerenciaActual)}
+                    >
+                      Usar este horario
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+
+              <Textarea
+                id="editar-observaciones"
+                label="Observaciones (opcional)"
+                value={observaciones}
+                maxLength={MAX_OBSERVACIONES}
+                placeholder="Ej: repasar ecuaciones para el parcial"
+                hint={`${observaciones.length}/${MAX_OBSERVACIONES}`}
+                onChange={(e) => setObservaciones(e.target.value)}
+              />
+
+              {errores.global && (
+                <p role="alert" className="rounded-sm border border-error/40 bg-error/5 px-3 py-2 text-sm font-semibold text-error">
+                  {errores.global}
+                </p>
+              )}
+            </div>
+
+            {/* Columna Derecha: Recuadro "Datos anteriores" con comparador en vivo (criterio obligatorio) */}
+            <div className="flex flex-col gap-3 rounded-md border border-outline-variant bg-surface-container-lowest p-4 shadow-card md:col-span-4">
+              <div className="flex items-center justify-between border-b border-outline-variant pb-2">
+                <div className="flex items-center gap-2">
+                  <Icon name="history" size={18} className="text-secondary" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-on-surface">
+                    Datos anteriores
+                  </span>
+                </div>
+                <span className="rounded-full bg-surface-container-high px-2 py-0.5 text-[10px] font-bold text-on-surface-variant">
+                  {cambiosActivos.length === 0
+                    ? "Sin cambios"
+                    : `${cambiosActivos.length} ${cambiosActivos.length === 1 ? "cambio" : "cambios"}`}
+                </span>
+              </div>
+
+              <p className="text-xs text-on-surface-variant">
+                Comparación en tiempo real con los valores registrados originales:
+              </p>
+
+              <div className="flex flex-col gap-3">
+                {listaFilas.map((f) => (
+                  <div
+                    key={f.label}
+                    className={`flex flex-col gap-1 rounded-sm border p-2.5 transition-colors duration-fast ${
+                      f.cambiado
+                        ? "border-primary/40 bg-primary-container/20"
+                        : "border-outline-variant/60 bg-surface-container-low/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
+                        {f.label}
+                      </span>
+                      {f.cambiado && (
+                        <span className="rounded-full bg-secondary/15 px-1.5 py-0.2 text-[10px] font-bold text-secondary">
+                          Modificado
+                        </span>
+                      )}
+                    </div>
+
+                    {f.cambiado ? (
+                      <div className="flex flex-col gap-0.5 text-xs">
+                        <span className="text-on-surface-variant line-through">{f.antes}</span>
+                        <div className="flex items-center gap-1 font-semibold text-primary">
+                          <Icon name="arrow_downward" size={14} />
+                          <span>{f.despues}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs font-medium text-on-surface">{f.antes}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-auto border-t border-outline-variant pt-2 text-[11px] text-on-surface-variant">
+                <p>ℹ Se actualiza solo con lo que cambia. El horario previo se libera al confirmar.</p>
+              </div>
+            </div>
           </div>
-
-          <Textarea
-            id="editar-observaciones"
-            label="Observaciones (opcional)"
-            value={observaciones}
-            maxLength={MAX_OBSERVACIONES}
-            placeholder="Ej: repasar ecuaciones para el parcial"
-            hint={`${observaciones.length}/${MAX_OBSERVACIONES}`}
-            onChange={(e) => setObservaciones(e.target.value)}
-          />
-
-          {errores.global && (
-            <p role="alert" className="rounded-sm border border-error/40 bg-error/5 px-3 py-2 text-sm font-semibold text-error">
-              {errores.global}
-            </p>
-          )}
         </div>
       </Modal>
 
+      {/* Modal de confirmación Antes → Después (Paso 2) */}
       <ConfirmarDialog
         open={confirmarOpen}
         tone="neutral"
@@ -417,7 +562,7 @@ export function EditarTurnoModal({
         onConfirm={confirmar}
       >
         <ul className="mt-3 flex flex-col gap-2 rounded-sm bg-surface-container px-3 py-2">
-          {filasCambio().map((f) => (
+          {cambiosActivos.map((f) => (
             <li key={f.label} className="flex flex-col gap-0.5 text-sm">
               <span className="font-bold text-on-surface">{f.label}</span>
               <span className="flex flex-wrap items-center gap-1.5 text-on-surface-variant">

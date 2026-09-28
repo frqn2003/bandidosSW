@@ -1,22 +1,19 @@
 "use client";
 
-import { Button } from "@/components/ui/Button";
-import { Icon } from "@/components/ui/Icon";
+import { MenuAcciones } from "@/components/ui/MenuAcciones";
 import { EstadoTurnoBadge } from "@/components/turnos/EstadoTurnoBadge";
 import { ContadorModificaciones } from "@/components/turnos/ContadorModificaciones";
 import { estadoVisibleDe } from "@/funciones/estado-turno";
-import { formatearFecha } from "@/funciones/formato";
-import { formatearValor } from "@/data/materias";
 import type { TurnoResponse } from "@/data/turnos";
 
 // Listado de turnos de /turnos (HU-TUR-02).
 //
-// Columnas del criterio: Código · Alumno · Materia · Profesor · Fecha ·
-// Precio · Estado · Modificaciones · Acciones.
+// Columnas del criterio: Código · Alumno · Materia · Profesor · Fecha y hora ·
+// Estado · Modif. · Acciones.
 //
-// La fila NO vuelve a calcular reglas: los flags `puedeModificar`/`puedeCancelar`
-// llegan calculados por el back/fixture. El estado visible (Finalizado derivado)
-// sí es del front (decisión 1 del brief).
+// Formato de fecha y hora: `Lun 28/09 · 15:00` (criterio específico de HU-TUR-02).
+// Las acciones van agrupadas en un `MenuAcciones` para evitar desbordes y estandarizar
+// el menú desplegable (Ver · Modificar · Cancelar).
 
 interface TurnosTableProps {
   turnos: TurnoResponse[];
@@ -26,32 +23,45 @@ interface TurnosTableProps {
   onCancelar: (turno: TurnoResponse) => void;
 }
 
+const DIAS_CORTOS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+
+function formatearFechaHoraTurno(fechaIso: string, hora: string): string {
+  const soloFecha = fechaIso.slice(0, 10);
+  const d = new Date(`${soloFecha}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return `${fechaIso} · ${hora}`;
+  const weekday = DIAS_CORTOS[d.getDay()] ?? "";
+  const dia = String(d.getDate()).padStart(2, "0");
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  return `${weekday} ${dia}/${mes} · ${hora}`;
+}
+
 export function TurnosTable({ turnos, maxModificaciones, onVer, onModificar, onCancelar }: TurnosTableProps) {
   return (
     <div className="overflow-x-auto rounded-md border border-outline-variant bg-surface-container-lowest shadow-card">
-      <table className="w-full min-w-[1080px] border-collapse text-left">
+      <table className="w-full min-w-[1020px] border-collapse text-left">
         <caption className="sr-only">
-          Listado de turnos con código, alumno, materia, profesor, fecha, precio, estado, modificaciones y acciones
+          Listado de turnos con código, alumno, materia, profesor, fecha y hora, estado, modificaciones y acciones
         </caption>
         <thead>
           <tr className="border-b border-outline-variant bg-surface-container-low">
             {[
-              "Turno",
+              "Código",
               "Alumno",
               "Materia",
               "Profesor",
-              "Fecha",
-              "Precio",
+              "Fecha y hora",
               "Estado",
-              "Modificaciones",
-              "",
+              "Modif.",
+              "Acciones",
             ].map((col) => (
               <th
-                key={col || "acciones"}
+                key={col}
                 scope="col"
-                className={`px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant`}
+                className={`px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-on-surface-variant ${
+                  col === "Acciones" ? "text-right" : col === "Modif." ? "text-center" : ""
+                }`}
               >
-                {col || "Acciones"}
+                {col}
               </th>
             ))}
           </tr>
@@ -63,7 +73,7 @@ export function TurnosTable({ turnos, maxModificaciones, onVer, onModificar, onC
             return (
               <tr
                 key={t.id}
-                className="align-top transition-colors duration-fast ease-out hover:bg-surface-container-low/50"
+                className="align-middle transition-colors duration-fast ease-out hover:bg-surface-container-low/50"
               >
                 <td className="px-4 py-3">
                   <span className="font-mono text-xs font-bold text-primary">{t.codigo}</span>
@@ -81,53 +91,51 @@ export function TurnosTable({ turnos, maxModificaciones, onVer, onModificar, onC
                 </td>
                 <td className="px-4 py-3">
                   <p className="text-sm font-semibold tabular-nums text-on-surface">
-                    {formatearFecha(t.fecha).slice(0, 5)} - {t.horaInicio}
+                    {formatearFechaHoraTurno(t.fecha, t.horaInicio)}
                   </p>
-                </td>
-                <td className="px-4 py-3 text-sm font-semibold tabular-nums text-on-surface">
-                  {formatearValor(t.valorClaseCongelado)}
                 </td>
                 <td className="px-4 py-3">
                   <EstadoTurnoBadge estado={estadoVisible} />
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <ContadorModificaciones
-                    cantidad={t.cantidadModificaciones}
-                    maxModificaciones={maxModificaciones}
-                  />
+                  {t.estado === "Cancelado" ? (
+                    <span className="text-sm font-medium text-on-surface-variant/60" aria-label="Sin modificaciones aplicables">
+                      —
+                    </span>
+                  ) : (
+                    <ContadorModificaciones
+                      cantidad={t.cantidadModificaciones}
+                      maxModificaciones={maxModificaciones}
+                    />
+                  )}
                 </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center justify-end gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Ver turno ${t.codigo} de ${nombreAlumno}`}
-                      onClick={() => onVer(t)}
-                    >
-                      <Icon name="visibility" size={20} />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Modificar turno ${t.codigo} de ${nombreAlumno}`}
-                      disabled={!t.puedeModificar}
-                      onClick={() => onModificar(t)}
-                    >
-                      <Icon name="edit_calendar" size={20} />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="text-status-danger hover:bg-status-danger/10"
-                      aria-label={`Cancelar turno ${t.codigo} de ${nombreAlumno}`}
-                      disabled={!t.puedeCancelar}
-                      onClick={() => onCancelar(t)}
-                    >
-                      <Icon name="event_busy" size={20} />
-                    </Button>
+                <td className="px-4 py-3 text-right">
+                  <div className="flex items-center justify-end">
+                    <MenuAcciones
+                      ariaLabel={`Acciones para el turno ${t.codigo} de ${nombreAlumno}`}
+                      acciones={[
+                        {
+                          label: "Ver",
+                          icon: "visibility",
+                          onSelect: () => onVer(t),
+                        },
+                        {
+                          label: "Modificar",
+                          icon: "edit_calendar",
+                          disabled: !t.puedeModificar,
+                          title: !t.puedeModificar ? (t.motivoDeshabilitado ?? "No se puede modificar este turno") : undefined,
+                          onSelect: () => onModificar(t),
+                        },
+                        {
+                          label: "Cancelar",
+                          icon: "event_busy",
+                          peligro: true,
+                          disabled: !t.puedeCancelar,
+                          title: !t.puedeCancelar ? (t.motivoDeshabilitado ?? "No se puede cancelar este turno") : undefined,
+                          onSelect: () => onCancelar(t),
+                        },
+                      ]}
+                    />
                   </div>
                 </td>
               </tr>

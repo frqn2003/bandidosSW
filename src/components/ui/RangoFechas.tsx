@@ -1,70 +1,109 @@
 "use client";
 
+import { useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { Input } from "@/components/ui/Input";
 
 // Rango de fechas de la pantalla /turnos (HU-TUR-02).
 //
-// Dos campos de fecha (Desde / Hasta) con "al" en el medio, para insertar
-// inline en la fila de filtros. Nada de barra ajustable: la selección es
-// directa con los inputs.
-//
-// Restricciones compartidas (auditoría HU-TUR-02):
-//  · desde ≤ hasta.
-//  · Ancho máximo del rango = `maxDias` (60): si se excede, el campo se clava en
-//    el límite y el chip lo avisa, en vez de permitir ventanas gigantes.
-//  · Todo queda dentro de [min, max] (historia reciente + ventana de reserva).
+// Dos campos de fecha (Desde / Hasta) con "al" en el medio.
+// Permite tanto la selección con el calendario nativo como la edición manual
+// directa por teclado (día, mes, año), sin auto-clampeo prematuro que interrumpa
+// la digitación (por ejemplo, al tipear el mes '10' no lo fuerza a '06').
 
 interface RangoFechasProps {
   desde: string;
   hasta: string;
-  min: string;
-  max: string;
-  maxDias: number;
+  min?: string;
+  max?: string;
+  maxDias?: number;
   onChange: (rango: { desde: string; hasta: string }) => void;
-  /** Prefijo de ids (evita ids duplicados si hay más de un RangoFechas). */
   id?: string;
 }
 
-const DIA_MS = 86_400_000;
+const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
-function aDia(iso: string): number {
-  return Math.round(new Date(`${iso}T00:00:00`).getTime() / DIA_MS);
+function esFechaValida(s: string): boolean {
+  if (!FECHA_REGEX.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
 }
 
-function diaAISO(dia: number): string {
-  const d = new Date(dia * DIA_MS);
-  return d.toISOString().slice(0, 10);
+function diferenciaDias(d1: string, d2: string): number {
+  const t1 = new Date(`${d1}T00:00:00Z`).getTime();
+  const t2 = new Date(`${d2}T00:00:00Z`).getTime();
+  return Math.round((t2 - t1) / 86_400_000);
 }
 
-function clampear(dia: number, min: number, max: number): number {
-  return Math.min(Math.max(dia, min), max);
-}
+export function RangoFechas({
+  desde,
+  hasta,
+  maxDias = 60,
+  onChange,
+  id = "range",
+}: RangoFechasProps) {
+  const [desdeStr, setDesdeStr] = useState(desde);
+  const [prevDesde, setPrevDesde] = useState(desde);
+  const [hastaStr, setHastaStr] = useState(hasta);
+  const [prevHasta, setPrevHasta] = useState(hasta);
 
-export function RangoFechas({ desde, hasta, min, max, maxDias, onChange, id = "range" }: RangoFechasProps) {
-  const minDia = aDia(min);
-  const maxDia = aDia(max);
-  const desdeDia = aDia(desde);
-  const hastaDia = aDia(hasta);
+  // Patrón oficial de React para sincronizar estado derivado cuando las props cambian
+  if (desde !== prevDesde) {
+    setPrevDesde(desde);
+    setDesdeStr(desde);
+  }
 
-  /** Aplica las 3 restricciones y emite el rango. */
-  const cambiar = (campo: "desde" | "hasta", dia: number) => {
-    // 1. desde ≤ hasta (el extremo no se pasa del otro).
-    const sinCruzar = campo === "desde" ? Math.min(dia, hastaDia) : Math.max(dia, desdeDia);
-    // 2. Dentro de los límites del sistema.
-    let d = clampear(sinCruzar, minDia, maxDia);
-    // 3. Ventana máxima: el extremo se CLAVA en el borde del tope (el chip
-    //    "Rango máximo" queda visible para que se entienda).
-    if (campo === "desde" && hastaDia - d > maxDias) d = Math.max(minDia, hastaDia - maxDias);
-    if (campo === "hasta" && d - desdeDia > maxDias) d = Math.min(maxDia, desdeDia + maxDias);
-    onChange(
-      campo === "desde"
-        ? { desde: diaAISO(d), hasta: diaAISO(hastaDia) }
-        : { desde: diaAISO(desdeDia), hasta: diaAISO(d) },
-    );
+  if (hasta !== prevHasta) {
+    setPrevHasta(hasta);
+    setHastaStr(hasta);
+  }
+
+  const emitirSiValido = (d: string, h: string) => {
+    if (esFechaValida(d) && esFechaValida(h)) {
+      if (d <= h) {
+        onChange({ desde: d, hasta: h });
+      }
+    }
   };
 
-  const anchoEnDias = Math.max(0, hastaDia - desdeDia);
+  const alCambiarDesde = (valor: string) => {
+    setDesdeStr(valor);
+    emitirSiValido(valor, hastaStr);
+  };
+
+  const alCambiarHasta = (valor: string) => {
+    setHastaStr(valor);
+    emitirSiValido(desdeStr, valor);
+  };
+
+  const alBlurDesde = () => {
+    if (!esFechaValida(desdeStr)) {
+      setDesdeStr(desde);
+      return;
+    }
+    // Si al salir el usuario dejó desde > hasta, ajustamos hasta para que coincida
+    if (esFechaValida(hastaStr) && desdeStr > hastaStr) {
+      setHastaStr(desdeStr);
+      onChange({ desde: desdeStr, hasta: desdeStr });
+    }
+  };
+
+  const alBlurHasta = () => {
+    if (!esFechaValida(hastaStr)) {
+      setHastaStr(hasta);
+      return;
+    }
+    // Si al salir el usuario dejó hasta < desde, ajustamos desde para que coincida
+    if (esFechaValida(desdeStr) && hastaStr < desdeStr) {
+      setDesdeStr(hastaStr);
+      onChange({ desde: hastaStr, hasta: hastaStr });
+    }
+  };
+
+  const anchoEnDias =
+    esFechaValida(desdeStr) && esFechaValida(hastaStr)
+      ? Math.max(0, diferenciaDias(desdeStr, hastaStr))
+      : 0;
 
   return (
     <>
@@ -74,13 +113,9 @@ export function RangoFechas({ desde, hasta, min, max, maxDias, onChange, id = "r
             id={`${id}-desde`}
             type="date"
             label="Desde"
-            min={min}
-            max={hasta}
-            value={desde}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v) cambiar("desde", aDia(v));
-            }}
+            value={desdeStr}
+            onChange={(e) => alCambiarDesde(e.target.value)}
+            onBlur={alBlurDesde}
           />
         </div>
         <span aria-hidden="true" className="select-none pb-3 text-sm font-semibold leading-none text-on-surface-variant">
@@ -91,13 +126,9 @@ export function RangoFechas({ desde, hasta, min, max, maxDias, onChange, id = "r
             id={`${id}-hasta`}
             type="date"
             label="Hasta"
-            min={desde}
-            max={max}
-            value={hasta}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v) cambiar("hasta", aDia(v));
-            }}
+            value={hastaStr}
+            onChange={(e) => alCambiarHasta(e.target.value)}
+            onBlur={alBlurHasta}
           />
         </div>
       </div>
