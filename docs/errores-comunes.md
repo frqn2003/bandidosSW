@@ -22,6 +22,36 @@ Resumen de las reglas de las entradas de abajo; se verifican en el paso 6 de `/d
 
 ---
 
+### 2026-09-28 · Turnos (HU-TUR-02) — `ui/StatusBadge` con texto que no llegaba a 4.5:1 en algunas variantes
+
+- **Qué pasó:** al diseñar los badges de estado del listado de turnos (`EstadoTurnoBadge`), `StatusBadge` seguía pintando el texto chico con el color del estado sobre fondos claros en varias variantes (`warning`/`danger`), y `neutral` usaba `on-surface-variant`. En la tabla de `/turnos` (texto de 11–12 px) eso no llega al contraste pedido.
+- **Cómo se detectó:** paso 6a de `/disenar` (checklist de accesibilidad), contra los hex de `globals.css`.
+- **Causa:** el componente recargaba `text-status-*` según la variante; la regla 13 existía pero no se aplicaba en todas las variantes.
+- **Regla para no repetirlo:** en `ui/StatusBadge` el texto es SIEMPRE `on-surface`; el color de estado vive en el punto (`bg-status-*-strong`) y, si hay ícono, en `iconClass` (`text-status-*-strong`). El `neutral` también usa `on-surface`, no `on-surface-variant`.
+
+---
+
+### 2026-09-28 · Deuda del back — `npx tsc --noEmit` no queda 100% en verde
+
+- **Qué pasó:** la verificación técnica de HU-TUR-02 deja 1 error de tipos que NO es del front ni de esta pantalla:
+  - `src/modules/alumnos/alumno.mapper.ts(25,3)` — faltan `institucionOrigen`, `observacionesGenerales`, `materiasInteres`, `deudaPendiente` en `AlumnoResponse`.
+- **Resuelto hoy:** los 2 errores de calendario que estaban en esta lista se corrigieron al resolver el crash de `CalendarioTurnos.tsx` (la agenda no emitía `profesor` en los turnos). Ver entrada 2026-09-28 "Crash CalendarioTurnos".
+- **Cómo se detectó:** paso 6a de `/disenar` (verificación estática obligatoria) y reporte de runtime del usuario.
+- **Causa:** el contrato de la API exige campos que el mapper del back todavía no emite. El front (que consume el contrato) está bien: `src/data/turnos.ts`, `estado-turno.ts` y los componentes nuevos dan `tsc` limpio por su cuenta.
+- **Regla para no repetirlo:** cargarlo al equipo de back como deuda; en el checklist de `/disenar`, anotar "tsc verde salvo deuda conocida del back" en vez de tratarlo como fallo del frente.
+
+---
+
+### 2026-09-28 · Crash `CalendarioTurnos.tsx` — "Cannot read properties of undefined (reading 'apellido')"
+
+- **Qué pasó:** al entrar desde "Ver en calendario" en `/turnos/reservas`, la grilla explotaba en `CalendarioTurnos.tsx:606` leyendo `t.profesor.apellido` porque `t.profesor` era `undefined`. También arrancaba `t.materia` en riesgo.
+- **Cómo se detectó:** reporte de runtime del usuario (React dev overlay); recién se hacía visible porque antes la semana visible no tenía turnos cargados.
+- **Causa real:** NO era el front. `repo.turnosDelDia` no seleccionaba las columnas del profesor, `TurnoCalendarioRow` no las declaraba y `turnoCalendarioToApi` omitía `profesor` (era deuda tsc conocida). El contrato exige `profesor` y la tarjeta lo usa.
+- **Fix (raíz, no parche defensivo):** `calendario.repo.ts` agrega `JOIN profesor/usuario` y los alias `profesor_id/nombre/apellido`; `calendario.types.ts` los declara en `TurnoCalendarioRow`; `calendario.mapper.ts` emite `profesor`. Además `agendaDelDia` ahora valida `profesorId`/`fecha` opcionales (404/422 según contrato) en vez de romper el tipo en la ruta.
+- **Regla para no repetirlo:** cuando una tarjeta consume `contrato.<campo obligatorio>`, no cubrir el bug con optional chaining: verificar que el back emita el campo. Los mappers que dejan tsc en rojo terminan explotando en runtime.
+
+---
+
 ### 2026-09-23 · Turnos (HU-TUR-01) — texto de estado con contraste insuficiente
 
 - **Qué pasó:** en las franjas horarias, el motivo de una franja deshabilitada iba en `text-on-surface-variant` sobre `bg-surface-container-high` (≈3.6:1), el aviso "último cupo" en `text-status-warning-strong` sobre blanco (≈3.2:1) y "El alumno ya tiene un turno" en `text-error` sobre gris. Ninguno llega a 4.5:1 para texto de 12 px. El mismo patrón ámbar se había puesto en el aviso de "día pasado" del `ReservaTurnoModal`.

@@ -87,13 +87,29 @@ export async function huecos(
  * turnos reservados y huecos libres (§HU-CAL-01).
  */
 export async function agendaDelDia(
-  profesorId: number,
-  fecha: string,
+  profesorId: number | undefined,
+  fecha: string | undefined,
   session: Session,
 ): Promise<AgendaDiaResponse> {
   const rolesPermitidos = ["Gerente", "Mesa de Entrada", "Profesor"];
   if (!rolesPermitidos.includes(session.rol)) {
     throw new ForbiddenError(`Tu rol (${session.rol}) no tiene permisos para ver el calendario.`);
+  }
+
+  if (profesorId === undefined) {
+    throw new ValidationError(
+      "REFERENCIA_INVALIDA",
+      "Indicá un profesor para consultar la agenda.",
+      "profesorId",
+    );
+  }
+
+  if (fecha === undefined) {
+    throw new ValidationError(
+      "DATOS_INVALIDOS",
+      "Indicá una fecha para consultar la agenda.",
+      "fecha",
+    );
   }
 
   // Restricción por rol: Profesor visualiza únicamente su propio calendario

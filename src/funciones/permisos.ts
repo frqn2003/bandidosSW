@@ -56,10 +56,12 @@ export const MODULOS: Modulo[] = [
   },
   // Después de Calendario a propósito: `inicioDe` toma el primer módulo
   // construido del rol, y la pantalla de entrada sigue siendo el calendario.
+  // La entrada del módulo turnos es el listado (HU-TUR-02); la reserva
+  // (`/turnos/reservas`) queda como pantalla interna alcanzable desde el botón.
   {
     id: "turnos",
     label: "Turnos y Agenda",
-    href: "/turnos/reservas",
+    href: "/turnos",
     icon: "calendar_month",
     construido: true,
   },
@@ -70,7 +72,7 @@ export const MODULOS: Modulo[] = [
   { id: "mi-ficha", label: "Mi ficha", href: "#", icon: "badge", construido: false },
   { id: "materias", label: "Materias", href: "/materias", icon: "menu_book", construido: true },
   { id: "cobranzas", label: "Cobranzas", href: "#", icon: "receipt_long", construido: false },
-  { id: "usuarios", label: "Usuarios", href: "#", icon: "school", construido: false },
+  { id: "usuarios", label: "Usuarios", href: "/usuarios", icon: "manage_accounts", construido: true },
   { id: "reportes", label: "Reportes", href: "#", icon: "settings", construido: false },
 ];
 

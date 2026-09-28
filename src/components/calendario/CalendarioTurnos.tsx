@@ -7,13 +7,11 @@ import { Icon } from "@/components/ui/Icon";
 import { Select } from "@/components/ui/Select";
 import {
   limiteAtencion,
-  listarTurnosEnRango,
   verAgendaDia,
   verAgendaSemana,
   verProximoTurno,
   type AgendaDiaResponse,
   type ProfesorCalendario,
-  type TurnoResponse,
 } from "@/data/calendario";
 import { TurnoCalendarioBadge } from "./TurnoCalendarioBadge";
 import { TurnoDetalleModal } from "./TurnoDetalleModal";
@@ -43,9 +41,6 @@ const ROW_HEIGHT = 56;
 type Vista = "semana" | "dia";
 type Zoom = 30 | 60;
 type EstadoCarga = "cargando" | "error" | "listo";
-
-/** Valor del select "Todos los profesores": lista de turnos sin disponibilidad. */
-const TODOS = "todos";
 
 // ─── Helpers de fecha/hora ───────────────────────────────────────────────
 
@@ -122,36 +117,39 @@ interface CalendarioTurnosProps {
   profesores: ProfesorCalendario[];
   /** Ficha fija para el rol Profesor (filtro bloqueado). Null si el rol elige. */
   profesorFijo: ProfesorCalendario | null;
+  /** Profesor preseleccionado desde /turnos/reservas ("Ver en calendario"). */
+  profesorIdInicial?: string;
+  /** Fecha para anclar la semana inicial (la del turno recién reservado). */
+  fechaIdeal?: string;
 }
 
-export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosProps) {
+export function CalendarioTurnos({
+  profesores,
+  profesorFijo,
+  profesorIdInicial = "",
+  fechaIdeal,
+}: CalendarioTurnosProps) {
   const { sesion } = useSesion();
   const rol = sesion?.usuario.rol.nombre;
   const puedeReservar = rol === "Gerente" || rol === "Mesa de Entrada";
   const [hoyISO] = useState(() => aISO(new Date()));
-  const [lunes, setLunes] = useState(() => lunesDe(hoyISO));
+  const [lunes, setLunes] = useState(() => lunesDe(fechaIdeal || hoyISO));
   const [vista, setVista] = useState<Vista>("semana");
   const [zoom, setZoom] = useState<Zoom>(30);
-  const [profesorElegido, setProfesorId] = useState("");
+  const [profesorElegido, setProfesorId] = useState(profesorIdInicial);
   // La ficha del rol Profesor llega async (después del primer render): se deriva
   // en vez de copiarla al estado inicial, que la perdería.
   const profesorId = profesorFijo ? String(profesorFijo.id) : rol === "Profesor" ? "" : profesorElegido;
   // El rol Profesor entra con su ficha ya aplicada: el selector queda bloqueado.
   const filtroBloqueado = rol === "Profesor" || profesorFijo !== null;
-  // "todos" no es un id: la grilla no aplica, se muestra la lista consolidada.
-  const todosActivo = profesorId === TODOS;
 
   // Límites de la grilla: horario de atención del CENTRO, no del profesor.
   const [limites, setLimites] = useState<{ min: number; max: number } | null>(null);
 
   const [agenda, setAgenda] = useState<AgendaDiaResponse[]>([]);
-  const [turnosTodos, setTurnosTodos] = useState<TurnoResponse[]>([]);
   const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>("cargando");
   const [intento, setIntento] = useState(0);
   const solicitudProximo = useRef(0);
-  // Al seleccionar "todos", si el rango visible está vacío, saltar a la primera
-  // fecha con turnos. La navegación manual (◀ ▶ Hoy o cambiar vista) lo desactiva.
-  const saltarPrimeraSemana = useRef(false);
   const [busquedaProximo, setBusquedaProximo] = useState<{
     profesorId: string;
     estado: "buscando" | "listo" | "error";
@@ -216,7 +214,7 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
   // Mismo patrón que las demás pantallas: el estado solo se toca dentro de las
   // promesas; el efecto devuelve la cancelación. `intento` fuerza reintentos.
   const traer = useCallback(() => {
-    if (!profesorId || todosActivo) return;
+    if (!profesorId) return;
     let cancelado = false;
     const p = Number(profesorId);
     const cargar =
@@ -235,41 +233,9 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
     return () => {
       cancelado = true;
     };
-  }, [profesorId, vista, lunes, todosActivo]);
+  }, [profesorId, vista, lunes]);
 
   useEffect(traer, [traer, intento]);
-
-  // Todos los turnos del rango visible, sin huecos disponibles (opción "todos").
-  useEffect(() => {
-    if (!todosActivo) return;
-    let cancelado = false;
-    const desde = vista === "semana" ? lunesDe(lunes) : lunes;
-    const hasta = vista === "semana" ? sumarDias(lunesDe(lunes), 5) : lunes;
-    listarTurnosEnRango(desde, hasta)
-      .then(async (turnos) => {
-        if (cancelado) return;
-        // Al entrar a "todos": si el rango visible no tiene turnos, saltar a la
-        // primera fecha con turnos (búsqueda hacia adelante, 90 días).
-        if (turnos.length === 0 && saltarPrimeraSemana.current) {
-          saltarPrimeraSemana.current = false;
-          const proximos = await listarTurnosEnRango(desde, sumarDias(desde, 90));
-          if (cancelado) return;
-          const primera = proximos[0];
-          if (primera) {
-            setLunes(vista === "semana" ? lunesDe(primera.fecha) : primera.fecha);
-            return; // el cambio de `lunes` recarga el rango con datos
-          }
-        }
-        setTurnosTodos(turnos);
-        setEstadoCarga("listo");
-      })
-      .catch(() => {
-        if (!cancelado) setEstadoCarga("error");
-      });
-    return () => {
-      cancelado = true;
-    };
-  }, [todosActivo, vista, lunes, intento]);
 
   const reintentar = () => {
     setEstadoCarga("cargando");
@@ -292,26 +258,22 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
     return filas;
   }, [limites, zoom]);
 
-  const turnosTotales = useMemo(() => {
-    if (todosActivo) return turnosTodos.length;
-    return agenda.reduce((acc, d) => acc + d.turnos.length, 0);
-  }, [agenda, turnosTodos, todosActivo]);
+  const turnosTotales = useMemo(
+    () => agenda.reduce((acc, d) => acc + d.turnos.length, 0),
+    [agenda],
+  );
 
   const irHoy = () => {
-    saltarPrimeraSemana.current = false;
     setVista("semana");
     setLunes(lunesDe(hoyISO));
   };
   const irAnterior = () => {
-    saltarPrimeraSemana.current = false;
     setLunes((l) => sumarDias(l, vista === "semana" ? -7 : -1));
   };
   const irSiguiente = () => {
-    saltarPrimeraSemana.current = false;
     setLunes((l) => sumarDias(l, vista === "semana" ? 7 : 1));
   };
   const cambiarVista = (v: Vista) => {
-    saltarPrimeraSemana.current = false;
     setVista(v);
     // Al volver a semana, el ancla se normaliza a lunes.
     if (v === "semana") setLunes((l) => lunesDe(l));
@@ -373,13 +335,11 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
               onChange={(e) => {
                 solicitudProximo.current += 1;
                 setBusquedaProximo(null);
-                saltarPrimeraSemana.current = e.target.value === TODOS;
                 setProfesorId(e.target.value);
                 setEstadoCarga("cargando");
               }}
             >
               <option value="">Seleccione un profesor…</option>
-              <option value={TODOS}>Todos los profesores</option>
               {profesores.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.apellido}, {p.nombre}
@@ -408,22 +368,15 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
               Día
             </Button>
           </div>
-          {!todosActivo && (
-            <div className="flex items-center gap-2" role="group" aria-label="Zoom de la grilla">
-              <span className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Zoom</span>
-              <Button variant={zoom === 30 ? "primary" : "outline"} size="md" type="button" onClick={() => setZoom(30)}>
-                30&apos;
-              </Button>
-              <Button variant={zoom === 60 ? "primary" : "outline"} size="md" type="button" onClick={() => setZoom(60)}>
-                60&apos;
-              </Button>
-            </div>
-          )}
-          {todosActivo && (
-            <p className="text-sm font-medium text-on-surface-variant">
-              Vista consolidada: todos los turnos del período, sin disponibilidad.
-            </p>
-          )}
+          <div className="flex items-center gap-2" role="group" aria-label="Zoom de la grilla">
+            <span className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Zoom</span>
+            <Button variant={zoom === 30 ? "primary" : "outline"} size="md" type="button" onClick={() => setZoom(30)}>
+              30&apos;
+            </Button>
+            <Button variant={zoom === 60 ? "primary" : "outline"} size="md" type="button" onClick={() => setZoom(60)}>
+              60&apos;
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -435,7 +388,7 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
 
       {sinProfesor && !filtroBloqueado && (
         <p className="-mt-2 text-sm font-medium text-on-surface-variant print:hidden">
-          Elegí un profesor para ver su calendario, o «Todos los profesores» para ver todos los turnos.
+          Elegí un profesor para ver su calendario y sus turnos reservados.
         </p>
       )}
 
@@ -469,7 +422,7 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
             size="md"
             type="button"
             onClick={irProximoTurno}
-            disabled={sinProfesor || todosActivo || busquedaActual?.estado === "buscando"}
+            disabled={sinProfesor || busquedaActual?.estado === "buscando"}
           >
             <Icon name="event_upcoming" size={20} />
             {busquedaActual?.estado === "buscando" ? "Buscando…" : "Próximo turno"}
@@ -513,72 +466,6 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
             Reintentar
           </Button>
         </section>
-      ) : todosActivo ? (
-        <div
-          className={`overflow-auto rounded-md border border-outline-variant bg-surface-container-lowest print:max-h-none print:overflow-visible ${estadoCarga === "cargando" ? "opacity-60" : ""}`}
-          style={{ maxHeight: "calc(100vh - 17rem)" }}
-        >
-          {estadoCarga === "cargando" && turnosTodos.length === 0 ? (
-            <p role="status" aria-live="polite" className="px-4 py-16 text-center text-sm font-semibold text-on-surface-variant">
-              Cargando turnos…
-            </p>
-          ) : turnosTodos.length === 0 ? (
-            <p className="px-4 py-16 text-center text-sm font-medium text-on-surface-variant">
-              No hay turnos asignados{" "}
-              {vista === "semana"
-                ? `en la ${formatearSemana(lunes).toLowerCase()}`
-                : `el ${formatearDia(lunes).toLowerCase()}`}
-              . Probá navegar con ◀ ▶ o volver a Hoy.
-            </p>
-          ) : (
-            <table className="w-full border-collapse" aria-label="Todos los turnos asignados en el período">
-              <thead>
-                <tr className="border-b border-outline-variant">
-                  <th scope="col" className="sticky top-0 z-10 bg-surface-container-lowest px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-on-surface-variant">Fecha</th>
-                  <th scope="col" className="sticky top-0 z-10 bg-surface-container-lowest px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-on-surface-variant">Horario</th>
-                  <th scope="col" className="sticky top-0 z-10 bg-surface-container-lowest px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-on-surface-variant">Código</th>
-                  <th scope="col" className="sticky top-0 z-10 bg-surface-container-lowest px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-on-surface-variant">Alumno</th>
-                  <th scope="col" className="sticky top-0 z-10 bg-surface-container-lowest px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-on-surface-variant">Profesor</th>
-                  <th scope="col" className="sticky top-0 z-10 bg-surface-container-lowest px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-on-surface-variant">Materia</th>
-                  <th scope="col" className="sticky top-0 z-10 bg-surface-container-lowest px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-on-surface-variant">Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {turnosTodos.map((t) => {
-                  const [, mes, dia] = t.fecha.split("-");
-                  return (
-                    <tr
-                      key={t.id}
-                      className="border-b border-outline-variant last:border-b-0 hover:bg-surface-container-low/50"
-                    >
-                      <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-on-surface">
-                        {DIAS_CORTOS[nuevoDia(t.fecha)]} {dia}/{mes}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-bold text-on-surface-variant">
-                        {t.horaInicio} – {t.horaFin}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-bold text-on-surface-variant">
-                        {t.codigo}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-on-surface">
-                        {t.alumno.apellido}, {t.alumno.nombre}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-on-surface">
-                        {t.profesor.apellido}, {t.profesor.nombre}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-on-surface-variant">
-                        {t.materia.nombre}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <TurnoCalendarioBadge estado={t.estado} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
       ) : (
         <div
           className={`overflow-auto rounded-md border border-outline-variant bg-surface-container-lowest print:max-h-none print:overflow-visible ${estadoCarga === "cargando" ? "opacity-60" : ""}`}
@@ -716,7 +603,7 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
                                     {t.alumno.apellido}, {t.alumno.nombre}
                                   </span>
                                   <span className="truncate pl-2.5 text-[11px] font-medium leading-none text-on-surface-variant">
-                                    {d.profesor.apellido} · {t.materia.nombre}
+                                    {t.profesor.apellido} · {t.materia.nombre}
                                   </span>
                                 </button>
                               ))}
@@ -735,9 +622,9 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
 
       {/* Encabezado solo para impresión: academia + profesor + rango. */}
       <header className="hidden print:block">
-        <h2 className="text-center font-display text-lg font-bold">Centro Académico</h2>
+        <h2 className="text-center font-display text-lg font-bold">Nexo Académico</h2>
         <p className="text-center text-sm font-semibold">
-          Calendario de turnos · {todosActivo ? "Todos los profesores" : profesorSeleccionado ? `${profesorSeleccionado.apellido}, ${profesorSeleccionado.nombre}` : ""}
+          Calendario de turnos · {profesorSeleccionado ? `${profesorSeleccionado.apellido}, ${profesorSeleccionado.nombre}` : ""}
         </p>
         <p className="text-center text-sm font-medium text-on-surface-variant">
           {vista === "semana"
