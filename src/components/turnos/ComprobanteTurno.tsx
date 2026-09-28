@@ -51,10 +51,22 @@ export function ComprobanteTurno({
       aria-labelledby="comprobante-titulo"
       className="flex flex-col overflow-hidden rounded-md border border-outline-variant bg-surface-container-lowest shadow-card print:border-0 print:shadow-none"
     >
-      {/* Encabezado solo impreso: identifica el papel fuera de la pantalla. */}
-      <p className="hidden px-6 pt-6 text-sm font-bold text-primary print:block">
-        Centro Académico · Comprobante de reserva de clase de apoyo
-      </p>
+      {/* Encabezado solo impreso: logo + institución, para un papel institucional. */}
+      <div className="hidden items-center gap-3 px-6 pt-6 print:flex">
+        <img
+          src="/logo-centro-academico.png"
+          alt="Logo de Nexo Académico"
+          width={48}
+          height={48}
+          className="h-12 w-12 shrink-0 rounded-sm object-cover"
+        />
+        <div>
+          <p className="text-base font-bold text-primary">Nexo Académico</p>
+          <p className="text-sm font-semibold text-on-surface-variant">
+            Comprobante de reserva de clase de apoyo
+          </p>
+        </div>
+      </div>
 
       <header className="flex flex-wrap items-center justify-between gap-4 border-b border-outline-variant px-6 py-5">
         <div className="flex items-center gap-3">

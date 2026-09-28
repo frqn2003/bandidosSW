@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { RequiereSesion } from "@/components/auth/RequiereSesion";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { CalendarioTurnos } from "@/components/calendario/CalendarioTurnos";
@@ -9,6 +10,11 @@ import { useSesion } from "@/funciones/sesion";
 
 function CalendarioContent() {
   const { sesion } = useSesion();
+  // Preselección desde /turnos/reservas ("Ver en calendario"):
+  // ?profesorId=&fecha= abre la semana del turno, con ese profesor elegido.
+  const searchParams = useSearchParams();
+  const profesorIdInicial = searchParams.get("profesorId") ?? "";
+  const fechaIdeal = searchParams.get("fecha") ?? undefined;
   const [profesores, setProfesores] = useState<ProfesorCalendario[]>([]);
   const [cargandoProfs, setCargandoProfs] = useState(true);
   const [profesorFijo, setProfesorFijo] = useState<ProfesorCalendario | null>(null);
@@ -70,7 +76,12 @@ function CalendarioContent() {
               </span>
             </div>
           ) : (
-            <CalendarioTurnos profesores={profesores} profesorFijo={profesorFijo} />
+            <CalendarioTurnos
+              profesores={profesores}
+              profesorFijo={profesorFijo}
+              profesorIdInicial={profesorIdInicial}
+              fechaIdeal={fechaIdeal}
+            />
           )}
         </div>
       </main>
@@ -81,7 +92,10 @@ function CalendarioContent() {
 export default function CalendarioPage() {
   return (
     <RequiereSesion>
-      <CalendarioContent />
+      {/* useSearchParams necesita un límite de Suspense para el prerender. */}
+      <Suspense fallback={null}>
+        <CalendarioContent />
+      </Suspense>
     </RequiereSesion>
   );
 }

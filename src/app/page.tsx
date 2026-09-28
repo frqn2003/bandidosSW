@@ -107,13 +107,13 @@ export default function LoginPage() {
         <header className="flex flex-col items-center gap-3 text-center">
           <img
             src="/logo-centro-academico.png"
-            alt="Logo de Centro Académico"
+            alt="Logo de Nexo Académico"
             width={56}
             height={56}
             className="h-14 w-14 shrink-0 rounded-md object-cover"
           />
           <div>
-            <h1 className="font-display text-2xl font-bold text-on-surface">Centro Académico</h1>
+            <h1 className="font-display text-2xl font-bold text-on-surface">Nexo Académico</h1>
             <p className="text-sm font-medium text-on-surface-variant">
               Ingresá con tu cuenta del centro
             </p>

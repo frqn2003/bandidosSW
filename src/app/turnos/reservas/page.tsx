@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { RequiereSesion } from "@/components/auth/RequiereSesion";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { BuscadorAlumno } from "@/components/turnos/BuscadorAlumno";
@@ -72,6 +72,7 @@ function leerPrecarga(sp: URLSearchParams | null) {
 
 function ReservaContent() {
   const { showToast } = useToast();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [hoy] = useState(() => hoyISO());
   const fechaMax = sumarDias(hoy, DIAS_MAXIMOS_RESERVA);
@@ -541,6 +542,17 @@ function ReservaContent() {
                 </p>
               </div>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (window.history.length > 1) router.back();
+                else router.push("/turnos");
+              }}
+            >
+              <Icon name="arrow_back" size={16} />
+              Volver
+            </Button>
           </header>
 
           {turno ? (
@@ -548,7 +560,9 @@ function ReservaContent() {
               turno={turno}
               dniAlumno={dniComprobante}
               onNuevaReserva={nuevaReserva}
-              hrefCalendario="/calendario"
+              // "Ver en calendario": abre la vista semanal del profesor del turno
+              // recién reservado, con la semana anclada en la fecha del turno.
+              hrefCalendario={`/calendario?profesorId=${turno.profesor.id}&fecha=${turno.fecha}`}
               // OPCIONAL: impresión del comprobante (borrar esta prop si no se quiere).
               onImprimir={() => window.print()}
               // OPCIONAL: envío por email (borrar estas tres props si no se quiere).
