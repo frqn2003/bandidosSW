@@ -26,6 +26,8 @@ export type TurnoDetalleRow = {
   valor_clase_congelado: string;
   estado: EstadoTurno;
   observaciones: string | null;
+  cantidad_modificaciones: number;
+  pagado: boolean;
   usuario_id: number;
   usuario_nombre: string;
   usuario_apellido: string;

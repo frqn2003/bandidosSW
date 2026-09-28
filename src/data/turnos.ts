@@ -18,10 +18,28 @@
 
 import {
   RUTA,
+  rutaCancelar,
+  rutaTurno,
+  type CancelarTurnoInput,
   type CrearTurnoBody,
+  type EditarTurnoInput,
   type ErrorTurno,
+  type ListarTurnosQuery,
   type TurnoResponse,
 } from "@/contracts/turno";
+import {
+  RUTA_MOTIVOS_CANCELACION,
+  rutaParametro,
+  type MotivoCancelacionResponse,
+} from "@/contracts/catalogo";
+import {
+  MAX_MODIFICACIONES_FIXTURE,
+  PROFESORES_FIXTURE,
+  franjasDeEdicionFixture,
+  hoyFixture,
+  motivosCancelacionFixture,
+  turnoFixtures,
+} from "@/data/fixtures/turnos.fixture";
 import {
   RUTA_AGENDA,
   RUTA_HUECOS,
@@ -379,4 +397,192 @@ export async function enviarComprobantePorEmail(turnoId: number): Promise<{ dest
     undefined,
     501,
   );
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// HU-TUR-02 · Listado, modificación y cancelación de turnos
+//
+// El back todavía no publica estos endpoints en la forma que exige el contrato
+// (`puedeModificar`, `puedeCancelar`, `cantidadModificaciones` recién entran al
+// response), así que la maqueta resuelve contra el fixture de
+// src/data/fixtures/turnos.fixture.ts con las MISMAS reglas que va a validar el
+// service. Cuando el back termine, se borran turnosMemoria/demorar() y solo
+// cambia el cuerpo de cada función por la llamada apiGet/apiSend que está en el
+// comentario `// BACKEND:`. Patrón: docs/capa-de-datos-front.md.
+// ══════════════════════════════════════════════════════════════════════════
+
+/** Copia viva del fixture: la maqueta muta acá como si fueran los registros. */
+const turnosMemoria = turnoFixtures.map((f) => ({ ...f }));
+
+const DEMORA_MS = 300;
+const demorar = () => new Promise((r) => setTimeout(r, DEMORA_MS));
+
+function sumarMinutosBlanco(hora: string, minutos: number): string {
+  return minAString(aMin(hora) + minutos);
+}
+
+function turnoEnRango(fecha: string, desde?: string, hasta?: string): boolean {
+  if (desde && fecha < desde) return false;
+  if (hasta && fecha > hasta) return false;
+  return true;
+}
+
+/**
+ * Listado para la pantalla /turnos (HU-TUR-02).
+ * Mismos filtros de listarTurnosQuery: estado (Reservado/Cancelado),
+ * verCancelados, busqueda, alumnoId, profesorId, materiaId y rango de fechas.
+ */
+export async function listarTurnos(filtros: ListarTurnosQuery = {}): Promise<TurnoResponse[]> {
+  await demorar();
+  // const params = new URLSearchParams();
+  // if (filtros.busqueda) params.set("busqueda", filtros.busqueda);
+  // if (filtros.estado) params.set("estado", filtros.estado);
+  // if (filtros.verCancelados) params.set("verCancelados", "true");
+  // if (filtros.alumnoId) params.set("alumnoId", String(filtros.alumnoId));
+  // if (filtros.profesorId) params.set("profesorId", String(filtros.profesorId));
+  // if (filtros.materiaId) params.set("materiaId", String(filtros.materiaId));
+  // if (filtros.desde) params.set("desde", filtros.desde);
+  // if (filtros.hasta) params.set("hasta", filtros.hasta);
+  // return apiGet<TurnoResponse[]>(`${RUTA}?${params.toString()}`);
+  const q = filtros.busqueda?.trim().toLowerCase();
+  return turnosMemoria
+    .filter((t) => {
+      if (filtros.estado && t.estado !== filtros.estado) return false;
+      if (!filtros.estado && filtros.verCancelados !== true && t.estado !== "Reservado") return false;
+      if (filtros.alumnoId && t.alumno.id !== filtros.alumnoId) return false;
+      if (filtros.profesorId && t.profesor.id !== filtros.profesorId) return false;
+      if (filtros.materiaId && t.materia.id !== filtros.materiaId) return false;
+      if (!turnoEnRango(t.fecha, filtros.desde, filtros.hasta)) return false;
+      if (q) {
+        const texto = `${t.codigo} ${t.alumno.legajo} ${t.alumno.dni ?? ""} ${t.alumno.nombre} ${t.alumno.apellido}`.toLowerCase();
+        if (!texto.includes(q)) return false;
+      }
+      return true;
+    })
+    .map((t) => ({ ...t }));
+}
+
+/** Detalle de un turno (lo usa la acción "Ver" del listado). */
+export async function obtenerTurno(id: number): Promise<TurnoResponse> {
+  await demorar();
+  // return apiGet<TurnoResponse>(rutaTurno(id));
+  const turno = turnosMemoria.find((t) => t.id === id);
+  if (!turno) throw new ApiError("NO_ENCONTRADO", "El turno no existe.", undefined, 404);
+  return { ...turno };
+}
+
+/** Motivos de cancelación activos para el <select> del modal (HU-TUR-02). */
+export async function listarMotivosCancelacion(): Promise<MotivoCancelacionResponse[]> {
+  await demorar();
+  // return apiGet<MotivoCancelacionResponse[]>(`${RUTA_MOTIVOS_CANCELACION}?soloActivos=true`);
+  return motivosCancelacionFixture.filter((m) => m.estado === "activo").map((m) => ({ ...m }));
+}
+
+/**
+ * Tope de modificaciones por turno. Sale de la tabla parametro
+ * (seed: max_modificaciones_turno = 2).
+ */
+export async function obtenerMaxModificacionesTurno(): Promise<number> {
+  // const p = await apiGet<ParametroResponse>(rutaParametro("max_modificaciones_turno"));
+  // return p.valor;
+  return MAX_MODIFICACIONES_FIXTURE;
+}
+
+/** Opción de profesor para el <select> del modal de edición (HU-TUR-02). */
+export type ProfesorEdicionOpcion = { id: number; nombre: string; apellido: string };
+
+/**
+ * Profesores activos que dictan la materia del turno, para el formulario de
+ * edición. (En el back: GET /api/profesores?materiaId=&estado=activo.)
+ */
+export async function listarProfesoresParaEdicion(materiaId: number): Promise<ProfesorEdicionOpcion[]> {
+  await demorar();
+  // const lista = await listarProfesoresDeMateria(materiaId);
+  // return lista.map(({ id, nombre, apellido }) => ({ id, nombre, apellido }));
+  return PROFESORES_FIXTURE.filter((p) => p.materiaIds.includes(materiaId))
+    .map(({ id, nombre, apellido }) => ({ id, nombre, apellido }))
+    .sort((a, b) => a.apellido.localeCompare(b.apellido));
+}
+
+/**
+ * Franjas disponibles del profesor para la fecha, en el formulario de edición.
+ * Usa la MISMA regla de cupos que la reserva (listarFranjas), pero contra el
+ * fixture para que la maqueta no dependa del backend.
+ * // BACKEND: return listarFranjas(q);  (GET /api/calendario/agenda + cupos)
+ */
+export async function listarFranjasParaEdicion(q: FranjasQuery): Promise<FranjaTurnoResponse[]> {
+  await demorar();
+  return franjasDeEdicionFixture(q);
+}
+
+/**
+ * Modifica un turno (PUT /api/turnos/:id). Valida acá las mismas reglas del
+ * service (estado, pago, vencimiento y tope de modificaciones). Alumno y
+ * materia no se tocan: profesorId es opcional.
+ */
+export async function modificarTurno(id: number, body: EditarTurnoInput): Promise<TurnoResponse> {
+  await demorar();
+  // return apiSend<TurnoResponse>("PUT", rutaTurno(id), body);
+  const turno = turnosMemoria.find((t) => t.id === id);
+  if (!turno) throw new ApiError("NO_ENCONTRADO", "El turno no existe.", undefined, 404);
+  if (turno.estado !== "Reservado") throw new ApiError("TURNO_YA_CANCELADO", "El turno está cancelado.", undefined, 409);
+  if (turno.pagado) throw new ApiError("TURNO_YA_PAGADO", "El turno ya fue cobrado.", undefined, 409);
+  if (turno.fecha < hoyFixture) throw new ApiError("TURNO_PASADO", "El turno ya ocurrió.", undefined, 409);
+  if (turno.cantidadModificaciones >= (await obtenerMaxModificacionesTurno())) {
+    throw new ApiError(
+      "MAX_MODIFICACIONES_ALCANZADO",
+      "Este turno alcanzó el máximo de 2 modificaciones. Cancelalo y reservá uno nuevo.",
+      undefined,
+      409,
+    );
+  }
+
+  let profesor = turno.profesor;
+  if (body.profesorId && body.profesorId !== turno.profesor.id) {
+    const nuevo = PROFESORES_FIXTURE.find((p) => p.id === body.profesorId && p.materiaIds.includes(turno.materia.id));
+    if (!nuevo) throw new ApiError("REFERENCIA_INVALIDA", "El profesor elegido no dicta esta materia.", "profesorId", 422);
+    profesor = { id: nuevo.id, nombre: nuevo.nombre, apellido: nuevo.apellido };
+  }
+
+  turno.profesor = profesor;
+  turno.fecha = body.fecha;
+  turno.horaInicio = body.horaInicio;
+  turno.horaFin = sumarMinutosBlanco(body.horaInicio, turno.materia.duracionClaseMinutos);
+  turno.observaciones = body.observaciones ?? null;
+  turno.cantidadModificaciones += 1;
+  return { ...turno };
+}
+
+/**
+ * Cancela un turno con motivo (POST /api/turnos/:id/cancelar). El back calcula
+ * cancelacionTardia (< 24 h de anticipación); acá se replica para la maqueta.
+ */
+export async function cancelarTurno(id: number, body: CancelarTurnoInput): Promise<TurnoResponse> {
+  await demorar();
+  // return apiSend<TurnoResponse>("POST", rutaCancelar(id), body);
+  const turno = turnosMemoria.find((t) => t.id === id);
+  if (!turno) throw new ApiError("NO_ENCONTRADO", "El turno no existe.", undefined, 404);
+  if (turno.estado !== "Reservado") throw new ApiError("TURNO_YA_CANCELADO", "El turno ya está cancelado.", undefined, 409);
+  if (turno.pagado) throw new ApiError("TURNO_YA_PAGADO", "El turno ya fue cobrado.", undefined, 409);
+  if (turno.fecha < hoyFixture) throw new ApiError("TURNO_PASADO", "El turno ya ocurrió.", undefined, 409);
+
+  const motivo = motivosCancelacionFixture.find((m) => m.id === body.motivoCancelacionId);
+  if (!motivo) throw new ApiError("MOTIVO_CANCELACION_INACTIVO", "El motivo elegido no está disponible.", "motivoCancelacionId", 422);
+  if (motivo.requiereDetalle && !body.detalleCancelacion?.trim()) {
+    throw new ApiError("DETALLE_CANCELACION_REQUERIDO", "Este motivo requiere un detalle.", "detalleCancelacion", 422);
+  }
+
+  const inicio = new Date(`${turno.fecha}T${turno.horaInicio}:00`).getTime();
+  const cancelacionTardia = inicio - Date.now() < 24 * 3_600_000;
+
+  turno.estado = "Cancelado";
+  turno.motivoCancelacion = { id: motivo.id, nombre: motivo.nombre };
+  turno.detalleCancelacion = body.detalleCancelacion ?? null;
+  turno.fechaCancelacion = new Date().toISOString();
+  turno.cancelacionTardia = cancelacionTardia;
+  turno.puedeModificar = false;
+  turno.puedeCancelar = false;
+  turno.motivoDeshabilitado = "El turno está cancelado.";
+  return { ...turno };
 }

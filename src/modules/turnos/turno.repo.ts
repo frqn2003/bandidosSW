@@ -29,6 +29,8 @@ const COLUMNAS_TURNO = `
   t.valor_clase_congelado::text AS valor_clase_congelado,
   t.estado,
   t.observaciones,
+  t.cantidad_modificaciones,
+  t.pagado,
   t.usuario_id,
   ur.nombre AS usuario_nombre,
   ur.apellido AS usuario_apellido,
