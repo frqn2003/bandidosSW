@@ -16,6 +16,9 @@ export type HuecoRow = {
 export type TurnoCalendarioRow = {
   id: number;
   codigo: string | null;
+  profesor_id: number;
+  profesor_nombre: string;
+  profesor_apellido: string;
   alumno_id: number;
   alumno_nombre: string;
   alumno_apellido: string;

@@ -75,6 +75,9 @@ export async function turnosDelDia(
     SELECT
       t.id,
       t.codigo,
+      t.profesor_id,
+      up.nombre AS profesor_nombre,
+      up.apellido AS profesor_apellido,
       t.alumno_id,
       a.nombre AS alumno_nombre,
       a.apellido AS alumno_apellido,
@@ -86,6 +89,8 @@ export async function turnosDelDia(
     FROM turno t
     JOIN alumno a ON a.id = t.alumno_id
     JOIN materia m ON m.id = t.materia_id
+    JOIN profesor p ON p.id = t.profesor_id
+    JOIN usuario up ON up.id = p.usuario_id
     WHERE t.profesor_id = $1 AND t.fecha = $2::date
     ORDER BY t.hora_inicio ASC
   `;

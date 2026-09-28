@@ -45,6 +45,11 @@ export function turnoCalendarioToApi(row: TurnoCalendarioRow): TurnoCalendarioRe
       nombre: row.alumno_nombre,
       apellido: row.alumno_apellido,
     },
+    profesor: {
+      id: row.profesor_id,
+      nombre: row.profesor_nombre,
+      apellido: row.profesor_apellido,
+    },
     materia: {
       id: row.materia_id,
       nombre: row.materia_nombre,
