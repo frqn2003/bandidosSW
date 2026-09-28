@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, Role, Status } from "./useUsers";
+import { User, Role } from "./useUsers";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -32,6 +32,7 @@ export function UserFormModal({ open, modo, user, onClose, onGuardar, checkDupli
   const [dniError, setDniError] = useState("");
   const [emailError, setEmailError] = useState("");
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
       if (user) {
@@ -53,6 +54,7 @@ export function UserFormModal({ open, modo, user, onClose, onGuardar, checkDupli
       setEmailError("");
     }
   }, [open, user]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const [phoneError, setPhoneError] = useState("");
 
@@ -121,14 +123,33 @@ export function UserFormModal({ open, modo, user, onClose, onGuardar, checkDupli
       subtitle={isRead && user ? `Alta: 03/02/2026 por Carlos Benítez · Última modificación: 14/09/2026` : undefined}
       footer={
         !isRead ? (
-          <>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancelar
-            </Button>
-            <Button type="button" variant="primary" onClick={handleSubmit}>
-              Guardar usuario
-            </Button>
-          </>
+          <div className="flex w-full items-center justify-between">
+            <div>
+              {modo === "EDICION" && user && onDeactivateClick && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => {
+                    onClose();
+                    onDeactivateClick(user);
+                  }}
+                  disabled={user.status === "Inactivo"}
+                >
+                  <Icon name="delete" size={18} />
+                  Dar de baja
+                </Button>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button type="button" variant="primary" onClick={handleSubmit}>
+                <Icon name="save" size={18} />
+                {modo === "EDICION" ? "Guardar cambios" : "Guardar usuario"}
+              </Button>
+            </div>
+          </div>
         ) : (
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Button type="button" variant="outline" onClick={onClose}>
@@ -136,46 +157,37 @@ export function UserFormModal({ open, modo, user, onClose, onGuardar, checkDupli
             </Button>
             {user && (
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Button 
-                  type="button" 
-                  variant="outline"
-                  onClick={() => {
-                    onClose();
-                    onDeactivateClick?.(user);
-                  }}
-                  disabled={user.status === "Inactivo"}
-                  className="!border-error !text-error hover:!bg-error/10 hover:!text-error disabled:!border-outline-variant disabled:!text-on-surface-variant/50"
-                >
-                  <Icon name="person_remove" size={18} />
-                  Dar de baja
-                </Button>
-                <Button 
-                  type="button" 
-                  variant="primary" 
-                  onClick={() => {
-                    onClose();
-                    onEditClick?.(user);
-                  }}
-                >
-                  <Icon name="edit" size={18} />
-                  Editar usuario
-                </Button>
+                {onEditClick && (
+                  <Button
+                    type="button"
+                    variant="primary"
+                    onClick={() => {
+                      onClose();
+                      onEditClick(user);
+                    }}
+                  >
+                    <Icon name="edit" size={18} />
+                    Modificar ficha
+                  </Button>
+                )}
               </div>
             )}
           </div>
         )
       }
     >
-      {!isRead && (
-        <div className="mb-6 flex gap-2">
-          <span className="inline-flex items-center rounded-sm bg-primary-container/20 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-primary">
-            MODO {modo}
+      <div className="mb-4 flex items-center justify-between border-b border-outline-variant pb-3">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center rounded-sm bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary">
+            {modo === "EDICION" && "Modo EDICIÓN"}
+            {modo === "LECTURA" && "Modo LECTURA"}
+            {modo === "INSERCION" && "Modo INSERCIÓN"}
           </span>
-          {modo === "INSERCION" && (
-            <span className="text-xs text-on-surface-variant self-center ml-auto">* Campo obligatorio</span>
-          )}
         </div>
-      )}
+        {!isRead && (
+          <span className="text-xs font-medium text-on-surface-variant">* Campo obligatorio</span>
+        )}
+      </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <fieldset className="rounded-md border border-outline-variant p-5">
