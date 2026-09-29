@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { RequiereSesion } from "@/components/auth/RequiereSesion";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Button } from "@/components/ui/Button";
@@ -25,6 +26,7 @@ import { hoyAR } from "@/contracts/alumno";
 import {
   listarTurnos,
   obtenerMaxModificacionesTurno,
+  obtenerTurno,
   sumarDias,
   type TurnoResponse,
 } from "@/data/turnos";
@@ -99,6 +101,77 @@ function TurnosContent() {
     setEstadoCarga("cargando");
     traer();
   };
+
+  // Deep-link desde el detalle del calendario (HU-CAL-02, B6): /calendario
+  // manda ?turnoId=&accion=modificar|cancelar y acá se abre el modal que
+  // corresponde, para que el usuario siga el flujo sin tener que buscar el
+  // turno en el listado. El deep-link es de UN SOLO disparo: apenas se abre (o
+  // se rechaza) el turno, se limpian `turnoId` y `accion` de la URL. Sin eso, un
+  // F5 volvería a montar el modal encima del que el usuario ya cerró.
+  //
+  // `profesorId` y `fecha` NO se tocan: esta pantalla todavía no los lee (su
+  // filtro es por rango, no por día) y son datos del turno, no de un solo
+  // disparo. Queda pendiente que el filtro de /turnos los entienda.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const turnoId = searchParams.get("turnoId");
+  const accion = searchParams.get("accion");
+
+  useEffect(() => {
+    if (!turnoId || (accion !== "modificar" && accion !== "cancelar")) return;
+
+    const limpiarAccion = () => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("turnoId");
+      params.delete("accion");
+      const qs = params.toString();
+      router.replace(qs ? `/turnos?${qs}` : "/turnos", { scroll: false });
+    };
+
+    const id = Number(turnoId);
+    if (!Number.isInteger(id) || id <= 0) {
+      showToast("error", "El enlace al turno no es válido.");
+      limpiarAccion();
+      return;
+    }
+
+    // No se toca estado en el cuerpo del efecto: sólo dentro de los callbacks
+    // de la promesa (regla react-hooks/set-state-in-effect).
+    let cancelado = false;
+    // BACKEND: GET /api/turnos/:id
+    obtenerTurno(id)
+      .then((turno) => {
+        if (cancelado) return;
+        // Los flags vienen del back y el front NO los recalcula. El calendario
+        // ya esconde el botón cuando no puede, pero la URL se puede escribir a
+        // mano: mejor un aviso que un modal inútil.
+        if (accion === "modificar") {
+          if (turno.puedeModificar !== true) {
+            showToast("error", `El turno ${turno.codigo} no se puede modificar.`);
+            return;
+          }
+          setEditar(turno);
+        } else {
+          if (turno.puedeCancelar !== true) {
+            showToast("error", `El turno ${turno.codigo} no se puede cancelar.`);
+            return;
+          }
+          setCancelar(turno);
+        }
+      })
+      .catch(() => {
+        if (!cancelado) {
+          showToast("error", "No pudimos abrir el turno. Volvé a intentarlo desde el listado.");
+        }
+      })
+      .finally(() => {
+        if (!cancelado) limpiarAccion();
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [turnoId, accion, searchParams, router, showToast]);
 
   // Rango → al servidor; estado → en memoria (ver arriba).
   const cambiarFiltros = (next: FiltrosTurnosState) => {
@@ -327,7 +400,10 @@ export default function TurnosPage() {
   return (
     <RequiereSesion>
       <ToastProvider>
-        <TurnosContent />
+        {/* useSearchParams necesita un límite de Suspense para el prerender. */}
+        <Suspense fallback={null}>
+          <TurnosContent />
+        </Suspense>
       </ToastProvider>
     </RequiereSesion>
   );
