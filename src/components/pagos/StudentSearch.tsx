@@ -86,7 +86,8 @@ export function StudentSearch({
           </div>
           <input
             id={searchInputId}
-            type="search"
+            type="text"
+            role="searchbox"
             autoComplete="off"
             value={query}
             onChange={(e) => {
@@ -97,7 +98,7 @@ export function StudentSearch({
               if (query.trim().length > 0) setIsOpen(true);
             }}
             placeholder="Buscar por DNI, Nombre, Apellido o Legajo (ej. A-0120)"
-            className="h-11 w-full rounded-md border border-slate-300 bg-white py-2.5 pr-10 pl-10 text-sm text-slate-900 placeholder:text-slate-400 shadow-xs transition-colors focus:border-blue-600 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+            className="h-11 w-full rounded-md border border-slate-300 bg-white py-2.5 pr-10 pl-10 text-sm text-slate-900 placeholder:text-slate-400 shadow-xs transition-colors focus:border-blue-600 focus:ring-2 focus:ring-blue-100 focus:outline-none [&::-ms-clear]:hidden [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:appearance-none"
           />
           {query && (
             <button
