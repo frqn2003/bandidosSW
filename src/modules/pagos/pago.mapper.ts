@@ -17,6 +17,16 @@ export function clasePendienteToApi(row: ClasePendientePagoRow): ClasePendienteP
   return {
     id: row.id,
     codigo: row.codigo ?? `TUR-${String(row.id).padStart(6, "0")}`,
+    alumnoId: row.alumno_id,
+    alumno: row.alumno_nombre && row.alumno_apellido
+      ? {
+          id: row.alumno_id,
+          legajo: row.alumno_legajo ?? `ALU-${String(row.alumno_id).padStart(6, "0")}`,
+          nombre: row.alumno_nombre,
+          apellido: row.alumno_apellido,
+          dni: row.alumno_dni ?? "",
+        }
+      : undefined,
     fecha: row.fecha.slice(0, 10),
     horaInicio: hhmm(row.hora_inicio),
     horaFin: hhmm(row.hora_fin),

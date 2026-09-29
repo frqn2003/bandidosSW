@@ -75,6 +75,7 @@ export function turnoCalendarioToApi(
   return {
     id: row.id,
     codigo: row.codigo ?? `TUR-${String(row.id).padStart(6, "0")}`,
+    fecha: row.fecha.slice(0, 10),
     alumno: {
       id: row.alumno_id,
       nombre: row.alumno_nombre,

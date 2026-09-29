@@ -1,11 +1,12 @@
 // src/modules/calendario/useCalendar.ts
 //
 // Hook de estado y lógica de negocio para el Calendario de Turnos (HU-CAL-02).
+// Conectado directamente a la API de backend (/api/calendario/agenda, /api/profesores, /api/materias).
 // Maneja:
 //  · Vistas (Día, Semana predeterminada, Mes).
 //  · Navegación temporal (Hoy, Anterior, Siguiente, Salto a fecha específica).
 //  · Filtros combinables (Profesor, Materia, Ver cancelados, Solo con cupo).
-//  · Simulación de tiempo real (polling silencioso cada 30s + contador "actualizado hace X s").
+//  · Actualización en tiempo real (polling silencioso cada 30s + contador de segundos).
 //  · Selección de turno y apertura de panel lateral de detalle.
 //  · Reprogramación de turnos (Drag & Drop) con flujo de confirmación.
 //  · Cancelación y modificación de turnos respetando reglas de negocio.
@@ -13,6 +14,11 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { apiGet, apiSend } from "@/lib/api-client";
+import { RUTA_AGENDA, type AgendaDiaResponse } from "@/contracts/calendario";
+import { listarProfesoresActivos } from "@/data/calendario";
+import { listarMaterias } from "@/data/materias";
+import { sumarDias } from "@/funciones/fechas-calendario";
 import type {
   TurnoCalendario,
   ProfesorCalendario,
@@ -23,11 +29,17 @@ import type {
   ColumnaProfesorDia,
   ReprogramarTurnoData,
 } from "./types";
-import {
-  MOCK_PROFESORES,
-  MOCK_MATERIAS,
-  MOCK_TURNOS_INICIALES,
-} from "./mock-data";
+
+const PALETA_COLORES = [
+  "#2563eb", // azul
+  "#7c3aed", // violeta
+  "#059669", // esmeralda
+  "#d97706", // ambar
+  "#dc2626", // rojo
+  "#0891b2", // cian
+  "#4f46e5", // indigo
+  "#c026d3", // fucsia
+];
 
 export interface UseCalendarOptions {
   vistaInicial?: VistaCalendario;
@@ -40,28 +52,125 @@ export function useCalendar(options: UseCalendarOptions = {}) {
   // ─── 1. Estado principal ────────────────────────────────────────────────
   const [vista, setVista] = useState<VistaCalendario>(options.vistaInicial ?? "semana");
   const [fechaSeleccionada, setFechaSeleccionada] = useState<string>(
-    options.fechaInicial ?? "2026-09-28" // Lunes 28 de septiembre 2026 (según wireframes)
+    options.fechaInicial ?? "2026-09-28"
   );
 
   const [filtros, setFiltros] = useState<FiltrosCalendario>({
     profesorId: options.profesorIdInicial,
     materiaId: options.materiaIdInicial,
-    verCancelados: false, // Ocultos por defecto (requisito HU-CAL-02)
+    verCancelados: false, // Ocultos por defecto
     soloConCupo: false,
   });
 
-  const [turnos, setTurnos] = useState<TurnoCalendario[]>(MOCK_TURNOS_INICIALES);
-  const [profesores] = useState<ProfesorCalendario[]>(MOCK_PROFESORES);
-  const [materias] = useState<MateriaCalendario[]>(MOCK_MATERIAS);
+  const [turnos, setTurnos] = useState<TurnoCalendario[]>([]);
+  const [profesores, setProfesores] = useState<ProfesorCalendario[]>([]);
+  const [materias, setMaterias] = useState<MateriaCalendario[]>([]);
 
   const [turnoSeleccionado, setTurnoSeleccionado] = useState<TurnoCalendario | null>(null);
   const [reprogramacionPendiente, setReprogramacionPendiente] = useState<ReprogramarTurnoData | null>(null);
 
-  // ─── 2. Simulación de Tiempo Real (Polling 30s + contador de segundos) ──
-  const [segundosActualizado, setSegundosActualizado] = useState<number>(3);
+  // ─── 2. Tiempo real (Polling 30s + contador de segundos) ────────────────
+  const [segundosActualizado, setSegundosActualizado] = useState<number>(0);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
-  // Incremento de contador de segundos transcurridos
+  // Lunes de la semana que contiene `fechaSeleccionada`
+  const fechaLunesSemana = useMemo(() => {
+    const d = new Date(`${fechaSeleccionada}T00:00:00`);
+    const day = d.getDay(); // 0 es domingo
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(d.setDate(diff));
+    return monday.toISOString().split("T")[0];
+  }, [fechaSeleccionada]);
+
+  // Carga de catálogo de profesores y materias activas
+  useEffect(() => {
+    let cancelado = false;
+
+    Promise.all([
+      listarProfesoresActivos(),
+      listarMaterias({ estado: "activo" }),
+    ])
+      .then(([profs, mats]) => {
+        if (cancelado) return;
+
+        setProfesores(
+          profs.map((p) => ({
+            id: p.id,
+            nombre: p.nombre,
+            apellido: p.apellido,
+            usuarioId: p.usuarioId,
+          }))
+        );
+
+        setMaterias(
+          mats.map((m, idx) => ({
+            id: m.id,
+            nombre: m.nombre,
+            color: PALETA_COLORES[idx % PALETA_COLORES.length],
+            duracionMinutos: m.duracionClaseMinutos,
+          }))
+        );
+      })
+      .catch((err) => {
+        if (!cancelado) console.error("Error al cargar profesores y materias:", err);
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  // Helper que consulta la API de agenda
+  const obtenerTurnosApi = useCallback(() => {
+    let desde: string;
+    let hasta: string;
+
+    if (vista === "dia") {
+      desde = fechaSeleccionada;
+      hasta = fechaSeleccionada;
+    } else if (vista === "mes") {
+      const [y, m] = fechaSeleccionada.split("-");
+      const totalDias = new Date(parseInt(y, 10), parseInt(m, 10), 0).getDate();
+      desde = `${y}-${m}-01`;
+      hasta = `${y}-${m}-${String(totalDias).padStart(2, "0")}`;
+    } else {
+      // Vista semana
+      desde = fechaLunesSemana;
+      hasta = sumarDias(fechaLunesSemana, 5);
+    }
+
+    const params = new URLSearchParams({ desde, hasta });
+    if (filtros.profesorId !== undefined) params.set("profesorId", String(filtros.profesorId));
+    if (filtros.materiaId !== undefined) params.set("materiaId", String(filtros.materiaId));
+    if (filtros.verCancelados) params.set("verCancelados", "true");
+
+    return apiGet<AgendaDiaResponse>(`${RUTA_AGENDA}?${params.toString()}`);
+  }, [vista, fechaSeleccionada, fechaLunesSemana, filtros]);
+
+  // Carga inicial y ante cambios en fechas o filtros vía callback asíncrono
+  useEffect(() => {
+    let cancelado = false;
+    obtenerTurnosApi()
+      .then((res) => {
+        if (cancelado) return;
+        setTurnos(
+          res.turnos.map((t) => ({
+            ...t,
+            fecha: t.fecha ?? fechaSeleccionada,
+          }))
+        );
+        setSegundosActualizado(0);
+      })
+      .catch((err) => {
+        if (!cancelado) console.error("Error al cargar turnos:", err);
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [obtenerTurnosApi, fechaSeleccionada]);
+
+  // Incremento del contador de segundos
   useEffect(() => {
     const timer = setInterval(() => {
       setSegundosActualizado((prev) => prev + 1);
@@ -69,27 +178,36 @@ export function useCalendar(options: UseCalendarOptions = {}) {
     return () => clearInterval(timer);
   }, []);
 
-  // Polling silencioso cada 30 segundos (simula actualización de datos en segundo plano)
+  const refrescarTurnos = useCallback(() => {
+    setIsRefreshing(true);
+    obtenerTurnosApi()
+      .then((res) => {
+        setTurnos(
+          res.turnos.map((t) => ({
+            ...t,
+            fecha: t.fecha ?? fechaSeleccionada,
+          }))
+        );
+        setSegundosActualizado(0);
+      })
+      .catch(console.error)
+      .finally(() => {
+        setIsRefreshing(false);
+      });
+  }, [obtenerTurnosApi, fechaSeleccionada]);
+
+  // Polling silencioso cada 30 segundos
   useEffect(() => {
     const pollInterval = setInterval(() => {
-      setIsRefreshing(true);
-      // Simula sincronización silenciosa con backend
-      setTimeout(() => {
-        setSegundosActualizado(0);
-        setIsRefreshing(false);
-      }, 300);
+      refrescarTurnos();
     }, 30000);
 
     return () => clearInterval(pollInterval);
-  }, []);
+  }, [refrescarTurnos]);
 
   const refrescarManualmente = useCallback(() => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setSegundosActualizado(0);
-      setIsRefreshing(false);
-    }, 200);
-  }, []);
+    refrescarTurnos();
+  }, [refrescarTurnos]);
 
   // ─── 3. Setters de filtros ──────────────────────────────────────────────
   const setProfesorFiltro = useCallback((profesorId?: number) => {
@@ -111,15 +229,12 @@ export function useCalendar(options: UseCalendarOptions = {}) {
   // ─── 4. Filtrado de Turnos ──────────────────────────────────────────────
   const turnosFiltrados = useMemo(() => {
     return turnos.filter((t) => {
-      // Filtro Profesor
       if (filtros.profesorId !== undefined && t.profesor.id !== filtros.profesorId) {
         return false;
       }
-      // Filtro Materia
       if (filtros.materiaId !== undefined && t.materia.id !== filtros.materiaId) {
         return false;
       }
-      // Filtro Cancelados: Ocultos salvo que verCancelados esté activo
       if (!filtros.verCancelados && t.estado === "Cancelado") {
         return false;
       }
@@ -128,20 +243,13 @@ export function useCalendar(options: UseCalendarOptions = {}) {
   }, [turnos, filtros]);
 
   // ─── 5. Helpers de Fechas y Rangos ──────────────────────────────────────
-  // Lunes de la semana que contiene `fechaSeleccionada`
-  const fechaLunesSemana = useMemo(() => {
-    const d = new Date(`${fechaSeleccionada}T00:00:00`);
-    const day = d.getDay(); // 0 es domingo
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(d.setDate(diff));
-    return monday.toISOString().split("T")[0];
-  }, [fechaSeleccionada]);
-
-  // Lista de 6 días de la semana (Lunes a Sábado, el domingo no se dictan clases)
   const diasSemana = useMemo(() => {
     const lista: { fecha: string; nombreDia: string; numeroDia: number; esHoy: boolean }[] = [];
     const base = new Date(`${fechaLunesSemana}T00:00:00`);
     const nombres = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
+    const hoyStr = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Argentina/Buenos_Aires",
+    }).format(new Date());
 
     for (let i = 0; i < 6; i++) {
       const current = new Date(base);
@@ -151,7 +259,7 @@ export function useCalendar(options: UseCalendarOptions = {}) {
         fecha: iso,
         nombreDia: nombres[i],
         numeroDia: current.getDate(),
-        esHoy: iso === "2026-09-28", // Fecha de referencia de la app
+        esHoy: iso === hoyStr,
       });
     }
     return lista;
@@ -160,8 +268,7 @@ export function useCalendar(options: UseCalendarOptions = {}) {
   // ─── 6. Turnos por Día y Columnas por Profesor (para DayView) ───────────
   const columnasDia = useMemo((): ColumnaProfesorDia[] => {
     const turnosDelDia = turnosFiltrados.filter((t) => t.fecha === fechaSeleccionada);
-    
-    // Profesores a mostrar (todos o el seleccionado)
+
     const profesoresVisibles = filtros.profesorId
       ? profesores.filter((p) => p.id === filtros.profesorId)
       : profesores;
@@ -180,7 +287,10 @@ export function useCalendar(options: UseCalendarOptions = {}) {
           { horaInicio: "14:00", horaFin: "15:00" },
           { horaInicio: "15:00", horaFin: "16:00" },
         ].filter(
-          (franja) => !turnosProf.some((t) => t.horaInicio === franja.horaInicio && t.estado === "Reservado")
+          (franja) =>
+            !turnosProf.some(
+              (t) => t.horaInicio === franja.horaInicio && t.estado === "Reservado"
+            )
         ),
       };
     });
@@ -196,13 +306,15 @@ export function useCalendar(options: UseCalendarOptions = {}) {
     const ultimoDia = new Date(anio, mesIndex + 1, 0);
     const totalDias = ultimoDia.getDate();
 
-    // Días de relleno previo para que la grilla empiece en Lunes
     const primerDiaSemana = primerDia.getDay(); // 0 domingo, 1 lunes...
     const offsetInicio = primerDiaSemana === 0 ? 6 : primerDiaSemana - 1;
 
+    const hoyStr = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Argentina/Buenos_Aires",
+    }).format(new Date());
+
     const lista: DiaResumenMes[] = [];
 
-    // Helper reactivo que calcula el resumen de un día a partir de turnosFiltrados
     const obtenerResumenDia = (iso: string, numeroDia: number, esMesActual: boolean): DiaResumenMes => {
       const turnosEnFecha = turnosFiltrados.filter((t) => t.fecha === iso);
       const uniqueMateriasMap = new Map<number, { materiaId: number; color: string; nombre: string }>();
@@ -222,13 +334,13 @@ export function useCalendar(options: UseCalendarOptions = {}) {
         fecha: iso,
         numeroDia,
         esMesActual,
-        esHoy: iso === "2026-09-28",
+        esHoy: iso === hoyStr,
         cantidadTurnos: turnosEnFecha.length,
         materiasConTurnos: Array.from(uniqueMateriasMap.values()),
       };
     };
 
-    // Relleno días mes anterior (ej. 31 de agosto)
+    // Relleno días mes anterior
     const ultimoDiaMesAnterior = new Date(anio, mesIndex, 0).getDate();
     for (let i = offsetInicio - 1; i >= 0; i--) {
       const num = ultimoDiaMesAnterior - i;
@@ -244,7 +356,7 @@ export function useCalendar(options: UseCalendarOptions = {}) {
       lista.push(obtenerResumenDia(iso, dia, true));
     }
 
-    // Relleno días mes siguiente para completar la cuadrícula de 35 o 42 celdas
+    // Relleno días mes siguiente
     const resto = lista.length % 7;
     if (resto > 0) {
       const faltan = 7 - resto;
@@ -261,14 +373,16 @@ export function useCalendar(options: UseCalendarOptions = {}) {
 
   // ─── 8. Navegación temporal ─────────────────────────────────────────────
   const irAHoy = useCallback(() => {
-    setFechaSeleccionada("2026-09-28");
+    const hoyStr = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Argentina/Buenos_Aires",
+    }).format(new Date());
+    setFechaSeleccionada(hoyStr);
   }, []);
 
   const anterior = useCallback(() => {
     const d = new Date(`${fechaSeleccionada}T00:00:00`);
     if (vista === "dia") {
       d.setDate(d.getDate() - 1);
-      // Saltear domingo al ir hacia atrás
       if (d.getDay() === 0) d.setDate(d.getDate() - 1);
     } else if (vista === "semana") {
       d.setDate(d.getDate() - 7);
@@ -282,7 +396,6 @@ export function useCalendar(options: UseCalendarOptions = {}) {
     const d = new Date(`${fechaSeleccionada}T00:00:00`);
     if (vista === "dia") {
       d.setDate(d.getDate() + 1);
-      // Saltear domingo al ir hacia adelante
       if (d.getDay() === 0) d.setDate(d.getDate() + 1);
     } else if (vista === "semana") {
       d.setDate(d.getDate() + 7);
@@ -354,10 +467,6 @@ export function useCalendar(options: UseCalendarOptions = {}) {
     setTurnoSeleccionado(null);
   }, []);
 
-  /**
-   * Disparado al soltar un turno en Drag and Drop en una nueva fecha/hora/profesor.
-   * Abre el modal de confirmación con los campos modificados antes de aplicar el cambio.
-   */
   const iniciarReprogramacion = useCallback(
     (
       turnoId: number,
@@ -369,7 +478,6 @@ export function useCalendar(options: UseCalendarOptions = {}) {
       const nuevoProf = profesores.find((p) => p.id === nuevoProfesorId);
       if (!turnoActual || !nuevoProf) return;
 
-      // Calcula hora fin sumando la duración de la materia
       const [h, min] = nuevaHoraInicio.split(":").map(Number);
       const duracion = turnoActual.materia.duracionClaseMinutos ?? 60;
       const minFin = h * 60 + min + duracion;
@@ -399,11 +507,12 @@ export function useCalendar(options: UseCalendarOptions = {}) {
     [turnos, profesores]
   );
 
-  const confirmarReprogramacion = useCallback(() => {
+  const confirmarReprogramacion = useCallback(async () => {
     if (!reprogramacionPendiente) return;
     const { turno, fechaNueva, horaInicioNueva, horaFinNueva, profesorNuevo } =
       reprogramacionPendiente;
 
+    // Actualización optimista local
     setTurnos((prev) =>
       prev.map((t) => {
         if (t.id !== turno.id) return t;
@@ -422,7 +531,6 @@ export function useCalendar(options: UseCalendarOptions = {}) {
       })
     );
 
-    // Si el turno modificado estaba abierto en el detalle, se actualiza
     setTurnoSeleccionado((prev) => {
       if (prev?.id === turno.id) {
         return {
@@ -438,38 +546,67 @@ export function useCalendar(options: UseCalendarOptions = {}) {
     });
 
     setReprogramacionPendiente(null);
-  }, [reprogramacionPendiente]);
+
+    try {
+      await apiSend("PUT", `/api/turnos/${turno.id}`, {
+        fecha: fechaNueva,
+        horaInicio: horaInicioNueva,
+        horaFin: horaFinNueva,
+        profesorId: profesorNuevo.id,
+      });
+      refrescarTurnos();
+    } catch (e) {
+      console.error("Error al reprogramar turno:", e);
+      refrescarTurnos();
+    }
+  }, [reprogramacionPendiente, refrescarTurnos]);
 
   const cancelarReprogramacion = useCallback(() => {
     setReprogramacionPendiente(null);
   }, []);
 
-  const cancelarTurno = useCallback((turnoId: number, motivo?: string) => {
-    setTurnos((prev) =>
-      prev.map((t) => {
-        if (t.id !== turnoId) return t;
-        return {
-          ...t,
-          estado: "Cancelado",
-          puedeModificar: false,
-          puedeCancelar: false,
-          observaciones: motivo ?? t.observaciones,
-        };
-      })
-    );
-    setTurnoSeleccionado((prev) => {
-      if (prev?.id === turnoId) {
-        return {
-          ...prev,
-          estado: "Cancelado",
-          puedeModificar: false,
-          puedeCancelar: false,
-          observaciones: motivo ?? prev.observaciones,
-        };
+  const cancelarTurno = useCallback(
+    async (turnoId: number, motivo?: string) => {
+      // Actualización optimista local
+      setTurnos((prev) =>
+        prev.map((t) => {
+          if (t.id !== turnoId) return t;
+          return {
+            ...t,
+            estado: "Cancelado",
+            puedeModificar: false,
+            puedeCancelar: false,
+            observaciones: motivo ?? t.observaciones,
+          };
+        })
+      );
+
+      setTurnoSeleccionado((prev) => {
+        if (prev?.id === turnoId) {
+          return {
+            ...prev,
+            estado: "Cancelado",
+            puedeModificar: false,
+            puedeCancelar: false,
+            observaciones: motivo ?? prev.observaciones,
+          };
+        }
+        return prev;
+      });
+
+      try {
+        await apiSend("POST", `/api/turnos/${turnoId}/cancelar`, {
+          motivoCancelacionId: 1,
+          detalleMotivo: motivo ?? null,
+        });
+        refrescarTurnos();
+      } catch (e) {
+        console.error("Error al cancelar turno:", e);
+        refrescarTurnos();
       }
-      return prev;
-    });
-  }, []);
+    },
+    [refrescarTurnos]
+  );
 
   return {
     // Estado y filtros

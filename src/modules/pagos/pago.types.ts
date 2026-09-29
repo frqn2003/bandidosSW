@@ -8,6 +8,10 @@ export type ClasePendientePagoRow = {
   id: number;
   codigo: string | null;
   alumno_id: number;
+  alumno_legajo?: string | null;
+  alumno_nombre?: string;
+  alumno_apellido?: string;
+  alumno_dni?: string;
   fecha: string;
   hora_inicio: string;
   hora_fin: string;

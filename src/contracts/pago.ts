@@ -55,7 +55,7 @@ export const clasesPendientesQuery = z
   .object({
     alumnoId: z.coerce.number().int().positive({
       message: "Debe indicar el alumno para consultar sus clases adeudadas.",
-    }),
+    }).optional(),
   })
   .strict();
 
@@ -122,6 +122,14 @@ export type CrearPagoInput = z.output<typeof crearPagoBody>;
 export type ClasePendientePagoResponse = {
   id: number; // turno_id
   codigo: string;
+  alumnoId?: number;
+  alumno?: {
+    id: number;
+    legajo: string;
+    nombre: string;
+    apellido: string;
+    dni: string;
+  };
   /** "yyyy-mm-dd" */
   fecha: string;
   /** "HH:MM" */

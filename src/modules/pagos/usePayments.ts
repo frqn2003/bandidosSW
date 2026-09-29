@@ -1,11 +1,21 @@
 // src/modules/pagos/usePayments.ts
 //
 // Custom Hook para el módulo de Gestión de Pagos (HU-PAG-01).
+// Conectado directamente a la capa de datos real (PostgreSQL / API).
 // Gestiona el estado reactivo del flujo de cobro, selección de clases impagas,
 // cálculo dinámico de totales, registro de comprobantes e historial del alumno.
 
-import { useState, useMemo, useCallback } from "react";
-import { hoyAR } from "@/contracts/pago";
+"use client";
+
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { ApiError } from "@/lib/api-client";
+import { listarAlumnos } from "@/data/alumnos";
+import {
+  listarPagos,
+  registrarPago,
+  listarClasesPendientes,
+  listarFormasPago,
+} from "@/data/pagos";
 import type {
   ClasePendientePagoResponse,
   FormaPagoResponse,
@@ -15,12 +25,6 @@ import type {
   PaymentsTab,
   ErrorPago,
 } from "./types";
-import {
-  MOCK_FORMAS_PAGO,
-  MOCK_STUDENTS,
-  INITIAL_PENDING_CLASSES_MOCK,
-  INITIAL_PAYMENT_HISTORY_MOCK,
-} from "./mock-data";
 
 export interface RegisterPaymentParams {
   formasPago: {
@@ -43,15 +47,16 @@ export function usePayments() {
   const [activeTab, setActiveTab] = useState<PaymentsTab>("registrar");
 
   // Alumnos y clases pendientes en estado reactivo
-  const [students, setStudents] = useState<StudentPaymentSummary[]>(MOCK_STUDENTS);
+  const [students, setStudents] = useState<StudentPaymentSummary[]>([]);
   const [pendingClassesByStudent, setPendingClassesByStudent] = useState<
     Record<number, ClasePendientePagoResponse[]>
-  >(INITIAL_PENDING_CLASSES_MOCK);
+  >({});
 
   // Historial global de comprobantes
-  const [paymentHistory, setPaymentHistory] = useState<PagoResponse[]>(
-    INITIAL_PAYMENT_HISTORY_MOCK
-  );
+  const [paymentHistory, setPaymentHistory] = useState<PagoResponse[]>([]);
+
+  // Catálogo de formas de pago
+  const [formasPagoCatalogo, setFormasPagoCatalogo] = useState<FormaPagoResponse[]>([]);
 
   // Alumno actualmente seleccionado
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
@@ -62,8 +67,57 @@ export function usePayments() {
   // Comprobante emitido tras confirmar el pago (para mostrar en ReceiptView)
   const [lastReceipt, setLastReceipt] = useState<PaymentReceipt | null>(null);
 
-  // Catálogo de formas de pago
-  const formasPagoCatalogo: FormaPagoResponse[] = useMemo(() => MOCK_FORMAS_PAGO, []);
+  // Carga inicial de datos desde la API
+  useEffect(() => {
+    let cancelado = false;
+
+    Promise.all([
+      listarAlumnos({ estado: "activo" }),
+      listarClasesPendientes(),
+      listarFormasPago(),
+      listarPagos(),
+    ])
+      .then(([alus, pendientes, fp, historial]) => {
+        if (cancelado) return;
+
+        // Indexar clases pendientes por alumno
+        const pendientesPorAlumno: Record<number, ClasePendientePagoResponse[]> = {};
+        for (const c of pendientes) {
+          const aid = c.alumnoId ?? c.alumno?.id;
+          if (aid) {
+            if (!pendientesPorAlumno[aid]) pendientesPorAlumno[aid] = [];
+            pendientesPorAlumno[aid].push(c);
+          }
+        }
+
+        // Construir resumen con deuda real calculada de los turnos impagos
+        const studentSummaries: StudentPaymentSummary[] = alus.map((a) => {
+          const clasesDelAlumno = pendientesPorAlumno[a.id] ?? [];
+          const totalDeuda = clasesDelAlumno.reduce((sum, cl) => sum + cl.importe, 0);
+          return {
+            id: a.id,
+            legajo: a.legajo,
+            nombre: a.nombre,
+            apellido: a.apellido,
+            dni: a.dni,
+            totalDeudaPendiente: totalDeuda,
+            clasesPendientesCount: clasesDelAlumno.length,
+          };
+        });
+
+        setStudents(studentSummaries);
+        setPendingClassesByStudent(pendientesPorAlumno);
+        setFormasPagoCatalogo(fp);
+        setPaymentHistory(historial);
+      })
+      .catch((err) => {
+        console.error("Error al cargar datos iniciales de pagos:", err);
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, []);
 
   // Alumno seleccionado actual
   const selectedStudent = useMemo(() => {
@@ -71,7 +125,7 @@ export function usePayments() {
     return students.find((s) => s.id === selectedStudentId) ?? null;
   }, [students, selectedStudentId]);
 
-  // Clases pendientes del alumno seleccionado (solo las que no han sido pagadas)
+  // Clases pendientes del alumno seleccionado (solo las no pagadas)
   const pendingClasses = useMemo(() => {
     if (!selectedStudentId) return [];
     const classes = pendingClassesByStudent[selectedStudentId] ?? [];
@@ -106,6 +160,17 @@ export function usePayments() {
     setSelectedStudentId(studentId);
     setSelectedClassIds([]);
     setLastReceipt(null);
+
+    if (studentId) {
+      listarClasesPendientes(studentId)
+        .then((clases) => {
+          setPendingClassesByStudent((prev) => ({
+            ...prev,
+            [studentId]: clases,
+          }));
+        })
+        .catch(console.error);
+    }
   }, []);
 
   // Alternar selección de una clase individual
@@ -140,10 +205,9 @@ export function usePayments() {
     [students]
   );
 
-  // Registrar pago simulando transacción de backend
+  // Registrar pago llamando a la API real
   const registerPayment = useCallback(
     async (params: RegisterPaymentParams): Promise<RegisterPaymentResult> => {
-      // BACKEND: POST /api/pagos con CrearPagoBody
       if (!selectedStudent) {
         return {
           success: false,
@@ -160,129 +224,61 @@ export function usePayments() {
         };
       }
 
-      // Validar fecha futura
-      const fechaActual = hoyAR();
-      if (params.fechaPago > fechaActual) {
+      try {
+        const nuevoPago = await registrarPago({
+          alumnoId: selectedStudent.id,
+          turnoIds: selectedClassIds,
+          formasPago: params.formasPago,
+          fechaPago: params.fechaPago,
+          observaciones: params.observaciones ?? null,
+        });
+
+        // Actualizar comprobante emitido
+        setLastReceipt(nuevoPago);
+
+        // Incorporar al historial de comprobantes
+        setPaymentHistory((prev) => [nuevoPago, ...prev.filter((p) => p.id !== nuevoPago.id)]);
+
+        // Eliminar las clases abonadas del listado pendiente
+        setPendingClassesByStudent((prev) => {
+          const studentClasses = prev[selectedStudent.id] ?? [];
+          return {
+            ...prev,
+            [selectedStudent.id]: studentClasses.filter((c) => !selectedClassIds.includes(c.id)),
+          };
+        });
+
+        // Actualizar totales y contadores del alumno en memoria
+        setStudents((prev) =>
+          prev.map((s) => {
+            if (s.id !== selectedStudent.id) return s;
+            const nuevaDeuda = Math.max(0, s.totalDeudaPendiente - nuevoPago.monto);
+            const nuevoCount = Math.max(0, s.clasesPendientesCount - nuevoPago.clases.length);
+            return {
+              ...s,
+              totalDeudaPendiente: nuevaDeuda,
+              clasesPendientesCount: nuevoCount,
+            };
+          })
+        );
+
+        setSelectedClassIds([]);
+
+        return {
+          success: true,
+          receipt: nuevoPago,
+        };
+      } catch (err) {
+        const msg = err instanceof ApiError ? err.message : "Error de comunicación al procesar el pago.";
+        const code = (err instanceof ApiError ? err.codigo : "ERROR_DESCONOCIDO") as ErrorPago;
         return {
           success: false,
-          errorCode: "FECHA_PAGO_FUTURA",
-          errorMessage: "La fecha de pago no puede ser futura.",
+          errorCode: code,
+          errorMessage: msg,
         };
       }
-
-      // Validar medios de pago y N° de operación
-      if (!params.formasPago || params.formasPago.length === 0) {
-        return {
-          success: false,
-          errorCode: "FORMA_PAGO_REQUERIDA",
-          errorMessage: "Debe indicar al menos una forma de pago.",
-        };
-      }
-
-      for (const fp of params.formasPago) {
-        const catalogoItem = formasPagoCatalogo.find((c) => c.id === fp.formaPagoId);
-        if (catalogoItem?.requiereNroOperacion && (!fp.nroOperacion || fp.nroOperacion.trim() === "")) {
-          return {
-            success: false,
-            errorCode: "NRO_OPERACION_REQUERIDO",
-            errorMessage: `El medio de pago ${catalogoItem.nombre} requiere N° de operación o referencia.`,
-          };
-        }
-      }
-
-      // Simular latencia de red
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      const clasesAbonadas = pendingClasses.filter((c) => selectedClassIds.includes(c.id));
-      const montoTotalCalculado = clasesAbonadas.reduce((acc, c) => acc + c.importe, 0);
-
-      // Generar secuencia de comprobante
-      const nextSequence = paymentHistory.length + 124;
-      const comprobante = `REC-${String(nextSequence).padStart(6, "0")}`;
-      const nowIso = new Date().toISOString();
-
-      const nuevoPago: PagoResponse = {
-        id: nextSequence,
-        comprobante,
-        alumno: {
-          id: selectedStudent.id,
-          legajo: selectedStudent.legajo,
-          nombre: selectedStudent.nombre,
-          apellido: selectedStudent.apellido,
-          dni: selectedStudent.dni,
-        },
-        monto: montoTotalCalculado,
-        fechaPago: params.fechaPago,
-        observaciones: params.observaciones?.trim() || null,
-        formasPago: params.formasPago.map((fp, idx) => {
-          const cat = formasPagoCatalogo.find((c) => c.id === fp.formaPagoId);
-          return {
-            id: idx + 1,
-            formaPagoId: fp.formaPagoId,
-            nombre: cat?.nombre || "Medio de Pago",
-            nroOperacion: fp.nroOperacion || null,
-          };
-        }),
-        clases: clasesAbonadas.map((c) => ({
-          turnoId: c.id,
-          codigo: c.codigo,
-          fecha: c.fecha,
-          horaInicio: c.horaInicio,
-          horaFin: c.horaFin,
-          materiaNombre: c.materia.nombre,
-          profesorNombre: `${c.profesor.nombre} ${c.profesor.apellido}`,
-          importe: c.importe,
-        })),
-        registradoPor: {
-          id: 2,
-          nombre: "Laura",
-          apellido: "Gómez",
-        },
-        fechaCreacion: nowIso,
-      };
-
-      // Marcar las clases como pagadas en el estado
-      setPendingClassesByStudent((prev) => {
-        const studentList = prev[selectedStudent.id] || [];
-        return {
-          ...prev,
-          [selectedStudent.id]: studentList.map((c) =>
-            selectedClassIds.includes(c.id) ? { ...c, pagado: true } : c
-          ),
-        };
-      });
-
-      // Actualizar deuda pendiente del alumno en la lista de alumnos
-      setStudents((prev) =>
-        prev.map((s) => {
-          if (s.id !== selectedStudent.id) return s;
-          const nuevaDeuda = Math.max(0, s.totalDeudaPendiente - montoTotalCalculado);
-          const nuevasClasesCount = Math.max(0, s.clasesPendientesCount - clasesAbonadas.length);
-          return {
-            ...s,
-            totalDeudaPendiente: nuevaDeuda,
-            clasesPendientesCount: nuevasClasesCount,
-          };
-        })
-      );
-
-      // Agregar comprobante al historial
-      setPaymentHistory((prev) => [nuevoPago, ...prev]);
-      setLastReceipt(nuevoPago);
-      setSelectedClassIds([]);
-
-      return {
-        success: true,
-        receipt: nuevoPago,
-      };
     },
-    [
-      selectedStudent,
-      selectedClassIds,
-      pendingClasses,
-      formasPagoCatalogo,
-      paymentHistory.length,
-    ]
+    [selectedStudent, selectedClassIds]
   );
 
   const clearLastReceipt = useCallback(() => {

@@ -17,14 +17,28 @@ type Ejecutor = Pool | PoolClient;
  * que no están Cancelados y que no han sido pagados.
  */
 export async function listarClasesPendientes(
-  alumnoId: number,
+  alumnoId?: number,
   ejecutor: Ejecutor = pool,
 ): Promise<ClasePendientePagoRow[]> {
+  const params: unknown[] = [];
+  let where = `WHERE t.estado <> 'Cancelado'
+    AND t.pagado = false
+    AND (t.fecha + t.hora_inicio) <= (now() AT TIME ZONE 'America/Argentina/Buenos_Aires')`;
+
+  if (alumnoId !== undefined) {
+    params.push(alumnoId);
+    where += ` AND t.alumno_id = $1`;
+  }
+
   const sql = `
     SELECT
       t.id,
       t.codigo,
       t.alumno_id,
+      a.legajo AS alumno_legajo,
+      a.nombre AS alumno_nombre,
+      a.apellido AS alumno_apellido,
+      a.dni AS alumno_dni,
       t.fecha::text AS fecha,
       t.hora_inicio::text AS hora_inicio,
       t.hora_fin::text AS hora_fin,
@@ -37,21 +51,19 @@ export async function listarClasesPendientes(
       t.pagado,
       t.estado
     FROM turno t
+    JOIN alumno a ON a.id = t.alumno_id
     JOIN materia m ON m.id = t.materia_id
     JOIN profesor p ON p.id = t.profesor_id
     JOIN usuario u ON u.id = p.usuario_id
-    WHERE t.alumno_id = $1
-      AND t.estado <> 'Cancelado'
-      AND t.pagado = false
-      AND (t.fecha + t.hora_inicio) <= (now() AT TIME ZONE 'America/Argentina/Buenos_Aires')
+    ${where}
     ORDER BY t.fecha ASC, t.hora_inicio ASC
   `;
 
   if ("query" in ejecutor && ejecutor !== pool) {
-    const { rows } = await ejecutor.query<ClasePendientePagoRow>(sql, [alumnoId]);
+    const { rows } = await ejecutor.query<ClasePendientePagoRow>(sql, params);
     return rows;
   }
-  return query<ClasePendientePagoRow>(sql, [alumnoId]);
+  return query<ClasePendientePagoRow>(sql, params);
 }
 
 /**

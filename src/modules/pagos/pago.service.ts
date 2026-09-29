@@ -52,21 +52,23 @@ function validarAcceso(session: Session): void {
  * Consulta las clases dictadas pendientes de cobro de un alumno (§HU-PAG-01).
  */
 export async function listarClasesPendientes(
-  alumnoId: number,
+  alumnoId: number | undefined,
   session: Session,
 ): Promise<ClasePendientePagoResponse[]> {
   validarAcceso(session);
 
-  const alumno = await repo.obtenerAlumno(alumnoId);
-  if (!alumno) {
-    throw new NotFoundError("el alumno", alumnoId);
-  }
-  if (alumno.estado !== "activo") {
-    throw new ValidationError(
-      "ALUMNO_INACTIVO",
-      "El alumno se encuentra inactivo y no se pueden consultar sus pagos.",
-      "alumnoId",
-    );
+  if (alumnoId !== undefined) {
+    const alumno = await repo.obtenerAlumno(alumnoId);
+    if (!alumno) {
+      throw new NotFoundError("el alumno", alumnoId);
+    }
+    if (alumno.estado !== "activo") {
+      throw new ValidationError(
+        "ALUMNO_INACTIVO",
+        "El alumno se encuentra inactivo y no se pueden consultar sus pagos.",
+        "alumnoId",
+      );
+    }
   }
 
   const filas = await repo.listarClasesPendientes(alumnoId);

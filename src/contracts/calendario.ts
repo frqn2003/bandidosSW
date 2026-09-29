@@ -120,6 +120,8 @@ export type HuecoResponse = {
 export type TurnoCalendarioResponse = {
   id: number;
   codigo: string;
+  /** "yyyy-mm-dd" */
+  fecha?: string;
   alumno: { id: number; nombre: string; apellido: string };
   profesor: { id: number; nombre: string; apellido: string };
   materia: { id: number; nombre: string };

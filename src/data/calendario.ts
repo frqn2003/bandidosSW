@@ -35,11 +35,6 @@ import {
 } from "@/contracts/profesor";
 import { RUTA as RUTA_TURNOS, type TurnoResponse } from "@/contracts/turno";
 import { apiGet } from "@/lib/api-client";
-import {
-  agendaMultiProfesor,
-  CAPACIDADES_FIXTURE,
-  resumenMes as resumenMesFixture,
-} from "@/data/fixtures/calendario-multiprofesor.fixture";
 import { aISO, aMin, sumarDias } from "@/funciones/fechas-calendario";
 
 export type {
@@ -202,54 +197,59 @@ export async function verAgendaRango(
   hasta: string,
   filtros: FiltrosAgenda,
 ): Promise<AgendaDiaResponse[]> {
-  if (filtros.profesorId === undefined) {
-    return agendaMultiProfesor({ desde, hasta, ...filtros });
+  const params = new URLSearchParams({ desde, hasta });
+  if (filtros.profesorId !== undefined) params.set("profesorId", String(filtros.profesorId));
+  if (filtros.materiaId !== undefined) params.set("materiaId", String(filtros.materiaId));
+  if (filtros.verCancelados !== undefined) params.set("verCancelados", String(filtros.verCancelados));
+
+  const agenda = await apiGet<AgendaDiaResponse>(`${RUTA_AGENDA}?${params.toString()}`);
+  const dias: AgendaDiaResponse[] = [];
+  let curr = desde;
+  while (curr <= hasta) {
+    const fecha = curr;
+    dias.push({
+      ...agenda,
+      fecha,
+      turnos: agenda.turnos.filter((t) => t.fecha === fecha),
+      huecos: agenda.huecos.filter((h) => h.fecha === fecha),
+    });
+    curr = sumarDias(curr, 1);
   }
-  const dias = await verAgendaSemana(filtros.profesorId, desde);
-  return dias.map((dia) => ({ ...dia, turnos: filtrarTurnosAgenda(dia.turnos, filtros) }));
+  return dias;
 }
 
 /** Agenda de un solo día, con los filtros combinables aplicados. */
 export async function verAgendaRangoDia(fecha: string, filtros: FiltrosAgenda): Promise<AgendaDiaResponse> {
-  if (filtros.profesorId === undefined) {
-    const [dia] = await agendaMultiProfesor({ desde: fecha, hasta: fecha, ...filtros });
-    return dia;
-  }
-  const dia = await verAgendaDia(filtros.profesorId, fecha);
-  return { ...dia, turnos: filtrarTurnosAgenda(dia.turnos, filtros) };
+  const params = new URLSearchParams({ fecha });
+  if (filtros.profesorId !== undefined) params.set("profesorId", String(filtros.profesorId));
+  if (filtros.materiaId !== undefined) params.set("materiaId", String(filtros.materiaId));
+  if (filtros.verCancelados !== undefined) params.set("verCancelados", String(filtros.verCancelados));
+  return apiGet<AgendaDiaResponse>(`${RUTA_AGENDA}?${params.toString()}`);
 }
 
 /**
- * Vista Mes: cantidad de turnos por día del mes (sin detalle de turno).
- *
- * Sale del fixture de diseño porque `GET /api/calendario/mes` todavía no está
- * implementado (B5). Ojo: cuando hay un `profesorId` elegido, la vista Mes
- * cuenta sobre los turnos del fixture, no sobre la API real — es una maqueta, no
- * un dato de producción.
- *
- * BACKEND: GET /api/calendario/mes?anio=&mes=&profesorId=&materiaId=&verCancelados=
+ * Vista Mes: cantidad de turnos por día del mes.
  */
 export async function verResumenMes(filtros: CalendarioMesQuery): Promise<CalendarioMesResponse> {
-  return resumenMesFixture(filtros);
+  const params = new URLSearchParams({
+    anio: String(filtros.anio),
+    mes: String(filtros.mes),
+  });
+  if (filtros.profesorId !== undefined) params.set("profesorId", String(filtros.profesorId));
+  if (filtros.materiaId !== undefined) params.set("materiaId", String(filtros.materiaId));
+  if (filtros.verCancelados !== undefined) params.set("verCancelados", String(filtros.verCancelados));
+  return apiGet<CalendarioMesResponse>(`${RUTA_MES}?${params.toString()}`);
 }
 
-/** Ruta del endpoint mensual, para el `// BACKEND:` del día del swap. */
+/** Ruta del endpoint mensual. */
 export const RUTA_CALENDARIO_MES = RUTA_MES;
 
 /**
  * Cupo máximo por `(profesor, materia)` — la fuente del filtro "Solo franjas con
- * cupo disponible" (decisión 5 del brief).
- *
- * PROVISIONAL: se arma en el navegador cruzando el padrón de profesores con sus
- * materias. El cálculo real de "cupo libre" de una franja es del servidor (B7),
- * porque tiene que contar los turnos reservados de ESA franja.
- *
- * BACKEND: GET /api/calendario/cupos?profesorId=&desde=&hasta= → [{ profesorId, materiaId, capacidad, reservados }]
+ * cupo disponible".
  */
 export async function listarCapacidadesPorProfesorMateria(): Promise<Map<string, number>> {
-  const mapa = new Map<string, number>(Object.entries(CAPACIDADES_FIXTURE));
-  // BACKEND: cuando B7 exista, esta llamada se borra: el cupo por franja llega
-  // calculado del servidor y no hace falta cruzarlo en el navegador.
+  const mapa = new Map<string, number>();
   const profesores = await apiGet<ProfesorResponse[]>(`${RUTA_PROFESORES}?estado=activo`);
   for (const p of profesores) {
     if (p.estado !== "activo") continue;
