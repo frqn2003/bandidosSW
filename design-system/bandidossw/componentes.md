@@ -78,7 +78,17 @@ Módulo HU-SIS-01 (inicio de sesión y control de acceso por rol). Pantallas: `/
 > **`src/lib/sesion.tsx` (nuevo):** `SesionProvider` (montado en `src/app/layout.tsx`, envuelve toda la app) + `useSesion()`. Sesión en `localStorage` (sobrevive al F5), timer de inactividad de `MINUTOS_INACTIVIDAD` (del contrato) con aviso previo, y `motivoSalida` para el aviso del login.
 > Datos en `src/data/auth.ts` (**fixture**): 4 cuentas demo (una por rol + una de primer ingreso), conteo de intentos y bloqueo de 15 min en memoria, y `CREDENCIALES_DEMO` para el panel de ayuda del login — que **solo se renderiza fuera de producción**.
 > `?demo=inactividad` acorta la expiración a 30 s y `?demo=auth-caido` fuerza el 503, para poder probar los dos sin esperar ni romper nada.
-> ⚠️ **Todo esto es UX, no seguridad:** el estado vive en el navegador y se saltea desde las devtools. Quien autoriza de verdad es `requireSession()` en cada endpoint del back.
+### pagos
+Módulo HU-PAG-01 (Gestión de Pagos y Cobro de Clases, `/pagos`):
+- `PaymentsPage`: vista principal con pestañas "Registrar pago" e "Historial del alumno", control de acceso por rol (bloqueo al rol Profesor con pantalla informativa de acceso denegado) y layout en dos columnas.
+- `StudentSearch`: buscador interactivo por DNI, Nombre, Apellido o Legajo; aviso de "No se encontraron resultados"; tarjeta de resumen lateral con total de deuda pendiente y conteo de clases adeudadas.
+- `PendingStudentsList`: listado de todos los alumnos con clases impagas y saldo deudor pendiente cuando no hay alumno preseleccionado, con botón "Cobrar" directo.
+- `PendingClassesTable`: tabla de clases dictadas pasadas no abonadas con selección múltiple (checkbox), autocalculo dinámico de total y cantidad de clases seleccionadas en el pie, y badge "Pendiente".
+- `PaymentForm`: formulario con selección de medio de pago (Efectivo / Transferencia), monto de solo lectura derivado de la selección, N° de operación alfanumérico obligatorio en Transferencia, fecha de pago validada (sin fechas futuras) y botón "Registrar pago" en Azul.
+- `PaymentConfirmModal`: modal de confirmación con fondo oscuro, desglose detallado de la operación, total destacado, botón Confirmar en Verde y Cancelar en Gris.
+- `ReceiptView`: comprobante estilo ticket con número correlativo REC-000123, banner verde de éxito, detalle fiscal y botones de acción ("Imprimir", "Enviar por email", "Descargar PDF", "Registrar otro pago").
+- `PaymentHistoryTab`: tabla de historial de cobros pasados en modo solo lectura ordenada cronológicamente de forma descendente, con acceso a ver el ticket detallado.
+> Datos y lógica: `src/modules/pagos/usePayments.ts` y fixtures en `src/modules/pagos/mock-data.ts`. Tipos en `src/modules/pagos/types.ts` derivados de `src/contracts/pago.ts`.
 
 ## Reglas de reuso
 
