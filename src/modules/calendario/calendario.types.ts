@@ -1,6 +1,8 @@
 import type {
   HuecosQuery,
+  AgendaQuery,
   AgendaDiaQuery,
+  CalendarioMesQuery,
 } from "@/contracts/calendario";
 
 export type HuecoRow = {
@@ -19,14 +21,22 @@ export type TurnoCalendarioRow = {
   alumno_id: number;
   alumno_nombre: string;
   alumno_apellido: string;
+  profesor_id: number;
+  profesor_nombre: string;
+  profesor_apellido: string;
   materia_id: number;
   materia_nombre: string;
+  fecha: string;
   hora_inicio: string;
   hora_fin: string;
   estado: "Reservado" | "Cancelado";
+  cantidad_modificaciones: number;
+  cancelacion_tardia: boolean;
+  pagado: boolean;
 };
 
 export type BloqueHorarioRow = {
+  profesor_id?: number;
   hora_inicio: string;
   hora_fin: string;
 };
@@ -37,5 +47,12 @@ export type ProfesorInfoRow = {
   apellido: string;
 };
 
+export type TurnosPorDiaRow = {
+  fecha: string;
+  cantidad_turnos: number;
+};
+
 export type FiltrosHuecos = HuecosQuery;
+export type FiltrosAgenda = AgendaQuery;
 export type FiltrosAgendaDia = AgendaDiaQuery;
+export type FiltrosCalendarioMes = CalendarioMesQuery;

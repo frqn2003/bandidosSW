@@ -716,7 +716,7 @@ export function CalendarioTurnos({ profesores, profesorFijo }: CalendarioTurnosP
                                     {t.alumno.apellido}, {t.alumno.nombre}
                                   </span>
                                   <span className="truncate pl-2.5 text-[11px] font-medium leading-none text-on-surface-variant">
-                                    {d.profesor.apellido} · {t.materia.nombre}
+                                    {(t.profesor?.apellido ?? d.profesor?.apellido ?? "")} · {t.materia.nombre}
                                   </span>
                                 </button>
                               ))}
