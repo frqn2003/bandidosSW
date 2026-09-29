@@ -231,6 +231,9 @@ export function useDashboardMetrics() {
       maximumFractionDigits: 0,
     });
 
+    const desde = metricas.periodo?.desde || filtros.desde;
+    const hasta = metricas.periodo?.hasta || filtros.hasta;
+
     return [
       {
         id: "turnosGenerados",
@@ -242,7 +245,10 @@ export function useDashboardMetrics() {
           "Suma la totalidad de clases programadas en el período seleccionado, independientemente de si se realizaron o cancelaron.",
         icono: "calendar_month",
         colorAcento: "primary",
-        linkOrigen: { href: "/turnos", label: "Ver turnos" },
+        linkOrigen: {
+          href: `/turnos?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&estado=`,
+          label: "Ver turnos",
+        },
       },
       {
         id: "porcentajeCancelaciones",
@@ -260,7 +266,10 @@ export function useDashboardMetrics() {
           "Proporción de turnos que no llegaron a dictarse por cancelación sobre el total generado en el período. Si no hay turnos, se muestra '—'.",
         icono: "event_busy",
         colorAcento: "warning",
-        linkOrigen: { href: "/turnos", label: "Ver cancelaciones" },
+        linkOrigen: {
+          href: `/turnos?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&estado=Cancelado`,
+          label: "Ver cancelaciones",
+        },
       },
       {
         id: "porcentajeOcupacion",
@@ -300,10 +309,10 @@ export function useDashboardMetrics() {
           "Monto total en pesos percibido efectivamente por el centro académico durante el rango de fechas seleccionado.",
         icono: "payments",
         colorAcento: "success",
-        linkOrigen: { href: "/turnos", label: "Ver detalle" },
+        linkOrigen: { href: "/pagos?tab=historial", label: "Ver detalle" },
       },
     ];
-  }, [metricas]);
+  }, [metricas, filtros.desde, filtros.hasta]);
 
   /**
    * Simulación de exportación a PDF.

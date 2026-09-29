@@ -14,6 +14,7 @@ import {
   FiltrosTurnos,
   FILTROS_TURNOS_INICIALES,
   type ConteoTurnos,
+  type FiltroEstadoTurno,
   type FiltrosTurnosState,
 } from "@/components/turnos/FiltrosTurnos";
 import { TurnosTable } from "@/components/turnos/TurnosTable";
@@ -49,16 +50,83 @@ const TAMANOS_PAGINA = [10, 25, 50];
 
 function TurnosContent() {
   const { showToast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const turnoId = searchParams.get("turnoId");
+  const accion = searchParams.get("accion");
+  const paramDesde = searchParams.get("desde");
+  const paramHasta = searchParams.get("hasta");
+  const paramEstado = searchParams.get("estado");
+  const paramBusqueda = searchParams.get("busqueda");
 
   const [turnos, setTurnos] = useState<TurnoResponse[]>([]);
   const [estadoCarga, setEstadoCarga] = useState<EstadoCarga>("cargando");
-  const [filtros, setFiltros] = useState<FiltrosTurnosState>(FILTROS_TURNOS_INICIALES);
+  const [filtros, setFiltros] = useState<FiltrosTurnosState>(() => {
+    const base = FILTROS_TURNOS_INICIALES();
+    const esFecha = (v: string | null): v is string => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+    let estado: FiltroEstadoTurno = base.estado;
+    if (paramEstado !== null) {
+      if (paramEstado === "Reservado" || paramEstado === "Finalizado" || paramEstado === "Cancelado") {
+        estado = paramEstado;
+      } else if (paramEstado === "Todos" || paramEstado === "") {
+        estado = "";
+      }
+    }
+
+    return {
+      busqueda: paramBusqueda ?? base.busqueda,
+      estado,
+      desde: esFecha(paramDesde) ? paramDesde : base.desde,
+      hasta: esFecha(paramHasta) ? paramHasta : base.hasta,
+    };
+  });
   const [maxModificaciones, setMaxModificaciones] = useState(2);
   const [pagina, setPagina] = useState(1);
   const [porPagina, setPorPagina] = useState(TAMANOS_PAGINA[0]);
   const [detalle, setDetalle] = useState<TurnoResponse | null>(null);
   const [editar, setEditar] = useState<TurnoResponse | null>(null);
   const [cancelar, setCancelar] = useState<TurnoResponse | null>(null);
+
+  // Sincroniza filtros si cambian los parámetros de la URL sin generar renders en cascada
+  const [prevParams, setPrevParams] = useState({
+    desde: paramDesde,
+    hasta: paramHasta,
+    estado: paramEstado,
+    busqueda: paramBusqueda,
+  });
+
+  if (
+    prevParams.desde !== paramDesde ||
+    prevParams.hasta !== paramHasta ||
+    prevParams.estado !== paramEstado ||
+    prevParams.busqueda !== paramBusqueda
+  ) {
+    setPrevParams({
+      desde: paramDesde,
+      hasta: paramHasta,
+      estado: paramEstado,
+      busqueda: paramBusqueda,
+    });
+
+    const esFecha = (v: string | null): v is string => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
+    let nuevoEstado: FiltroEstadoTurno = filtros.estado;
+    if (paramEstado !== null) {
+      if (paramEstado === "Reservado" || paramEstado === "Finalizado" || paramEstado === "Cancelado") {
+        nuevoEstado = paramEstado;
+      } else if (paramEstado === "Todos" || paramEstado === "") {
+        nuevoEstado = "";
+      }
+    }
+
+    setFiltros({
+      busqueda: paramBusqueda ?? filtros.busqueda,
+      estado: nuevoEstado,
+      desde: esFecha(paramDesde) ? paramDesde : filtros.desde,
+      hasta: esFecha(paramHasta) ? paramHasta : filtros.hasta,
+    });
+  }
 
   // Trae el rango elegido. NO toca estado en el cuerpo del efecto: solo dentro
   // de los callbacks de la promesa (regla react-hooks/set-state-in-effect).
@@ -108,15 +176,6 @@ function TurnosContent() {
   // turno en el listado. El deep-link es de UN SOLO disparo: apenas se abre (o
   // se rechaza) el turno, se limpian `turnoId` y `accion` de la URL. Sin eso, un
   // F5 volvería a montar el modal encima del que el usuario ya cerró.
-  //
-  // `profesorId` y `fecha` NO se tocan: esta pantalla todavía no los lee (su
-  // filtro es por rango, no por día) y son datos del turno, no de un solo
-  // disparo. Queda pendiente que el filtro de /turnos los entienda.
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const turnoId = searchParams.get("turnoId");
-  const accion = searchParams.get("accion");
-
   useEffect(() => {
     if (!turnoId || (accion !== "modificar" && accion !== "cancelar")) return;
 

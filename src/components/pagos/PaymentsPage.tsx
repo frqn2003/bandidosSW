@@ -12,8 +12,9 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { RequiereSesion } from "@/components/auth/RequiereSesion";
@@ -33,6 +34,8 @@ export function PaymentsPage() {
   const { sesion } = useSesion();
   const rolNombre = sesion?.usuario.rol.nombre;
   const { showToast } = useToast();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
 
   const {
     activeTab,
@@ -54,6 +57,14 @@ export function PaymentsPage() {
     lastReceipt,
     clearLastReceipt,
   } = usePayments();
+
+  useEffect(() => {
+    if (tabParam === "historial" || tabParam === "history") {
+      setActiveTab("historial");
+    } else if (tabParam === "registrar" || tabParam === "register") {
+      setActiveTab("registrar");
+    }
+  }, [tabParam, setActiveTab]);
 
   // Alumnos que tienen al menos un pago pendiente
   const studentsWithDebt = React.useMemo(() => {

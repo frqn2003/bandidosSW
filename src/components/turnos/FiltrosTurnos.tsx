@@ -108,8 +108,8 @@ export function FiltrosTurnos({ estado, conteo, onChange, onLimpiar }: FiltrosTu
           id="rango-turnos"
           desde={estado.desde}
           hasta={estado.hasta}
-          min={rangoMinimo()}
-          max={rangoMaximo()}
+          min={estado.desde && estado.desde < rangoMinimo() ? estado.desde : rangoMinimo()}
+          max={estado.hasta && estado.hasta > rangoMaximo() ? estado.hasta : rangoMaximo()}
           maxDias={DIAS_MAXIMOS_RANGO}
           onChange={(rango) => set(rango)}
         />
