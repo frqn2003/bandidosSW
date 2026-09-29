@@ -3,7 +3,13 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { forwardRef } from "react";
 
-type Variant = "primary" | "secondary" | "outline" | "ghost" | "destructive";
+type Variant =
+  | "primary"
+  | "secondary"
+  | "outline"
+  | "outline-danger"
+  | "ghost"
+  | "destructive";
 type Size = "sm" | "md" | "lg" | "icon";
 
 // Roles de color del documento de diseño (Nexo Académico):
@@ -18,6 +24,18 @@ const variantClasses: Record<Variant, string> = {
     "bg-secondary text-on-secondary hover:bg-primary active:scale-[0.97] disabled:hover:bg-secondary",
   outline:
     "border border-secondary bg-transparent text-secondary hover:bg-secondary/5 active:scale-[0.97]",
+  // `outline` con el color de la acción destructiva. Nació del detalle del
+  // calendario: un `ghost` con texto rojo (que ya se usaba en `TurnosTable`)
+  // queda invisible hasta el hover — sin borde ni fondo se lee como un texto,
+  // no como un botón (heurística de reconocimiento por sobre la de consistencia
+  // visual). Con el borde siempre visible el control se reconoce sin hover.
+  //
+  // Va como variante y NO como `className="... text-status-danger"` sobre
+  // `outline`: pisar el `text-secondary`/`border-secondary` del variant depende
+  // del ORDEN en que Tailwind emite las utilidades, y ese orden no es un
+  // contrato del design system. Acá el set de clases vive en un solo lugar.
+  "outline-danger":
+    "border border-status-danger bg-transparent text-status-danger hover:bg-status-danger/10 active:scale-[0.97]",
   ghost: "bg-transparent text-secondary hover:bg-secondary/10 active:scale-[0.97]",
   destructive:
     "bg-error text-on-error hover:bg-status-danger-strong active:scale-[0.97] disabled:hover:bg-error",

@@ -47,13 +47,29 @@ interface StatusBadgeProps {
   label: string;
   /** Nombre del símbolo Material Symbols (ej. "check_circle"). Reemplaza al punto. */
   icon?: string;
+  /**
+   * Solo el ícono, sin el texto. Para chips chicos donde la etiqueta no entra
+   * sin empujar el contenido (la tarjeta del calendario, que es un botón
+   * angosto con el nombre de la materia al lado).
+   *
+   * El estado NO se pierde: pasa al `aria-label` del pill con `role="img"`, que
+   * es lo que un lector de pantalla anuncia (un `span` genérico con `aria-label`
+   * no se nombra). Ojo con el segundo consumidor: si el pill va DENTRO de un
+   * botón que ya tiene `aria-label` propio, el texto del hijo no se usa para
+   * nombrar al botón — ahí el estado tiene que estar en ese `aria-label`.
+   */
+  soloIcono?: boolean;
 }
 
-export function StatusBadge({ variant, label, icon }: StatusBadgeProps) {
+export function StatusBadge({ variant, label, icon, soloIcono = false }: StatusBadgeProps) {
   const style = variantStyles[variant];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${style.chip}`}
+      role={soloIcono ? "img" : undefined}
+      aria-label={soloIcono ? label : undefined}
+      className={`inline-flex items-center gap-1.5 rounded-full py-1 text-xs font-bold ${
+        soloIcono ? "px-1.5" : "px-2.5"
+      } ${style.chip}`}
     >
       {icon ? (
         <span className="flex items-center">
@@ -62,7 +78,7 @@ export function StatusBadge({ variant, label, icon }: StatusBadgeProps) {
       ) : (
         <span className={`h-2 w-2 rounded-full ${style.accent}`} aria-hidden="true" />
       )}
-      {label}
+      {soloIcono ? null : label}
     </span>
   );
 }
