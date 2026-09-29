@@ -13,7 +13,9 @@
 
 import type { FranjaTurnoResponse } from "@/data/turnos";
 import type { MotivoCancelacionResponse } from "@/contracts/catalogo";
+import type { TurnoCalendarioResponse } from "@/contracts/calendario";
 import type { TurnoResponse } from "@/contracts/turno";
+import { agendaMultiProfesorFixture } from "@/data/fixtures/calendario-multiprofesor.fixture";
 
 function aISO(fecha: Date): string {
   const y = fecha.getFullYear();
@@ -126,8 +128,133 @@ export const PROFESORES_FIXTURE: { id: number; nombre: string; apellido: string;
   { id: P3.id, nombre: P3.nombre, apellido: P3.apellido, materiaIds: [15] },
 ];
 
-/** Copia viva del "servidor". MUTABLE: la capa de datos la modifica al editar/cancelar. */
-export const turnoFixtures: TurnoResponse[] = [
+/**
+ * Copia viva del "servidor". MUTABLE: la capa de datos la modifica al editar/cancelar.
+ *
+ * Son DOS fuentes con una sola identidad: los 14 casos a mano de arriba (que
+ * existen para exhibir estados borde: tope de modificaciones, cobrado, pasado,
+ * cancelado tardío) más los turnos que dibuja el calendario.
+ *
+ * Por qué mezclarlos: el detalle del calendario manda `?turnoId=&accion=` a
+ * `/turnos` (deep-link B6 de HU-CAL-02). Con dos listas separadas el deep-link
+ * navegaba bien pero `obtenerTurno()` devolvía 404, porque cada pantalla usaba
+ * su propio espacio de ids (acá 1..14; el calendario generaba
+ * `idDeTurno = YYYYMMDD*100 + profesor*10 + j`, o sea ~2.026.030.900).
+ *
+ * Y no alcanza con unificar la FÓRMULA de los ids: el turno del calendario sale
+ * de un `hash(fecha:profesorId)` y el `j` de su loop, y los 14 casos están
+ * escritos a mano con horas elegidas. Dos generadores distintos nunca coinciden
+ * en el mismo id. Lo que hace falta es que sea la MISMA lista, que es lo que
+ * pasa con la base real: las dos pantallas leen los mismos turnos.
+ *
+ * El merge también es lo que permite GUARDAR. Si el turno viviera sólo en el
+ * fixture del calendario, `modificarTurno`/`cancelarTurno` no lo encontrarían:
+ * ese fixture es determinista y se regenera en cada lectura, así que el cambio
+ * se perdería al refrescar. En `turnoFixtures` el turno es una fila más y
+ * `setTurnoFixtures` la actualiza de verdad.
+ *
+ * Con `GET /api/turnos/:id` esto desaparece entero: se borran los dos fixtures
+ * y cada pantalla pega a su endpoint.
+ */
+/**
+ * Ventana sembrada con turnos del calendario: 3 semanas antes y después de hoy.
+ *
+ * Es una ventana FIJA a propósito: el calendario genera turnos para cualquier
+ * fecha que se le pida, así que sembrarlo todo es imposible y sembrar poco
+ * rompe el deep-link. Con ±3 semanas cubre la semana actual (que es donde abre
+ * el calendario) y la navegación razonable. LIMITACIÓN CONOCIDA DE LA MAQUETA:
+ * si en `/calendario` se navega a una semana a más de 3 semanas de hoy y se
+ * hace clic en un turno, el deep-link da 404. Con `GET /api/turnos/:id` deja
+ * de importar: el endpoint no tiene ventana.
+ */
+const DIAS_CALENDARIO_ANTES = 21;
+const DIAS_CALENDARIO_HASTA = 21;
+
+/** Sin precio en el fixture del calendario; se usa uno plano. */
+const VALOR_TURNO_CALENDARIO = 18000;
+
+const REGISTRADO_POR = { id: 5, nombre: "Marta", apellido: "Sosa" };
+
+/**
+ * Los dos contratos difieren y esta función es la frontera:
+ * `TurnoCalendarioResponse` (lo que devuelve el fixture del calendario) es MÁS
+ * LIVIANO que `TurnoResponse` — al alumno le falta `legajo`, a la materia le
+ * faltan `nivel` y `duracionClaseMinutos`, y los flags son opcionales.
+ *
+ * Los ids de alumno y materia son los MISMOS en los dos fixtures (mismo seed
+ * que la DB), así que se completan con los catálogos de arriba en vez de
+ * inventar datos.
+ */
+const ALUMNOS_POR_ID = new Map<number, TurnoResponse["alumno"]>(
+  [A0, A1, A2, A3, A4, A5, A6, A7].map((a) => [a.id, a]),
+);
+const MATERIAS_POR_ID = new Map<number, TurnoResponse["materia"]>(
+  [M0, M1, M2, M3].map((m) => [m.id, m]),
+);
+
+/**
+ * `TurnoCalendarioResponse` → `TurnoResponse`. El shape del calendario no trae
+ * `fecha` (va en el día que lo contiene) ni los campos de auditoría y precio,
+ * que acá se completan con valores de diseño.
+ */
+function turnoDeCalendarioAFila(fecha: string, c: TurnoCalendarioResponse): TurnoResponse {
+  // Default defensivo: con los seeds de hoy la tabla siempre tiene la fila.
+  const cantidadModificaciones = c.cantidadModificaciones ?? 0;
+  const pagado = c.pagado ?? false;
+  // NO se recalculan: en el backend son columnas de la tabla (regla de la capa
+  // de datos). Acá sólo se les pone un default para el tipado opcional.
+  const puedeModificar = c.puedeModificar ?? false;
+  const puedeCancelar = c.puedeCancelar ?? false;
+  const reservadoDisponible = c.estado === "Reservado" && !pagado;
+
+  return {
+    id: c.id,
+    codigo: c.codigo,
+    alumno: ALUMNOS_POR_ID.get(c.alumno.id) ?? { ...c.alumno, legajo: "s/d" },
+    profesor: c.profesor,
+    materia: MATERIAS_POR_ID.get(c.materia.id) ?? {
+      id: c.materia.id,
+      nombre: c.materia.nombre,
+      nivel: "Secundario",
+      duracionClaseMinutos: 60,
+    },
+    fecha,
+    horaInicio: c.horaInicio,
+    horaFin: c.horaFin,
+    valorClaseCongelado: VALOR_TURNO_CALENDARIO,
+    estado: c.estado,
+    observaciones: c.observaciones ?? null,
+    cantidadModificaciones,
+    puedeModificar,
+    puedeCancelar,
+    // Mismo criterio de `t()`: el motivo explica POR QUÉ la acción está apagada.
+    motivoDeshabilitado: pagado
+      ? "El turno ya fue cobrado."
+      : c.estado === "Cancelado"
+        ? "El turno está cancelado."
+        : reservadoDisponible && !puedeModificar
+          ? "Este turno ya alcanzó el máximo de modificaciones. Cancelalo y reservá uno nuevo."
+          : null,
+    motivoCancelacion: c.estado === "Cancelado" ? { id: 2, nombre: "Pedido alumno" } : null,
+    detalleCancelacion: null,
+    fechaCancelacion: c.estado === "Cancelado" ? new Date(`${fecha}T18:00:00`).toISOString() : null,
+    cancelacionTardia: c.cancelacionTardia ?? false,
+    pagado,
+    registradoPor: REGISTRADO_POR,
+    fechaCreacion: new Date(`${fecha}T09:00:00`).toISOString(),
+  };
+}
+
+/** Turnos del calendario para la ventana sembrada, aplanados a filas. */
+function turnosDelCalendario(): TurnoResponse[] {
+  return agendaMultiProfesorFixture({
+    desde: sumarDiasFixture(hoyFixture, -DIAS_CALENDARIO_ANTES),
+    hasta: sumarDiasFixture(hoyFixture, DIAS_CALENDARIO_HASTA),
+    verCancelados: true,
+  }).flatMap((dia) => dia.turnos.map((c) => turnoDeCalendarioAFila(dia.fecha, c)));
+}
+
+const TURNOS_ESTADO_BORDE: TurnoResponse[] = [
   // Futuro hoy → Reservado, modificable.
   t(1, { alumno: A0, profesor: P0, materia: M0, fecha: hoyFixture, horaInicio: "15:00", horaFin: "16:00", valorClaseCongelado: 18000, estado: "Reservado", observaciones: "Traer calculadora" }),
   t(2, { alumno: A1, profesor: P1, materia: M1, fecha: sumarDiasFixture(hoyFixture, 1), horaInicio: "17:00", horaFin: "18:00", valorClaseCongelado: 20000, estado: "Reservado", cantidadModificaciones: 1 }),
@@ -148,6 +275,8 @@ export const turnoFixtures: TurnoResponse[] = [
   t(13, { alumno: A5, profesor: P0, materia: M0, fecha: sumarDiasFixture(hoyFixture, -4), horaInicio: "15:00", horaFin: "16:00", valorClaseCongelado: 18000, estado: "Cancelado", puedeModificar: false, puedeCancelar: false, motivoDeshabilitado: "El turno está cancelado.", motivoCancelacion: { id: 1, nombre: "Ausencia profesor" }, detalleCancelacion: "El profesor avisó que no podía asistir.", fechaCancelacion: new Date(`${sumarDiasFixture(hoyFixture, -5)}T12:00:00`).toISOString() }),
   t(14, { alumno: A6, profesor: P1, materia: M1, fecha: sumarDiasFixture(hoyFixture, 10), horaInicio: "09:00", horaFin: "10:00", valorClaseCongelado: 20000, estado: "Reservado" }),
 ];
+
+export const turnoFixtures: TurnoResponse[] = [...TURNOS_ESTADO_BORDE, ...turnosDelCalendario()];
 
 // ─── Catálogos que la pantalla necesita (la DB los siembra) ────────────────
 export const motivosCancelacionFixture: MotivoCancelacionResponse[] = [

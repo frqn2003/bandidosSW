@@ -1,12 +1,29 @@
-// Capa de datos de Calendario de turnos (HU-CAL-01).
+// Capa de datos de Calendario de turnos (HU-CAL-01 → HU-CAL-02).
 //
 // Consume los endpoints de la API mediante el cliente HTTP tipado con el contrato.
 // Contratos: src/contracts/calendario.ts · src/contracts/agenda.ts · src/contracts/profesor.ts
 // Patrón: docs/capa-de-datos-front.md
+//
+// ─── Lo que falta del lado del servidor (docs/briefs/HU-CAL-02.md §Backend) ──
+//   B2  La agenda por rango (lunes→sábado) en UNA llamada: hoy son 6.
+//   B3  Consulta SIN `profesorId` ("Todos los profesores"): el endpoint la exige.
+//   B4  Los params `materiaId` y `verCancelados` en la agenda (hoy se filtran en
+//       el navegador con `filtrarTurnosAgenda`).
+//   B5  `GET /api/calendario/mes` (la ruta existe en el contrato, no en el back).
+//   B6  Mapper: `observaciones`, `cantidadModificaciones`, `puedeModificar`,
+//       `puedeCancelar`, `pagado`, `cancelacionTardia`, `bloques[].profesorId`.
+//   B7  Cupo libre por franja, calculado por el servidor sobre
+//       `profesor_materia.capacidad_maxima`.
+// Mientras tanto, "Todos los profesores" y la vista Mes salen del fixture de
+// diseño (`fixtures/calendario-multiprofesor.fixture.ts`), que se borra entero
+// el día que el back cierre B3/B5. Cada función tiene el `// BACKEND:` puesto.
 
 import {
   RUTA_AGENDA,
+  RUTA_MES,
   type AgendaDiaResponse,
+  type CalendarioMesResponse,
+  type CalendarioMesQuery,
   type HuecoResponse,
   type TurnoCalendarioResponse,
 } from "@/contracts/calendario";
@@ -18,39 +35,35 @@ import {
 } from "@/contracts/profesor";
 import { RUTA as RUTA_TURNOS, type TurnoResponse } from "@/contracts/turno";
 import { apiGet } from "@/lib/api-client";
+import {
+  agendaMultiProfesor,
+  CAPACIDADES_FIXTURE,
+  resumenMes as resumenMesFixture,
+} from "@/data/fixtures/calendario-multiprofesor.fixture";
+import { aISO, aMin, sumarDias } from "@/funciones/fechas-calendario";
 
-export type { AgendaDiaResponse, HuecoResponse, TurnoCalendarioResponse, TurnoResponse };
+export type {
+  AgendaDiaResponse,
+  CalendarioMesResponse,
+  HuecoResponse,
+  TurnoCalendarioResponse,
+  TurnoResponse,
+};
 
-// ─── Helpers de fecha/hora ────────────────────────────────────────────────
-
-function aDate(iso: string): Date {
-  return new Date(`${iso}T00:00:00`);
-}
-
-export function aISO(fecha: Date): string {
-  const y = fecha.getFullYear();
-  const m = String(fecha.getMonth() + 1).padStart(2, "0");
-  const d = String(fecha.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function aMin(hora: string): number {
-  const [h, m] = hora.split(":").map(Number);
-  return h * 60 + m;
-}
-
-export function sumarDias(iso: string, dias: number): string {
-  const f = aDate(iso);
-  f.setDate(f.getDate() + dias);
-  return aISO(f);
-}
-
-/** Lunes de la semana de `iso` ("yyyy-mm-dd"). */
-export function lunesDe(iso: string): string {
-  const f = aDate(iso);
-  f.setDate(f.getDate() - ((f.getDay() + 6) % 7));
-  return aISO(f);
-}
+// Los helpers de fecha viven en `funciones/fechas-calendario.ts` (lógica pura).
+// Se reexportan acá porque varios componentes los piden desde la capa de datos.
+export {
+  aISO,
+  aMin,
+  celdasDelMes,
+  diaCorto,
+  fechaLarga,
+  lunesDe,
+  mesLargo,
+  minAHora,
+  primerDiaDelMes,
+  sumarDias,
+} from "@/funciones/fechas-calendario";
 
 // ─── Modelo de la pantalla ────────────────────────────────────────────────
 
@@ -146,3 +159,104 @@ export async function listarTurnosEnRango(desde: string, hasta: string): Promise
     (a, b) => a.fecha.localeCompare(b.fecha) || a.horaInicio.localeCompare(b.horaInicio) || a.id - b.id,
   );
 }
+
+// ─── HU-CAL-02: filtros combinables, multiprofesor y vista Mes ────────────
+
+export interface FiltrosAgenda {
+  /** Ausente = todos los profesores. */
+  profesorId?: number;
+  /** Ausente = todas las materias. */
+  materiaId?: number;
+  verCancelados: boolean;
+}
+
+/**
+ * Filtro de materia + cancelados en memoria. Es EXACTAMENTE lo que hará el
+ * back cuando acepte `materiaId` y `verCancelados` (B4); se deja acá para que el
+ * swap sea borrar la llamada.
+ */
+export function filtrarTurnosAgenda(
+  turnos: TurnoCalendarioResponse[],
+  filtros: Pick<FiltrosAgenda, "materiaId" | "verCancelados">,
+): TurnoCalendarioResponse[] {
+  return turnos.filter((t) => {
+    if (filtros.materiaId !== undefined && t.materia.id !== filtros.materiaId) return false;
+    if (!filtros.verCancelados && t.estado === "Cancelado") return false;
+    return true;
+  });
+}
+
+/**
+ * Agenda de un rango (lunes→sábado) con los filtros combinables aplicados.
+ *
+ * · Con `profesorId` → API real: una llamada por día (B2 lo baja a una sola).
+ * · Sin `profesorId` ("Todos los profesores") → fixture de diseño, porque la
+ *   API real exige `profesorId` (B3).
+ *
+ * BACKEND: GET /api/calendario/agenda?profesorId=&materiaId=&desde=&hasta=&verCancelados=
+ *   (rango en una llamada + `profesorId` opcional). Cuando exista, el cuerpo de
+ *   esta función pasa a ser un `apiGet<AgendaDiaResponse[]>` y se borra el fixture.
+ */
+export async function verAgendaRango(
+  desde: string,
+  hasta: string,
+  filtros: FiltrosAgenda,
+): Promise<AgendaDiaResponse[]> {
+  if (filtros.profesorId === undefined) {
+    return agendaMultiProfesor({ desde, hasta, ...filtros });
+  }
+  const dias = await verAgendaSemana(filtros.profesorId, desde);
+  return dias.map((dia) => ({ ...dia, turnos: filtrarTurnosAgenda(dia.turnos, filtros) }));
+}
+
+/** Agenda de un solo día, con los filtros combinables aplicados. */
+export async function verAgendaRangoDia(fecha: string, filtros: FiltrosAgenda): Promise<AgendaDiaResponse> {
+  if (filtros.profesorId === undefined) {
+    const [dia] = await agendaMultiProfesor({ desde: fecha, hasta: fecha, ...filtros });
+    return dia;
+  }
+  const dia = await verAgendaDia(filtros.profesorId, fecha);
+  return { ...dia, turnos: filtrarTurnosAgenda(dia.turnos, filtros) };
+}
+
+/**
+ * Vista Mes: cantidad de turnos por día del mes (sin detalle de turno).
+ *
+ * Sale del fixture de diseño porque `GET /api/calendario/mes` todavía no está
+ * implementado (B5). Ojo: cuando hay un `profesorId` elegido, la vista Mes
+ * cuenta sobre los turnos del fixture, no sobre la API real — es una maqueta, no
+ * un dato de producción.
+ *
+ * BACKEND: GET /api/calendario/mes?anio=&mes=&profesorId=&materiaId=&verCancelados=
+ */
+export async function verResumenMes(filtros: CalendarioMesQuery): Promise<CalendarioMesResponse> {
+  return resumenMesFixture(filtros);
+}
+
+/** Ruta del endpoint mensual, para el `// BACKEND:` del día del swap. */
+export const RUTA_CALENDARIO_MES = RUTA_MES;
+
+/**
+ * Cupo máximo por `(profesor, materia)` — la fuente del filtro "Solo franjas con
+ * cupo disponible" (decisión 5 del brief).
+ *
+ * PROVISIONAL: se arma en el navegador cruzando el padrón de profesores con sus
+ * materias. El cálculo real de "cupo libre" de una franja es del servidor (B7),
+ * porque tiene que contar los turnos reservados de ESA franja.
+ *
+ * BACKEND: GET /api/calendario/cupos?profesorId=&desde=&hasta= → [{ profesorId, materiaId, capacidad, reservados }]
+ */
+export async function listarCapacidadesPorProfesorMateria(): Promise<Map<string, number>> {
+  const mapa = new Map<string, number>(Object.entries(CAPACIDADES_FIXTURE));
+  // BACKEND: cuando B7 exista, esta llamada se borra: el cupo por franja llega
+  // calculado del servidor y no hace falta cruzarlo en el navegador.
+  const profesores = await apiGet<ProfesorResponse[]>(`${RUTA_PROFESORES}?estado=activo`);
+  for (const p of profesores) {
+    if (p.estado !== "activo") continue;
+    for (const pm of p.materias) {
+      mapa.set(`${p.id}:${pm.materia.id}`, pm.capacidadMaxima);
+    }
+  }
+  return mapa;
+}
+

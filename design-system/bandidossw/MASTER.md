@@ -171,6 +171,47 @@ nuevos de marca.
   Tamaño con la prop `size` (px), decorativo por defecto (`aria-hidden`).
 - **HTML equivalente:** `<span class="material-symbols-outlined">icon_name</span>`
 
+### Color por materia (HU-CAL-02)
+
+Ocho tokens para distinguir la materia de un turno en la grilla del calendario.
+El consumidor es `src/funciones/paleta-materia.ts` (`construirMapaTonos` /
+`tonoMateriaDe` / `tonoEstadoCancelado`).
+
+**El tono NO es `id % 8`.** Los ids de `materia` son dispersos (4, 9, 12, 15…) y
+el módulo haría que la 4 y la 12 compartieran tono: dos materias pintadas igual,
+justo lo que el color por materia tiene que evitar. `construirMapaTonos` ordena
+el catálogo por id y reparte los tonos **por posición**, así que dos materias
+distintas nunca comparten color mientras el catálogo quepa en la paleta. Es
+determinista: la misma materia tiene siempre el mismo color.
+
+| Token | Hex | Uso |
+|-------|-----|-----|
+| `--color-materia-1` | `#2F6FED` | franja azul |
+| `--color-materia-2` | `#1D4ED8` | franja azul profunda |
+| `--color-materia-3` | `#4338CA` | índigo |
+| `--color-materia-4` | `#5B21B6` | violeta |
+| `--color-materia-5` | `#7C3AED` | morado |
+| `--color-materia-6` | `#0369A1` | azul petróleo |
+| `--color-materia-7` | `#0E7490` | cian oscuro |
+| `--color-materia-8` | `#B45309` | ámbar profundo |
+
+**Límite conocido:** con más de 8 materias activas el reparto vuelve a ciclar.
+La salida definitiva es una columna de color en `materia` que asigne el backend
+(o un hash del id sobre un espacio de color más grande), no un token más.
+
+**Al consumir un token de color, la clase va ESCRITA COMPLETA.**
+`border-l-materia-3`, `bg-materia-3/8`, `bg-materia-3`. Nunca la armes con
+template literal (`` `border-l-${token}` ``): Tailwind v4 escanea el fuente con
+regex y una clase interpolada no existe para el compilador, así que la tarjeta
+sale gris sin ningún error. Ver `docs/errores-comunes.md` ("Una clase con template
+literal NUNCA llega al CSS").
+
+**Regla dura:** esta paleta **no usa rojo ni verde** porque esos dos colores ya
+tienen dueño en el sistema — `danger` para **Cancelado** y `success` para
+**Disponible**. Cuando una tarjeta muestra un turno cancelado, el estado pisa el
+tono de materia y la tarjeta se pinta de `error`. Es un color **visual**: no
+significa prioridad ni estado, solo ayuda a ubicar la materia de un vistazo.
+
 ### Status Colors
 
 | Variant | Dot | Chip text | Semántica | Estados típicos |
@@ -213,6 +254,7 @@ el secundario cae al **Azul Nexo** institucional.
 - **Secondary:** `bg-primary hover:bg-secondary`, `text-on-primary`
 - **Outline / Ghost:** `text-secondary`, borde o fondo `secondary/5`–`/10`
 - **Destructive:** `bg-error hover:bg-status-danger-strong`, `text-on-error`
+- **Outline-danger:** `border-status-danger` + `text-status-danger` + `hover:bg-status-danger/10`. Para la acción destructiva que acompaña a otra igual de importante (Cancelar junto a Modificar, confirmar junto a volver). Es `outline` con el color de la acción destructiva, y existe por una razón concreta: **un `ghost` con texto de color no tiene affordance** — sin borde ni fondo sólo se pinta al hacer hover, así que se lee como un texto y el usuario no lo reconoce como botón hasta descubrirlo. Cuando el rojo va como `className` sobre un `outline`/`ghost`, el color pisa por **orden de emisión** del CSS de Tailwind, que no es un contrato del design system: para eso está la variante.
 - `rounded-sm` (4px), `font-bold text-sm`, `h-11` (44px)
 
 ### Status Badges

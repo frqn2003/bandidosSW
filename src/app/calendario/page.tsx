@@ -10,11 +10,14 @@ import { useSesion } from "@/funciones/sesion";
 
 function CalendarioContent() {
   const { sesion } = useSesion();
-  // Preselección desde /turnos/reservas ("Ver en calendario"):
-  // ?profesorId=&fecha= abre la semana del turno, con ese profesor elegido.
+  // Preselección desde /turnos ("Ver en calendario") o desde /turnos/reservas:
+  // ?profesorId=&materiaId=&fecha= abre el período del turno, con esos filtros.
   const searchParams = useSearchParams();
   const profesorIdInicial = searchParams.get("profesorId") ?? "";
+  const materiaIdInicial = searchParams.get("materiaId") ?? "";
   const fechaIdeal = searchParams.get("fecha") ?? undefined;
+  const vistaQuery = searchParams.get("vista");
+  const vistaInicial = vistaQuery === "dia" || vistaQuery === "semana" || vistaQuery === "mes" ? vistaQuery : undefined;
   const [profesores, setProfesores] = useState<ProfesorCalendario[]>([]);
   const [cargandoProfs, setCargandoProfs] = useState(true);
   const [profesorFijo, setProfesorFijo] = useState<ProfesorCalendario | null>(null);
@@ -63,7 +66,9 @@ function CalendarioContent() {
       </div>
 
       <main className="flex-1 px-6 py-6 lg:px-8">
-        <div className="mx-auto flex max-w-6xl flex-col gap-5">
+        {/* Sin `max-w-*`: la grilla necesita todo el ancho disponible — son 6
+            columnas de profesor y el detalle lateral se come 20rem al abrirse. */}
+        <div className="flex w-full flex-col gap-5">
           {cargandoProfs ? (
             <div
               role="status"
@@ -80,7 +85,9 @@ function CalendarioContent() {
               profesores={profesores}
               profesorFijo={profesorFijo}
               profesorIdInicial={profesorIdInicial}
+              materiaIdInicial={materiaIdInicial}
               fechaIdeal={fechaIdeal}
+              vistaInicial={vistaInicial}
             />
           )}
         </div>

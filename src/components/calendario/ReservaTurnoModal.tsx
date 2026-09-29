@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { formatearFecha } from "@/funciones/formato";
 import type { ProfesorCalendario } from "@/data/calendario";
 import { hoyISO } from "@/data/turnos";
+import { franjaReservable } from "@/funciones/fechas-calendario";
 import { useSesion } from "@/funciones/sesion";
 
 // Puente del calendario a la reserva (HU-TUR-01). Muestra el hueco elegido y
@@ -34,9 +35,14 @@ export function ReservaTurnoModal({
   const params = new URLSearchParams({ fecha, hora: huecoInicio });
   if (profesor) params.set("profesorId", String(profesor.id));
   const hrefReserva = `/turnos/reservas?${params.toString()}`;
-  // Un hueco de un día que ya pasó se ve en la grilla pero no se reserva.
+  // Un hueco de un día que ya pasó se ve en la grilla pero no se reserva. El
+  // corte es POR HORA DE INICIO, no solo por fecha: sin esto, a las 10:15 el
+  // modal de un "Disponible 10:00 - 11:00" se abría normal y el turno quedaba
+  // arrancando en el pasado. Se usa el mismo predicado que la grilla
+  // (`franjaReservable`) para que no puedan discrepar.
   const [hoy] = useState(() => hoyISO());
-  const pasado = fecha !== "" && fecha < hoy;
+  const [minutoAhora] = useState(() => new Date().getHours() * 60 + new Date().getMinutes());
+  const pasado = !franjaReservable(fecha, huecoInicio, hoy, minutoAhora);
   const { sesion } = useSesion();
   const rol = sesion?.usuario.rol.nombre;
   if (rol !== "Gerente" && rol !== "Mesa de Entrada") return null;
@@ -78,7 +84,7 @@ export function ReservaTurnoModal({
             className="flex items-start gap-2 rounded-sm border border-status-warning/40 bg-status-warning/10 px-3 py-2.5 text-sm font-semibold text-on-surface"
           >
             <Icon name="history" size={18} className="mt-0.5 shrink-0 text-status-warning-strong" />
-            Este día ya pasó: no se puede reservar. Elegí un horario libre de hoy en adelante.
+            Este horario ya pasó: no se puede reservar. Elegí un horario libre de hoy en adelante.
           </p>
         )}
         <p className="text-sm font-medium text-on-surface-variant">
