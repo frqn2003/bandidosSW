@@ -71,7 +71,7 @@ export const MODULOS: Modulo[] = [
   // existe como pantalla, así que no navega a ningún lado (chip "Próx.").
   { id: "mi-ficha", label: "Mi ficha", href: "#", icon: "badge", construido: false },
   { id: "materias", label: "Materias", href: "/materias", icon: "menu_book", construido: true },
-  { id: "cobranzas", label: "Cobranzas", href: "#", icon: "receipt_long", construido: false },
+  { id: "cobranzas", label: "Cobranzas", href: "/pagos", icon: "receipt_long", construido: true },
   { id: "usuarios", label: "Usuarios", href: "/usuarios", icon: "manage_accounts", construido: true },
 ];
 

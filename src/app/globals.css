@@ -93,6 +93,33 @@
   --color-status-pink: #d81b60;
   --color-status-pink-strong: #ad1457;
 
+  /* ── Color por materia (HU-CAL-02) ──────────────────────────────────────
+      Paleta propia del calendario: `construirMapaTonos` (en
+      `src/funciones/paleta-materia.ts`) reparte estos 8 tonos POR POSICIÓN en
+      el catálogo de materias ordenado por id. NO es `id % 8`: los ids son
+      dispersos y el módulo haría que dos materias distintas pinten igual.
+      SIN rojos ni verdes a propósito: el rojo (`error`) es
+     exclusivo de "Cancelado" y el verde (`status-success`) de "Disponible"
+     (brief HU-CAL-02 §"Reglas de color y estados").
+
+      El hex NUNCA se usa como color de texto (regla 13 de
+      `docs/errores-comunes.md`): va en el borde izquierdo de la tarjeta, en un
+      fondo muy tenue y en la impresión. El texto va siempre en `on-surface`.
+
+      AL CONSUMIR UN TOKEN: la clase va ESCRITA COMPLETA
+      (`border-l-materia-3`, `bg-materia-3/8`), nunca interpolada. Tailwind v4
+      escanea el fuente con regex y `bg-${token}/8` no existe para el
+      compilador: la tarjeta sale gris sin error de tipo ni warning. */
+
+  --color-materia-1: #2f6fed;
+  --color-materia-2: #1d4ed8;
+  --color-materia-3: #4338ca;
+  --color-materia-4: #5b21b6;
+  --color-materia-5: #7c3aed;
+  --color-materia-6: #0369a1;
+  --color-materia-7: #0e7490;
+  --color-materia-8: #b45309;
+
   /* ── Motion ────────────────────────────────────────────────────────── */
 
   --duration-fast: 150ms;
@@ -181,6 +208,43 @@ body {
 /* La exportación a PDF del listado (HU-MAT-01) usa el diálogo de impresión   */
 /* del navegador: se imprime solo el contenido, sin sidebar ni controles.     */
 /* Los elementos que no van al papel se marcan con la utilidad `print:hidden`.*/
+
+/*
+ * Márgenes de página. Sin esto el contenido llega al borde del papel y las
+ * impresoras lo recortan (impresoras térmicas de 58 mm) o lo degradan.
+ * 12 mm arriba/abajo deja aire para el header del navegador (fecha y URL) en
+ * la mayoría de impresoras; 10 mm a los lados alcanza para separar columnas.
+ *
+ * La orientación se define POR PÁGINA con una página con nombre, no global: un
+ * `size: A4 landscape` acá volcaría también el listado de /turnos y el
+ * comprobante de reserva, que son documentos verticales y se verían raros.
+ * `page: calendario` se aplica solo en el contenedor de /calendario.
+ */
+@page {
+  size: A4 portrait;
+  margin: 12mm 10mm;
+}
+
+@page calendario {
+  size: A4 landscape;
+  margin: 12mm 10mm;
+}
+
+/*
+ * La grilla de `/calendario` (y cualquier bloque de color) tiene que conservar
+ * sus tonos en el papel: los turnos se distinguen por el color de la materia, y
+ * en gris salen todos iguales. `exact` deja que el fondo y el borde se pinten.
+ */
+@media print {
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .pagina-calendario {
+    page: calendario;
+  }
+}
 
 @media print {
   :root,

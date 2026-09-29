@@ -133,6 +133,8 @@ export type TurnoCalendarioResponse = {
   cantidadModificaciones?: number;
   cancelacionTardia?: boolean;
   pagado?: boolean;
+  /** 9º campo del panel lateral de detalle (brief HU-CAL-02). */
+  observaciones?: string | null;
 };
 
 export type BloqueHorarioResponse = {

@@ -18,8 +18,6 @@
 
 import {
   RUTA,
-  rutaCancelar,
-  rutaTurno,
   type CancelarTurnoInput,
   type CrearTurnoBody,
   type EditarTurnoInput,
@@ -28,8 +26,6 @@ import {
   type TurnoResponse,
 } from "@/contracts/turno";
 import {
-  RUTA_MOTIVOS_CANCELACION,
-  rutaParametro,
   type MotivoCancelacionResponse,
 } from "@/contracts/catalogo";
 import {

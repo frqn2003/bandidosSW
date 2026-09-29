@@ -20,9 +20,12 @@ const CONFIG: Record<EstadoTurnoVisible, { variant: StatusVariant; label: string
 
 interface EstadoTurnoBadgeProps {
   estado: EstadoTurnoVisible;
+  /** Ver `StatusBadge.soloIcono`. Acá siempre `false` (default): en el listado de
+   * /turnos la etiqueta escrita es el contenido, no un adorno. */
+  soloIcono?: boolean;
 }
 
-export function EstadoTurnoBadge({ estado }: EstadoTurnoBadgeProps) {
+export function EstadoTurnoBadge({ estado, soloIcono = false }: EstadoTurnoBadgeProps) {
   const cfg = CONFIG[estado];
-  return <StatusBadge variant={cfg.variant} label={cfg.label} icon={cfg.icon} />;
+  return <StatusBadge variant={cfg.variant} label={cfg.label} icon={cfg.icon} soloIcono={soloIcono} />;
 }

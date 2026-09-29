@@ -175,3 +175,133 @@ Resumen de las reglas de las entradas de abajo; se verifican en el paso 6 de `/d
 - **Cómo se detectó:** El comando devolvía "eslint no se reconoce" (PATH global sin eslint del proyecto).
 - **Causa:** Dependencias nunca instaladas en este clon.
 - **Regla para no repetirlo:** siempre verificar `node_modules/` antes de correr verificaciones; si falta, `npm install` (no usar `npx` suelto, que instala la versión global en vez de la del proyecto).
+
+---
+
+### 2026-09-28 · Calendario (HU-CAL-02) — `setState` dentro de un efecto y `Date.now()` en render
+
+- **Qué pasó:** ESLint (React Compiler, reglas `react-hooks/set-state-in-effect` y `react-hooks/purity`) tiró 2 errores en la grilla nueva: un `setAgenda([])` + `setEstadoCarga("listo")` sincrónicos dentro del `useEffect` de carga, y un `Math.floor((Date.now() - ultima) / 1000)` calculado **durante el render** para el texto "Actualizado hace N s".
+- **Cómo se detectó:** `npm run lint` en el paso de verificación técnica.
+- **Causa:** el estado de carga se seteaba desde el efecto (que debería solo *disparar* la consulta) y el reloj del polling leía el reloj del sistema en render, que es impuro y desactualiza el valor con cada re-render.
+- **Regla para no repetirlo:** el `useEffect` de datos **no setea estado**: solo llama al fetch. El "cargando" se dispara desde los **handlers** (`pedirDatos()`: `setEstadoCarga("cargando")` + `setIntento(i => i+1)`) y el efecto depende de `intento`. Para cualquier "hace N s" / "hace N minutos": el instante va en un `useRef` que se escribe **desde la promesa**, el contador en `useState`, y un `setInterval` que lo recalcula. En render solo se lee el estado.
+
+---
+
+### 2026-09-28 · Calendario (HU-CAL-02) — el color de la materia no puede usar rojo ni verde
+
+- **Qué pasó:** Al agregar el color por materia a las tarjetas de turno, la primera propuesta metió tonos que rozaban el rojo y el verde de la paleta de estados.
+- **Cómo se detectó:** en el audit de color contra `MASTER.md` (rojo = `danger` = Cancelado, verde = `success` = Disponible).
+- **Causa:** 8 tonos de una paleta opensource que incluía rojo y verde chocan con los dos colores que el sistema ya usa para estado.
+- **Regla para no repetirlo:** la paleta por materia (`--color-materia-1..8`) es **visual**, no semántica: no puede incluir rojo ni verde. Cuando el estado es Cancelado, **el estado pisa el color de materia** y la tarjeta se pinta de `error` (`tonoEstadoCancelado`). Antes de elegir un color nuevo para un componente, preguntarse si ya tiene dueño en `Status Colors`.
+
+---
+
+### 2026-09-28 · Documentación (HU-CAL-02) — no reescribir un `.md` con `Get-Content | Set-Content`
+
+- **Qué pasó:** al actualizar `design-system/bandidossw/componentes.md` con PowerShell, el archivo entero quedó con los acentos y las "ñ" corruptos (`â€”`, `Ã©`) y con BOM.
+- **Cómo se detectó:** `git diff` mostró 56 líneas modificadas de 90 para un cambio de una línea.
+- **Causa:** `Get-Content` sin `-Encoding UTF8` lee UTF-8 como Windows-1252; al escribir de vuelta, cada byte queda doble-codificado.
+- **Regla para no repetirlo:** editar los `.md` del repo **siempre con la herramienta de edición de archivos**, nunca con `Get-Content`/`Set-Content` de PowerShell. Si hay que usar la consola, `-Encoding UTF8` en lectura **y** escritura, y revisar el `git diff --stat` después: si un cambio de una línea movió decenas, se rompió el encoding.
+
+---
+
+### 2026-09-28 · Calendario (HU-CAL-02) — no repetir el estado en dos lugares
+
+- **Qué pasó:** la barra de controles ya tenía los Select de Profesor/Materia y los Switch de "Ver cancelados"/"Solo con cupo", y abajo del período había **además** una fila de chips "Filtros" con el mismo estado, cada uno con su X.
+- **Cómo se detectó:** el usuario, en la revisión visual de la pantalla.
+- **Causa:** se implementó el patrón "filtros activos + limpiar todo" (que sirve en tablas) sin preguntarse si en un calendario la barra de controles **ya está a la vista**: el chip repetía lo que el Select y el Switch acababan de mostrar.
+- **Regla para no repetirlo:** antes de agregar un resumen del estado de los filtros, preguntar si la pantalla **ya es autoexplicativa**. Si los controles quedan visibles en la misma vista, duplicarlos es ruido, no ayuda. El patrón de chips se reserva para filtros que se **ocultan** (drawer, panel colapsado) o que no se pueden ver de un vistazo. Si se eliminan, borrar también el componente que dejó de usarse, o queda código muerto y `no-unused-vars` lo delata.
+
+---
+
+### 2026-09-28 · Botones · Un `ghost` con texto de color no tiene affordance (y el rojo por `className` depende del orden de Tailwind)
+
+- **Qué pasó:** al sacar el ícono a "Cancelar" del detalle del calendario quedó `variant="ghost"` + `text-status-danger`. El resultado era un texto rojo sobre fondo transparente: **sólo se pintaba al pasar el mouse**, y sin borde ni fondo se lee como un texto, no como un botón. El usuario tiene que descubrirlo con el hover para saber que es un control. Lejos de "sólo se ve poco": no se ve el control.
+- **Por qué se cuela:** `ghost` está pensado para acciones **dentro de un menú o de una fila de íconos**, donde el contexto ya dice "esto es un botón". Sacado a un footer de panel con un `outline` al lado, el `ghost` pierde el contexto que lo justificaba.
+- **Regla para no repetirlo:** un `ghost` (o cualquier texto sin borde ni fondo) **sólo va donde el contexto ya declara que hay un botón**. Si la acción destructiva convive con una acción igual de importante, necesita silueta propia → `outline-danger` (nace de este caso: la silueta del `outline` con el color de la acción destructiva, en `ui/Button`). `destructive` (relleno rojo) es para el botón de confirmación solo.
+- **Segundo error, en el mismo cambio:** el rojo se puso como `className="text-status-danger hover:bg-status-danger/10"` sobre `ghost`. Funciona —lo verifiqué— **porque `.text-status-danger` se emite después de `.text-secondary`** (pos 40859 vs 40814), pero eso es un accidente del orden en que Tailwind emite las utilidades, no un contrato del design system. Pisar el color de una variante con `className` es frágil; si el color importa, que sea una variante.
+- **Al verificar CSS compilado, cuidado con los falsos negativos:** en los selectores Tailwind las utilidades con `:` y `/` van escapadas (`.hover\:bg-status-danger\/10:hover`). Buscar el nombre plano con `IndexOf("hover:bg-status-danger")` da **AUSENTE aunque la clase exista y funcione** — me pasó, y casi reporto un bug inexistente. Buscar el fragmento post-barra (`status-danger\/10`) o un regex que contemple el `\/`. Y ojo con selectores agrupados: `.text-on-error, .text-on-primary { color: #fff }` no matchea un regex que exija `{` justo después del nombre de clase.
+- **Observación aparte (preexistente, no tocada):** `active:scale-[0.97]` **no aparece en el CSS compilado** en ninguna variante de `Button`, así que la animación de pulsación no se está aplicando. Es previo a este cambio y afecta a todos los botones por igual.
+
+---
+
+### 2026-09-28 · Contraste (regla 13) — El chip de un estado no puede usar `on-surface-variant` sobre `surface-container`
+
+- **Qué pasó:** al convertir el conteo del mes en etiqueta, el chip de "0 turnos" quedó con `bg-surface-container-high` + `text-on-surface-variant`. Salió bonito y **rechazado**: `#64748b` sobre `#d9e2ec` da **3.64:1**, y un `text-xs` (12px) exige **4.5:1** por WCAG AA. El chip de los días con turnos (`bg-primary/10` + `on-surface`) da 13.4:1 y el mismo color de texto en gris da **11.2:1**.
+- **Por qué se cuela:** `on-surface-variant` es la elección "automática" cuando el fondo es un surface, y funciona sobre `surface-container` (claro) pero **se rompe sobre `surface-container-high`**, que es dos tonos más oscuro. El chip cambió de superficie y el texto no se recalculó.
+- **Regla para no repetirlo:** al cambiar el fondo de un chip, **recalcular el contraste del texto**, no arrastrarlo. Tabla rápida: texto chico sobre `surface-container-high` va en `on-surface`, nunca en `on-surface-variant`. Y ojo al revés también: si el chip es de estado (`status-*`/10), el texto va en `on-surface` y el color lo lleva el ícono o el punto.
+- **Corolario — el contraste se verifica, no se estima:** los valores de `globals.css` son los que se miden (`#d9e2ec` = `surface-container-high`, `#64748b` = `on-surface-variant`, `#1e293b` = `on-surface`, `#2f6fed` = `primary`). Merece la pena hacer la cuenta de luminancia cuando el texto es chico: son dos minutos contra un rechazo de accesibilidad.
+
+---
+
+### 2026-09-28 · Calendario (HU-CAL-02) — Un estado vacío sin salida es un bug de diseño
+
+- **Qué pasó:** con un filtro por profesor, la pantalla reemplazaba TODA la grilla por el cartel "No hay turnos para los filtros seleccionados" cuando el profesor tenía 0 turnos en la semana. El usuario perdía algo que sí existía: las franjas libres de ese profesor, que ya estaban calculadas y que la grilla sabe pintar como "Disponible" clickeable. Dead end absoluto: la pantalla no decía ni cuánto había libre ni cómo reservar.
+- **El error conceptual:** se trataron "0 filas" y "no hay nada" como la misma cosa. No lo son. **0 filas + N franjas libres = agenda libre.** El estado vacío corresponde a "no hay nada que mostrar", no a "el filtro no matcheó nada".
+- **Regla para no repetirlo:** antes de devolver un estado vacío, preguntarse **"¿hay algo más que sí puedo ofrecer?"**. Si la respuesta es sí, la pantalla no se vacía: se muestra la grilla real (con sus acciones) y un aviso que explica el 0. El cartel vacío queda reservado para el caso de verdad vacío.
+- **Corolario — el aviso cuenta, y hay que contarlo bien:** el memo `huecosReservables` deduplica por `fecha|profesor|horaInicio|horaFin`. Sin dedupe, la misma franja puede volver en dos respuestas de la agenda y el aviso promete más huecos de los que hay. **Un número en pantalla es una promesa: tiene que coincidir con lo clickeable.**
+- **Corolario — mismo criterio, dos lugares:** el memo `huecosReservables` tiene que usar EXACTAMENTE el mismo filtro que la celda (`muestraDisponibles` + `profesorId`), igual que pasó con `filasConAgenda`. Si el aviso dice "hay 8 franjas" y la grilla pinta 3, es peor que no decir nada.
+- **Corolario — no reindentar medio archivo:** para insertar un aviso arriba de la grilla se dudó entre envolver la rama en un `div.space-y-3` (que obligaba a reindentar ~50 líneas del `<Grilla>`) y poner el aviso como hermano antes de la cadena de condicionales con un `div.mb-3`. Se fue por la segunda. **Preferir el diff chico: si un cambio obliga a reindentar un bloque grande, probablemente hay un lugar más limpio para hacerlo.**
+
+---
+
+### 2026-09-28 · Calendario (HU-CAL-02) — Un feature flag de UI NO es lo mismo que `hayFiltros`
+
+- **Qué pasó:** se pidió que los huecos "Disponible" solo se vieran si hay filtro por materia o por profesor. El primer instinto fue reutilizar `hayFiltros` (`profesorId || materiaId || verCancelados || soloCupo`), que ya existía y "decía lo mismo". No dice lo mismo.
+- **Por qué importa:** `hayFiltros` responde "¿el usuario tocó algo para acotar la vista?" (y además gobierna el estado vacío con el botón "Limpiar filtros"). La regla nueva responde "¿el usuario ya sabe a QUIÉN o a QUÉ está mirando?". Con `hayFiltros` mal usado, activar "Ver cancelados" —un switch que no acota nada por profesor— habría pintado los disponibles de todos los profesores: exactamente lo que se pidió evitar.
+- **Regla para no repetirlo:** los flags de UI se nombran por la **pregunta que responden**, no por "ya tengo algo parecido". Si dos booleanos sirven para dos decisiones distintas, son dos booleanos: `hayFiltros` (vacío + botón limpiar) y `muestraDisponibles` (profesor o materia).
+- **Corolario — un flag tiene que propagarse a TODO lo que ese feature decide, no solo a su JSX:** el memo `filasConAgenda` (el margen gris/blanco de la columna Hora) también tenía que respetar `muestraDisponibles`. Si el flag queda solo en el `return`, la columna Hora queda gris en franjas donde ya no se muestra nada — el mismo bug de "dos partes contando historias distintas" que ya estaba en el log por el margen de la hora. **Cuando un flag cambia qué se ve, listar mentalmente todos los cálculos derivados antes de terminar.**
+
+- **El "hueco" se anula en el origen:** en vez de envolver el JSX con `hueco && muestraDisponibles`, el flag entró en la condición que calcula `hueco`. Así no existen dos verdades sobre "hay disponible": el `hueco` es `undefined` cuando no corresponde.
+- **Lo que NO cambió:** `limiteAtencion` sigue agregando los `huecos` al cálculo de ids de profesor. El rango de filas de la grilla viene de los límites de atención de los profesores visibles y no tiene que depender de si los huecos se pintan o no — si se mezclara, sin filtro la grilla perdería franjas que igual tienen turnos.
+
+---
+
+### 2026-09-28 · Calendario (HU-CAL-02) — Sacar el texto de un chip NO es solo CSS: hay que mover el nombre accesible
+
+- **Qué pasó:** se pidió que el chip de "Cancelado" de la tarjeta del calendario vaya solo con el ícono (la palabra le come el nombre de la materia). El cambio visual era de una línea, pero escondía un problema de accesibilidad.
+- **El error invisible:** `TarjetaTurnoCalendario` es un `<button>` con `aria-label` propio. Cuando un botón declara su nombre accesible, **el texto de sus hijos deja de usarlo**. O sea: antes, el chip con la palabra "Cancelado" tampoco se anunciaba (el `aria-label` del botón ya lo pisaba) — pero al sacarle el texto, el estado quedaba **completamente invisible** para un lector de pantalla, sin que nada pareciera roto.
+- **Regla para no repetirlo:** cuando un componente padre tiene `aria-label` explícito, **el `aria-label` es la única fuente de verdad del nombre**. Todo lo que antes se leía como texto (estado, cantidad, contexto) tiene que estar ahí adentro. Antes de sacar un texto visual, preguntarse quién lo anunciaba y copiar ese texto al `aria-label`.
+- **El patrón correcto para quitar texto a un chip:** la prop opcional `soloIcono` en `StatusBadge` (no un badge paralelo) + `role="img"` + `aria-label={label}` en el pill, porque un `span` genérico con `aria-label` **no se nombra** (rol generic no admite nombre accesible). Doble capa: el chip se nombra a sí mismo Y el padre lo repite.
+- **Corolario — extends, no dupliques:** la prop se agregó a `StatusBadge` con default `false` y se propagó por `EstadoTurnoBadge` y `TurnoCalendarioBadge`. `/turnos` sigue mostrando la etiqueta escrita sin tocar una línea: el detalle de un turno en un listado es el contenido principal, no un adorno.
+
+---
+
+### 2026-09-28 · Calendario (HU-CAL-02) — "El gris" de la grilla: hay que señalar el blanco, no solo pintar el color
+
+- **Qué pasó:** con el color por materia ya funcionando, el usuario pidió que "los momentos que no tienen ni materias ni disponibles" tengan fondo blanco. Lectura literal: la grilla. Resultado: la grilla **ya era blanca** (el contenedor de la tabla es `bg-surface-container-lowest`). Pedirle blanco a algo que ya es blanco no produce ningún cambio visible, y hace perder la vuelta.
+- **Regla para no repetirlo:** antes de proponer un cambio de color, **identificar qué elemento es el que tiene el color hoy**. Un pedido de "poné X de fondo" en realidad puede ser tres cosas: (a) el elemento ya tiene ese color y el problema es otro, (b) el pedido apunta a OTRO elemento del que uno está mirando, o (c) lo que se quiere NO es ese color sino "dejar de ver" el color actual. Acá era (b) + (c): lo gris era el margen de la columna Hora, y lo que se quería era **reservar el gris para las horas con agenda** en vez de pintar de blanco las franjas muertas.
+- **Cómo se resolvió:** en vez de blanquear las celdas (no-op), el gris `surface-container` de la columna Hora se volvió **condicional**: gris con agenda, blanco en franja muerta. Menos CSS que antes, y ahora el color **codifica información** en lugar de ser decorativo.
+- **Corolario — el color Should Say Something:** un fondo que está en todas las filas no dice nada. Cuando un color se vuelve condicional a un dato, la pantalla comunica ("acá hay movimiento, acá no") sin una sola etiqueta nueva.
+- **Corolario 2 — el estado actual no se pisa:** en la franja muerta que cae en la hora actual, gana el blanco y se conserva el punto `secondary` que marca "son las...". Regla: cuando un nuevo condicional compite con un indicador de estado, el estado gana y el nuevo condicional se acomoda. No al revés.
+
+---
+
+### 2026-09-28 · Tailwind v4 · Una clase con template literal NUNCA llega al CSS (el gris invisible)
+
+- **Qué pasó:** el calendario salía entero gris. El color por materia estaba bien calculado (mapa correcto, cada materia con un token distinto, `tono.borde` y `tono.fondo` correctos en runtime) y los tokens `--color-materia-1..8` **sí** estaban en el CSS compilado. Faltaba la mitad de la ecuación: las **utilidades** no existían.
+- **Por qué:** Tailwind v4 escanea el fuente con regex y genera el CSS a partir de las clases que encuentra **escritas**. `paleta-materia.ts` armaba `borde: \`border-l-${token}\`` y `fondo: \`bg-${token}/8\``. El escáner ve `border-l-${token}` — un placeholder, no una clase — y no genera nada. Resultado: la tarjeta sin `background-color` ni `border-left-color`, o sea **gris**, sin error de TypeScript, sin error de lint, sin warning y con la página sirviendo 200.
+- **Cómo se detectó:** buscando el token en el CSS compilado (`.next/dev/static/chunks/*.css`): la variable `--color-materia-1` aparecía, la clase `.bg-materia-1\/8` no. Antes: **0** utilidades. Después: **24**. Y un dato que lo delató solo: los turnos cancelados SÍ tenían color, y la única diferencia es que `tonoEstadoCancelado()` devuelve `"border-l-error"` **literal**.
+- **Regla para no repetirlo:** en Tailwind v4 las clases de un mapa de estilos van **escritas completas y literales**. Nada de `` `bg-${color}` `` ni `` `text-${estado}-500` ``. Si necesitás 8 tonos, escribís las 8 utilidades enteras.
+- **Cómo blindarlo:** tipar el mapa con plantillas literales para que `tsc` ate cada clase a su token. Acá, `type ParTono<T> = readonly [T, \`border-l-${T}\`, \`bg-${T}/8\`, \`bg-${T}\`]` con `as const satisfies` — si escribís `materia-2` con `border-l-materia-1`, el compilador lo rechaza. El descuido queda en el tipo, no en el ojo.
+- **Corolario — el gris es el síntoma, no el bug:** si algo "tiene la variable pero no se ve", sospechá de la generación de utilidades antes que del valor del color. Y antes de culpar al estado o al mapa, **grep del CSS compilado**: es la única fuente de verdad de qué existe de verdad.
+- **Alternativa válida si la lista es larga:** `@source inline("bg-materia-{1..8}")` en el CSS. Se descartó acá porque atar token y clase con tipos es más seguro que confiar en la sintaxis del safelist.
+
+---
+
+### 2026-09-28 · Calendario (HU-CAL-02) — `id % N` NO reparte colores: los ids son dispersos
+
+- **Qué pasó:** el color por materia salía de `(materia.id - 1) % 8`, como pedía el brief. Con los ids del catálogo (4 · 9 · 12 · 15) la 4 y la 12 caían en el **mismo** tono: Matemática e Inglés se veían idénticas. El usuario lo detectó a ojo en la pantalla.
+- **Cómo se detectó:** revisión visual. La fórmula "cumple el brief" y aun así rompe el requisito de fondo ("cada materia con un color distinto").
+- **Causa:** el módulo solo reparte sin colisiones si los ids son **contiguos desde 1**. En la base `materia.id` es un serial que deja huecos (bajas, borrados, altas posteriores), así que la función se comporta como "pseudoaleatoria" y en realidad es determinista-pero-colisiona.
+- **Regla para no repetirlo:** cuando el color depende de una entidad, **repartir por posición en el catálogo ordenado por id**, no por módulo del id crudo: `construirMapaTonos([...ids].sort())` asigna el índice 0..N-1. Determinista y sin colisiones mientras quepa la paleta. Y antes de aceptar una fórmula tipo "hash" o "módulo", **probarla con los ids reales del repo**, no con 1, 2, 3.
+- **Corolario:** un requisito de diseño ("cada X distinto") se cumple en la **función** pero hay que validarlo en la **pantalla**. La fórmula puede ser correcta y el reparto no. Y antes de aceptar "es un módulo, se ve aleatorio", probarlo con los ids reales del catálogo.
+
+---
+
+### 2026-09-28 · Verificación técnica (HU-CAL-02) — un error de `tsc` preexistente no es de esta HU
+
+- **Qué pasó:** `npx tsc --noEmit` queda con 1 error en `src/modules/alumnos/alumno.mapper.ts` (faltan 4 campos de `AlumnoResponse`) que **no** es de HU-CAL-02: viene de los commits de HU-TUR-02, que ampliaron el contrato de alumno.
+- **Cómo se detectó:** comparando el error contra `git diff --name-only HEAD`: el archivo no estaba entre los modificados.
+- **Causa:** alguien amplió `AlumnoResponse` sin actualizar el mapper.
+- **Regla para no repetirlo:** cuando el chequeo falle, **verificar primero si el archivo que falla está en el diff**. Si no está, es deuda previa: reportarlo y NO tocarlo de paso (mezclar arreglos ajenos vuelve la HU irrevisable). Se arregla en su propia HU.
