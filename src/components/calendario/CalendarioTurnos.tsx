@@ -69,6 +69,7 @@ export function CalendarioTurnos({
     isRefreshing,
     profesores,
     materias,
+    bloques,
     turnos,
     diasSemana,
     columnasDia,
@@ -143,7 +144,12 @@ export function CalendarioTurnos({
         onIrAHoy={irAHoy}
         onAnterior={anterior}
         onSiguiente={siguiente}
-        onReservarTurno={() => abrirReserva(fechaSeleccionada, "10:00")}
+        onReservarTurno={() => {
+          const params = new URLSearchParams();
+          if (filtros.profesorId) params.set("profesorId", String(filtros.profesorId));
+          if (filtros.materiaId) params.set("materiaId", String(filtros.materiaId));
+          router.push(`/turnos/reservas${params.toString() ? `?${params.toString()}` : ""}`);
+        }}
         profesores={profesores}
         materias={materias}
         filtros={filtros}
@@ -182,6 +188,7 @@ export function CalendarioTurnos({
               diasSemana={diasSemana}
               turnos={turnos}
               profesores={profesores}
+              bloques={bloques}
               filtroProfesorId={filtros.profesorId}
               onSelectTurno={seleccionarTurno}
               onIniciarReprogramacion={esProfesor ? undefined : iniciarReprogramacion}

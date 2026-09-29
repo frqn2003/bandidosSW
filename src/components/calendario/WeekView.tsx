@@ -10,12 +10,14 @@
 
 import React, { useState } from "react";
 import { Icon } from "@/components/ui/Icon";
+import type { BloqueHorarioResponse } from "@/contracts/calendario";
 import type { TurnoCalendario, ProfesorCalendario } from "./types";
 
 interface WeekViewProps {
   diasSemana: { fecha: string; nombreDia: string; numeroDia: number; esHoy: boolean }[];
   turnos: TurnoCalendario[];
   profesores: ProfesorCalendario[];
+  bloques?: BloqueHorarioResponse[];
   filtroProfesorId?: number;
   onSelectTurno: (turno: TurnoCalendario) => void;
   onIniciarReprogramacion?: (
@@ -29,6 +31,7 @@ interface WeekViewProps {
 }
 
 const FRANJAS_HORARIAS = [
+  "08:00",
   "09:00",
   "10:00",
   "11:00",
@@ -36,12 +39,16 @@ const FRANJAS_HORARIAS = [
   "13:00",
   "14:00",
   "15:00",
+  "16:00",
+  "17:00",
+  "18:00",
 ];
 
 export function WeekView({
   diasSemana,
   turnos,
   profesores,
+  bloques,
   filtroProfesorId,
   onSelectTurno,
   onIniciarReprogramacion,
@@ -196,9 +203,30 @@ export function WeekView({
                 {/* Columnas de cada día (Eje X) */}
                 {diasSemana.map((dia) => {
                   const slotKey = `${dia.fecha}_${hora}`;
-                  const turnosEnFranja = turnos.filter(
-                    (t) => t.fecha === dia.fecha && t.horaInicio === hora
-                  );
+                  const [hStr] = hora.split(":");
+                  const slotHour = parseInt(hStr, 10);
+                  const slotIni = slotHour * 60;
+                  const slotFin = slotIni + 60;
+
+                  // Turnos que inician dentro de esta hora (ej. 16:00 o 16:30)
+                  const turnosEnFranja = turnos.filter((t) => {
+                    if (t.fecha !== dia.fecha) return false;
+                    const [th, tm] = t.horaInicio.split(":").map(Number);
+                    const tIni = th * 60 + tm;
+                    return tIni >= slotIni && tIni < slotFin;
+                  });
+
+                  // Turnos activos que ocupan esta hora (iniciaron antes o durante)
+                  const turnosOcupandoSlot = turnos.filter((t) => {
+                    if (t.fecha !== dia.fecha) return false;
+                    if (t.estado === "Cancelado") return false;
+                    if (filtroProfesorId !== undefined && t.profesor.id !== filtroProfesorId) return false;
+                    const [tih, tim] = t.horaInicio.split(":").map(Number);
+                    const [tfh, tfm] = t.horaFin.split(":").map(Number);
+                    const tIni = tih * 60 + tim;
+                    const tFin = tfh * 60 + tfm;
+                    return slotIni < tFin && slotFin > tIni;
+                  });
 
                   const isSlotHovered = hoveredSlot === slotKey;
                   const MAX_VISIBLES = 3;
@@ -208,17 +236,44 @@ export function WeekView({
                     : turnosEnFranja;
                   const sobrantes = turnosEnFranja.length - MAX_VISIBLES;
 
+                  // Verifica si el profesor (o algún profesor si no hay filtro) atiende en este día y franja
+                  const [y, m, d] = dia.fecha.split("-").map(Number);
+                  const dt = new Date(y, m - 1, d);
+                  const jsDay = dt.getDay();
+                  const diaSemana = jsDay === 0 ? 7 : jsDay;
+
+                  const trabaja =
+                    bloques && bloques.length > 0
+                      ? bloques.some((b) => {
+                          if (filtroProfesorId !== undefined && b.profesorId !== filtroProfesorId) {
+                            return false;
+                          }
+                          if (b.diaSemana !== undefined && b.diaSemana !== diaSemana) {
+                            return false;
+                          }
+                          const [bih, bim] = b.horaInicio.split(":").map(Number);
+                          const [bfh, bfm] = b.horaFin.split(":").map(Number);
+                          const bIni = bih * 60 + bim;
+                          const bFin = bfh * 60 + bfm;
+                          return slotIni < bFin && slotFin > bIni;
+                        })
+                      : true;
+
+                  const esSlotLibre = trabaja && turnosOcupandoSlot.length === 0;
+
                   return (
                     <td
                       key={dia.fecha}
-                      onDragOver={(e) => handleDragOver(e, slotKey)}
+                      onDragOver={(e) => esSlotLibre && handleDragOver(e, slotKey)}
                       onDragLeave={handleDragLeave}
-                      onDrop={(e) => handleDrop(e, dia.fecha, hora)}
+                      onDrop={(e) => esSlotLibre && handleDrop(e, dia.fecha, hora)}
                       className={`h-24 p-1.5 align-top transition-colors relative group/slot ${
                         isSlotHovered
                           ? "bg-blue-50/80 ring-2 ring-inset ring-blue-500"
                           : dia.esHoy
                           ? "bg-blue-50/15"
+                          : !trabaja && turnosEnFranja.length === 0 && turnosOcupandoSlot.length === 0
+                          ? "bg-slate-50/40"
                           : "hover:bg-slate-50/60"
                       }`}
                     >
@@ -239,17 +294,22 @@ export function WeekView({
                               } ${
                                 esArrastrado ? "opacity-40 scale-95" : "hover:shadow-xs hover:border-slate-400"
                               }`}
-                              title={`${turno.materia.nombre} · ${turno.alumno.apellido} (${turno.profesor.apellido})`}
+                              title={`${turno.materia.nombre} · ${turno.alumno.apellido} (${turno.profesor.apellido}) · ${turno.horaInicio} - ${turno.horaFin}`}
                             >
                               <div className="flex items-center justify-between gap-1 leading-tight">
                                 <span className="font-bold text-[11px] truncate">
                                   {turno.materia.nombre}
                                 </span>
-                                {turno.estado === "Cancelado" && (
-                                  <span className="text-[10px] font-bold text-red-700 uppercase">
-                                    Cancelado
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <span className="text-[10px] font-bold text-slate-700">
+                                    {turno.horaInicio}
                                   </span>
-                                )}
+                                  {turno.estado === "Cancelado" && (
+                                    <span className="text-[10px] font-bold text-red-700 uppercase">
+                                      Cancelado
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                               <div className="text-[11px] leading-tight truncate mt-0.5 opacity-90">
                                 <span>{turno.alumno.apellido}, {turno.alumno.nombre[0]}.</span>
@@ -280,17 +340,42 @@ export function WeekView({
                           </button>
                         )}
 
-                        {/* Celda vacía con opción de reservar */}
-                        {turnosEnFranja.length === 0 && (
+                        {/* Clase en curso iniciada en franja previa */}
+                        {turnosEnFranja.length === 0 && turnosOcupandoSlot.length > 0 && (
                           <div
-                            onClick={() => onReservarFranja && onReservarFranja(dia.fecha, hora)}
-                            className="h-full w-full rounded flex items-center justify-center text-transparent hover:text-slate-400 hover:border hover:border-dashed hover:border-slate-300 hover:bg-white/80 cursor-pointer transition-all"
-                            title={`Reservar turno para el ${dia.fecha} a las ${hora}`}
+                            onClick={() => onSelectTurno(turnosOcupandoSlot[0])}
+                            className="h-full w-full rounded-md border border-slate-200 bg-slate-100/70 p-1.5 flex flex-col justify-center cursor-pointer hover:bg-slate-100 transition-all select-none shadow-2xs"
+                            title={`${turnosOcupandoSlot[0].materia.nombre} · Clase en curso (${turnosOcupandoSlot[0].horaInicio} – ${turnosOcupandoSlot[0].horaFin})`}
                           >
-                            <span className="text-[10px] font-semibold flex items-center gap-1">
-                              <Icon name="add" size={14} /> Libre
+                            <span className="font-bold text-[11px] text-slate-800 truncate">
+                              {turnosOcupandoSlot[0].materia.nombre}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-medium">
+                              Hasta {turnosOcupandoSlot[0].horaFin} hs
                             </span>
                           </div>
+                        )}
+
+                        {/* Celda vacía sin turnos ni clases en curso */}
+                        {turnosEnFranja.length === 0 && turnosOcupandoSlot.length === 0 && (
+                          trabaja ? (
+                            <div
+                              onClick={() => onReservarFranja && onReservarFranja(dia.fecha, hora)}
+                              className="h-full w-full rounded flex items-center justify-center text-transparent hover:text-blue-600 hover:border hover:border-dashed hover:border-blue-400 hover:bg-blue-50/50 cursor-pointer transition-all group"
+                              title={`Reservar turno para el ${dia.fecha} a las ${hora}`}
+                            >
+                              <span className="text-[10px] font-semibold flex items-center gap-1 group-hover:text-blue-600">
+                                <Icon name="add" size={14} /> Libre
+                              </span>
+                            </div>
+                          ) : (
+                            <div
+                              className="h-full w-full rounded select-none flex items-center justify-center"
+                              title="Fuera del horario de atención del profesor"
+                            >
+                              <span className="sr-only">No disponible</span>
+                            </div>
+                          )
                         )}
                       </div>
                     </td>

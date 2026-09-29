@@ -216,8 +216,12 @@ function ReservaContent() {
         if (pendiente) {
           if (lista.some((fr) => fr.horaInicio === pendiente && fr.disponible)) {
             setHora(pendiente);
+          } else {
+            setHora(null);
           }
           horaPendiente.current = null;
+        } else if (hora && !lista.some((fr) => fr.horaInicio === hora && fr.disponible)) {
+          setHora(null);
         }
       })
       .catch(() => {
@@ -226,7 +230,7 @@ function ReservaContent() {
     return () => {
       cancelado = true;
     };
-  }, [claveFranjas]);
+  }, [claveFranjas, hora]);
 
   // BACKEND: GET /api/turnos/proxima-franja?profesorId=&materiaId=&alumnoId=&desde= (PENDIENTE CONTRATO)
   useEffect(() => {
@@ -420,11 +424,9 @@ function ReservaContent() {
       (profesorPrecargado && profesorPrecargado.materias.length === 1 ? profesorPrecargado.materias[0].precio : null);
     const horarioTexto = franja
       ? `${franja.horaInicio} – ${franja.horaFin}`
-      : hora
+      : hora && (!franjas || cargandoFranjas || franjasActuales.some((f) => f.horaInicio === hora && f.disponible))
         ? `${hora} hs`
-        : precarga.hora
-          ? `${precarga.hora} hs`
-          : null;
+        : null;
 
     return [
       {
@@ -513,9 +515,12 @@ function ReservaContent() {
               ? "Ningún profesor activo dicta esta materia."
               : "Solo profesores activos que dictan la materia.";
 
+  const horaValida =
+    hora !== null && franjasActuales.some((f) => f.horaInicio === hora && f.disponible);
+
   const mostrarSugerencia =
     sugerenciaActual !== null &&
-    hora === null &&
+    !horaValida &&
     (fecha === "" ||
       (claveFranjas !== null &&
         franjas?.clave === claveFranjas &&

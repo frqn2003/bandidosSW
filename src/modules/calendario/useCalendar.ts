@@ -15,7 +15,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { apiGet, apiSend } from "@/lib/api-client";
-import { RUTA_AGENDA, type AgendaDiaResponse } from "@/contracts/calendario";
+import { RUTA_AGENDA, type AgendaDiaResponse, type BloqueHorarioResponse } from "@/contracts/calendario";
 import { listarProfesoresActivos } from "@/data/calendario";
 import { listarMaterias } from "@/data/materias";
 import { sumarDias } from "@/funciones/fechas-calendario";
@@ -63,6 +63,7 @@ export function useCalendar(options: UseCalendarOptions = {}) {
   });
 
   const [turnos, setTurnos] = useState<TurnoCalendario[]>([]);
+  const [bloques, setBloques] = useState<BloqueHorarioResponse[]>([]);
   const [profesores, setProfesores] = useState<ProfesorCalendario[]>([]);
   const [materias, setMaterias] = useState<MateriaCalendario[]>([]);
 
@@ -159,6 +160,7 @@ export function useCalendar(options: UseCalendarOptions = {}) {
             fecha: t.fecha ?? fechaSeleccionada,
           }))
         );
+        setBloques(res.bloques ?? []);
         setSegundosActualizado(0);
       })
       .catch((err) => {
@@ -188,6 +190,7 @@ export function useCalendar(options: UseCalendarOptions = {}) {
             fecha: t.fecha ?? fechaSeleccionada,
           }))
         );
+        setBloques(res.bloques ?? []);
         setSegundosActualizado(0);
       })
       .catch(console.error)
@@ -273,28 +276,52 @@ export function useCalendar(options: UseCalendarOptions = {}) {
       ? profesores.filter((p) => p.id === filtros.profesorId)
       : profesores;
 
+    const [y, m, d] = fechaSeleccionada.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    const jsDay = dt.getDay();
+    const diaSemana = jsDay === 0 ? 7 : jsDay;
+
     return profesoresVisibles.map((prof) => {
       const turnosProf = turnosDelDia.filter((t) => t.profesor.id === prof.id);
+
+      const bloquesProf = bloques.filter(
+        (b) =>
+          (b.profesorId === undefined || b.profesorId === prof.id) &&
+          (b.diaSemana === undefined || b.diaSemana === diaSemana)
+      );
+
+      const franjasLibres: { horaInicio: string; horaFin: string }[] = [];
+      for (const bloque of bloquesProf) {
+        const [ih, im] = bloque.horaInicio.split(":").map(Number);
+        const [fh, fm] = bloque.horaFin.split(":").map(Number);
+        const iniMin = ih * 60 + im;
+        const finMin = fh * 60 + fm;
+
+        for (let tMin = iniMin; tMin + 60 <= finMin; tMin += 60) {
+          const hInicio = `${String(Math.floor(tMin / 60)).padStart(2, "0")}:${String(
+            tMin % 60
+          ).padStart(2, "0")}`;
+          const hFin = `${String(Math.floor((tMin + 60) / 60)).padStart(2, "0")}:${String(
+            (tMin + 60) % 60
+          ).padStart(2, "0")}`;
+
+          const ocupada = turnosProf.some(
+            (t) => t.horaInicio === hInicio && t.estado === "Reservado"
+          );
+          if (!ocupada) {
+            franjasLibres.push({ horaInicio: hInicio, horaFin: hFin });
+          }
+        }
+      }
+
       return {
         profesor: prof,
         turnos: turnosProf,
         turnosCount: turnosProf.length,
-        franjasLibres: [
-          { horaInicio: "09:00", horaFin: "10:00" },
-          { horaInicio: "10:00", horaFin: "11:00" },
-          { horaInicio: "11:00", horaFin: "12:00" },
-          { horaInicio: "12:00", horaFin: "13:00" },
-          { horaInicio: "14:00", horaFin: "15:00" },
-          { horaInicio: "15:00", horaFin: "16:00" },
-        ].filter(
-          (franja) =>
-            !turnosProf.some(
-              (t) => t.horaInicio === franja.horaInicio && t.estado === "Reservado"
-            )
-        ),
+        franjasLibres,
       };
     });
-  }, [turnosFiltrados, fechaSeleccionada, filtros.profesorId, profesores]);
+  }, [turnosFiltrados, fechaSeleccionada, filtros.profesorId, profesores, bloques]);
 
   // ─── 7. Resumen Mensual (para MonthView) ─────────────────────────────────
   const diasMes = useMemo((): DiaResumenMes[] => {
@@ -620,6 +647,7 @@ export function useCalendar(options: UseCalendarOptions = {}) {
     // Colecciones y datos
     profesores,
     materias,
+    bloques,
     turnos: turnosFiltrados,
     totalTurnosFiltrados: turnosFiltrados.length,
 

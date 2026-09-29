@@ -82,6 +82,7 @@ function CalendarioContent() {
             </div>
           ) : (
             <CalendarioTurnos
+              key={`${profesorIdInicial}-${fechaIdeal ?? ""}-${materiaIdInicial}-${vistaInicial ?? ""}`}
               profesores={profesores}
               profesorFijo={profesorFijo}
               profesorIdInicial={profesorIdInicial}

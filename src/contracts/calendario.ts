@@ -141,6 +141,7 @@ export type TurnoCalendarioResponse = {
 
 export type BloqueHorarioResponse = {
   profesorId?: number;
+  diaSemana?: number;
   horaInicio: string;
   horaFin: string;
 };

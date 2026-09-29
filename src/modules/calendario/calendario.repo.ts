@@ -219,6 +219,7 @@ export async function bloquesEnRango(
   const sql = `
     SELECT DISTINCT
       ap.profesor_id,
+      ags.dia_semana,
       ap.hora_inicio::text AS hora_inicio,
       ap.hora_fin::text AS hora_fin
     FROM agenda_profesional ap
@@ -227,7 +228,7 @@ export async function bloquesEnRango(
       AND ags.dia_semana = ANY($2)
       AND ap.estado = 'activo'
       AND ags.estado = 'activo'
-    ORDER BY ap.profesor_id ASC, hora_inicio ASC
+    ORDER BY ap.profesor_id ASC, ags.dia_semana ASC, hora_inicio ASC
   `;
 
   const params = [profesorIds, diasSemana];

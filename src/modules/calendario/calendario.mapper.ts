@@ -104,6 +104,7 @@ export function turnoCalendarioToApi(
 export function bloqueHorarioToApi(row: BloqueHorarioRow): BloqueHorarioResponse {
   return {
     profesorId: row.profesor_id,
+    diaSemana: row.dia_semana,
     horaInicio: hhmm(row.hora_inicio),
     horaFin: hhmm(row.hora_fin),
   };

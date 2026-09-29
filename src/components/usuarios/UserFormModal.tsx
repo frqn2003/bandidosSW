@@ -421,9 +421,9 @@ export function UserFormModal({
 
         {modo === "INSERCION" && (
           <div className="flex items-start gap-3 rounded-md bg-primary-container/20 p-4">
-            <Icon name="mail" size={20} className="mt-0.5 text-primary" />
+            <Icon name="key" size={20} className="mt-0.5 text-primary" />
             <p className="text-sm font-medium text-primary">
-              Al dar de alta, el sistema genera automáticamente una <strong>contraseña temporal alfanumérica</strong> (mínimo 8 caracteres) y la envía al email registrado. El usuario estará obligado a cambiarla en su primer inicio de sesión.
+              Al dar de alta, el sistema genera automáticamente una <strong>contraseña temporal alfanumérica</strong> que se mostrará en pantalla para que se la entregues al usuario. Estará obligado a cambiarla en su primer inicio de sesión.
             </p>
           </div>
         )}

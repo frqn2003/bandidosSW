@@ -127,6 +127,7 @@ export type UsuarioResponse = {
   detalleMotivoBaja?: string | null;
   fechaBaja?: string | null;
   debeCambiarPassword?: boolean;
+  passwordTemporal?: string;
 };
 
 

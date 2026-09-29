@@ -60,7 +60,12 @@ export function UsersPage() {
     user: null,
   });
 
-  const [createdUserSuccess, setCreatedUserSuccess] = useState<{ email: string } | null>(null);
+  const [createdUserSuccess, setCreatedUserSuccess] = useState<{
+    email: string;
+    nombreCompleto?: string;
+    passwordTemporal?: string;
+  } | null>(null);
+  const [copiado, setCopiado] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [reactivating, setReactivating] = useState(false);
 
@@ -116,9 +121,13 @@ export function UsersPage() {
     role: Role;
   }) => {
     if (formModal.modo === "INSERCION") {
-      await addUser(userData);
+      const nuevo = await addUser(userData);
       setFormModal({ open: false, modo: "INSERCION", user: null });
-      setCreatedUserSuccess({ email: userData.email });
+      setCreatedUserSuccess({
+        email: userData.email,
+        nombreCompleto: `${userData.firstName} ${userData.lastName}`,
+        passwordTemporal: nuevo?.passwordTemporal,
+      });
       showFeedback("success", `Usuario ${userData.firstName} ${userData.lastName} dado de alta con éxito.`);
     } else if (formModal.modo === "EDICION" && formModal.user) {
       await updateUser(formModal.user.id, userData);
@@ -388,26 +397,78 @@ export function UsersPage() {
       {/* Modal de alta exitosa de usuario */}
       <Modal
         open={createdUserSuccess !== null}
-        onClose={() => setCreatedUserSuccess(null)}
+        onClose={() => {
+          setCreatedUserSuccess(null);
+          setCopiado(false);
+        }}
         title="Usuario dado de alta exitosamente"
         maxWidth="max-w-md"
         icon={
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-status-success-strong/10 text-status-success-strong">
-            <Icon name="mark_email_read" size={24} />
+            <Icon name="check_circle" size={24} />
           </div>
         }
         footer={
-          <Button type="button" variant="primary" onClick={() => setCreatedUserSuccess(null)}>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => {
+              setCreatedUserSuccess(null);
+              setCopiado(false);
+            }}
+          >
             Entendido
           </Button>
         }
       >
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           <p className="text-sm text-on-surface">
-            Se ha creado la cuenta para <strong>{createdUserSuccess?.email}</strong>.
+            Se ha creado la cuenta para{" "}
+            <strong>
+              {createdUserSuccess?.nombreCompleto
+                ? `${createdUserSuccess.nombreCompleto} (${createdUserSuccess.email})`
+                : createdUserSuccess?.email}
+            </strong>
+            .
           </p>
-          <div className="rounded-md border border-primary/20 bg-primary-container/20 p-3 text-sm text-primary">
-            El sistema generó una contraseña temporal alfanumérica y la envió por email. El usuario estará obligado a cambiarla en su primer inicio de sesión.
+
+          {createdUserSuccess?.passwordTemporal && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
+                Contraseña temporal
+              </label>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-outline-variant bg-surface-container-low px-3.5 py-2.5">
+                <code className="select-all font-mono text-base font-bold tracking-wider text-on-surface">
+                  {createdUserSuccess.passwordTemporal}
+                </code>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={async () => {
+                    if (!createdUserSuccess?.passwordTemporal) return;
+                    try {
+                      await navigator.clipboard.writeText(createdUserSuccess.passwordTemporal);
+                      setCopiado(true);
+                      setTimeout(() => setCopiado(false), 2000);
+                    } catch {
+                      // sin permiso de portapapeles
+                    }
+                  }}
+                  className="shrink-0"
+                >
+                  <Icon name={copiado ? "check" : "content_copy"} size={16} />
+                  {copiado ? "Copiada" : "Copiar"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-start gap-2 rounded-md border border-status-warning/40 bg-status-warning/10 p-3 text-xs text-on-surface">
+            <Icon name="warning" size={18} className="mt-0.5 shrink-0 text-status-warning-strong" />
+            <p>
+              <strong>Atención:</strong> La función de envío por email aún no está implementada. Por favor, copia y entrega esta contraseña temporal al usuario. Deberá cambiarla obligatoriamente en su primer inicio de sesión.
+            </p>
           </div>
         </div>
       </Modal>

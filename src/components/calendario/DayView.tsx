@@ -25,6 +25,7 @@ interface DayViewProps {
 }
 
 const FRANJAS_HORARIAS = [
+  "08:00",
   "09:00",
   "10:00",
   "11:00",
@@ -32,6 +33,9 @@ const FRANJAS_HORARIAS = [
   "13:00",
   "14:00",
   "15:00",
+  "16:00",
+  "17:00",
+  "18:00",
 ];
 
 export function DayView({
@@ -171,9 +175,39 @@ export function DayView({
                 {/* Celdas por cada profesor */}
                 {columnas.map((col) => {
                   const cellKey = `${col.profesor.id}_${hora}`;
-                  const turno = col.turnos.find((t) => t.horaInicio === hora);
+                  const [hStr] = hora.split(":");
+                  const slotHour = parseInt(hStr, 10);
+                  const slotIni = slotHour * 60;
+                  const slotFin = slotIni + 60;
+
+                  // Turno que inicia en esta hora (ej. 16:00 o 16:30)
+                  const turno = col.turnos.find((t) => {
+                    const [th, tm] = t.horaInicio.split(":").map(Number);
+                    const tIni = th * 60 + tm;
+                    return tIni >= slotIni && tIni < slotFin;
+                  });
+
+                  // Turno en curso iniciado en una franja previa
+                  const turnoEnCurso =
+                    !turno &&
+                    col.turnos.find((t) => {
+                      if (t.estado === "Cancelado") return false;
+                      const [tih, tim] = t.horaInicio.split(":").map(Number);
+                      const [tfh, tfm] = t.horaFin.split(":").map(Number);
+                      const tIni = tih * 60 + tim;
+                      const tFin = tfh * 60 + tfm;
+                      return slotIni < tFin && slotFin > tIni;
+                    });
+
                   const isHovered = hoveredCellKey === cellKey;
-                  const esFranjaLibre = !turno;
+                  const esFranjaLibre =
+                    !turno &&
+                    !turnoEnCurso &&
+                    col.franjasLibres.some((f) => {
+                      const [fh, fm] = f.horaInicio.split(":").map(Number);
+                      const fIni = fh * 60 + fm;
+                      return fIni >= slotIni && fIni < slotFin;
+                    });
 
                   return (
                     <td
@@ -203,17 +237,22 @@ export function DayView({
                                   ? "opacity-40 scale-95"
                                   : "hover:shadow-xs hover:border-slate-400"
                               }`}
-                              title={`${turno.materia.nombre} - ${turno.alumno.apellido}, ${turno.alumno.nombre}`}
+                              title={`${turno.materia.nombre} - ${turno.alumno.apellido}, ${turno.alumno.nombre} · ${turno.horaInicio} - ${turno.horaFin}`}
                             >
                               <div className="flex items-center justify-between">
                                 <span className={`text-xs ${estilos.materiaText}`}>
                                   {turno.materia.nombre}
                                 </span>
-                                {turno.estado === "Cancelado" && (
-                                  <span className="text-[10px] font-extrabold text-red-700 uppercase">
-                                    Cancelado
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <span className="text-[10px] font-bold text-slate-700">
+                                    {turno.horaInicio}
                                   </span>
-                                )}
+                                  {turno.estado === "Cancelado" && (
+                                    <span className="text-[10px] font-extrabold text-red-700 uppercase">
+                                      Cancelado
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                               <div className="text-xs mt-0.5 font-medium truncate">
                                 <span>{turno.alumno.apellido}, {turno.alumno.nombre}</span>
@@ -226,7 +265,36 @@ export function DayView({
                             </div>
                           );
                         })()
-                      ) : (
+                      ) : turnoEnCurso ? (
+                        /* Turno en curso iniciado previamente */
+                        (() => {
+                          const estilos = getEstilosMateria(turnoEnCurso.materia.nombre, turnoEnCurso.estado);
+                          return (
+                            <div
+                              onClick={() => onSelectTurno(turnoEnCurso)}
+                              className={`h-full w-full rounded-md border p-2.5 shadow-2xs flex flex-col justify-center transition-all cursor-pointer select-none opacity-85 ${
+                                estilos.bg
+                              }`}
+                              title={`${turnoEnCurso.materia.nombre} - ${turnoEnCurso.alumno.apellido}, ${turnoEnCurso.alumno.nombre} (${turnoEnCurso.horaInicio} – ${turnoEnCurso.horaFin})`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className={`text-xs ${estilos.materiaText}`}>
+                                  {turnoEnCurso.materia.nombre}
+                                </span>
+                                <span className="text-[10px] font-bold text-slate-600">
+                                  {turnoEnCurso.horaInicio}
+                                </span>
+                              </div>
+                              <div className="text-xs mt-0.5 font-medium truncate">
+                                <span>{turnoEnCurso.alumno.apellido}, {turnoEnCurso.alumno.nombre}</span>
+                              </div>
+                              <div className="text-[10px] font-semibold text-slate-500 mt-0.5">
+                                Clase en curso (hasta {turnoEnCurso.horaFin})
+                              </div>
+                            </div>
+                          );
+                        })()
+                      ) : esFranjaLibre ? (
                         /* Franja Libre (Dashed border, clickable) */
                         <div
                           onClick={() =>
@@ -236,6 +304,14 @@ export function DayView({
                           title={`Franja libre para ${col.profesor.apellido} a las ${hora}. Clic para reservar o arrastre un turno aquí para reprogramar.`}
                         >
                           <span>Libre</span>
+                        </div>
+                      ) : (
+                        /* Fuera de disponibilidad del profesor */
+                        <div
+                          className="h-full w-full rounded-md bg-slate-50/40 select-none flex items-center justify-center text-slate-300 text-[11px]"
+                          title={`Fuera del horario de atención de ${col.profesor.apellido}`}
+                        >
+                          <span className="sr-only">No disponible</span>
                         </div>
                       )}
                     </td>

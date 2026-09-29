@@ -37,6 +37,7 @@ export type TurnoCalendarioRow = {
 
 export type BloqueHorarioRow = {
   profesor_id?: number;
+  dia_semana?: number;
   hora_inicio: string;
   hora_fin: string;
 };

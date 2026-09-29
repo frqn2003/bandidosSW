@@ -168,7 +168,10 @@ export async function crear(
       return row;
     });
 
-    return mapper.toApi(usuarioCreado);
+    return {
+      ...mapper.toApi(usuarioCreado),
+      passwordTemporal,
+    };
   } catch (error) {
     // Compensación: Si falló la inserción en BD o el envío de email, borramos la cuenta huérfana de Auth
     if (authIdCreado) {

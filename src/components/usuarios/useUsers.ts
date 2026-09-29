@@ -14,7 +14,6 @@ import {
   type EditarUsuarioBody,
 } from "@/data/usuarios";
 import { sesionActual } from "@/data/auth";
-import { ApiError } from "@/lib/api-client";
 
 export type Role = "Profesor" | "Gerente" | "Mesa de Entrada";
 export type Status = "Activo" | "Inactivo";
@@ -36,6 +35,7 @@ export interface User {
   motivoBaja?: { id: number; nombre: string } | null;
   detalleMotivoBaja?: string | null;
   fechaBaja?: string | null;
+  passwordTemporal?: string;
 }
 
 function normalizarTexto(texto: string): string {
@@ -63,6 +63,7 @@ function aUser(resp: UsuarioResponse): User {
     motivoBaja: resp.motivoBaja ?? null,
     detalleMotivoBaja: resp.detalleMotivoBaja ?? null,
     fechaBaja: resp.fechaBaja ?? null,
+    passwordTemporal: resp.passwordTemporal,
   };
 }
 
