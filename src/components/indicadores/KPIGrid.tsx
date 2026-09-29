@@ -7,6 +7,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import type { KPICardData } from "@/modules/indicadores/types";
 
@@ -95,11 +96,21 @@ export function KPIGrid({ cards }: KPIGridProps) {
               </div>
             </div>
 
-            {/* Subtítulo o detalle contextual */}
-            <div className="mt-3 border-t border-outline-variant/50 pt-2.5">
-              <span className="text-xs font-medium text-on-surface-variant">
+            {/* Subtítulo y acceso directo al listado de origen */}
+            <div className="mt-3 flex items-center justify-between gap-2 border-t border-outline-variant/50 pt-2.5">
+              <span className="text-xs font-medium text-on-surface-variant truncate">
                 {card.subtitulo || "Período actual"}
               </span>
+              {card.linkOrigen && (
+                <Link
+                  href={card.linkOrigen.href}
+                  className="flex items-center gap-0.5 text-[11px] font-bold text-secondary hover:underline shrink-0"
+                  title={`Ir a ${card.linkOrigen.label}`}
+                >
+                  <span>{card.linkOrigen.label}</span>
+                  <Icon name="chevron_right" size={14} />
+                </Link>
+              )}
             </div>
           </div>
         );

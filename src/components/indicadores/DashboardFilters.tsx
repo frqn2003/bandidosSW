@@ -44,9 +44,9 @@ export function DashboardFilters({
   return (
     <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-5 shadow-card">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 items-end">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12 items-end">
           {/* Fecha Desde */}
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5 lg:col-span-2">
             <label
               htmlFor="filtro-desde"
               className="text-xs font-bold uppercase tracking-wider text-on-surface-variant"
@@ -63,7 +63,7 @@ export function DashboardFilters({
           </div>
 
           {/* Fecha Hasta */}
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5 lg:col-span-2">
             <label
               htmlFor="filtro-hasta"
               className="text-xs font-bold uppercase tracking-wider text-on-surface-variant"
@@ -80,7 +80,7 @@ export function DashboardFilters({
           </div>
 
           {/* Select Materia */}
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5 lg:col-span-3">
             <label
               htmlFor="filtro-materia"
               className="text-xs font-bold uppercase tracking-wider text-on-surface-variant"
@@ -106,7 +106,7 @@ export function DashboardFilters({
           </div>
 
           {/* Select Profesor */}
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5 lg:col-span-3">
             <label
               htmlFor="filtro-profesor"
               className="text-xs font-bold uppercase tracking-wider text-on-surface-variant"
@@ -131,20 +131,28 @@ export function DashboardFilters({
             </select>
           </div>
 
-          {/* Botón Limpiar filtros coherente con el sistema */}
-          <div className="flex items-center">
+          {/* Botones Actualizar y Limpiar filtros */}
+          <div className="flex items-center gap-2 lg:col-span-2">
+            <button
+              type="submit"
+              disabled={cargando}
+              className="flex h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-sm bg-primary px-3 text-sm font-bold text-white shadow-xs transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
+            >
+              <Icon
+                name={cargando ? "progress_activity" : "refresh"}
+                size={18}
+                className={cargando ? "animate-spin" : ""}
+              />
+              <span>{cargando ? "Actualizando…" : "Actualizar"}</span>
+            </button>
             <button
               type="button"
               disabled={cargando}
               onClick={onLimpiar}
-              className="flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-sm border border-secondary bg-white px-3.5 text-sm font-bold text-secondary shadow-xs transition-colors hover:bg-secondary/10 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
+              title="Restablecer filtros al mes actual"
+              className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-sm border border-secondary bg-white text-secondary hover:bg-secondary/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
             >
-              <Icon
-                name={cargando ? "progress_activity" : "filter_alt_off"}
-                size={18}
-                className={cargando ? "animate-spin text-secondary" : "text-secondary"}
-              />
-              {cargando ? "Actualizando…" : "Limpiar filtros"}
+              <Icon name="filter_alt_off" size={18} />
             </button>
           </div>
         </div>

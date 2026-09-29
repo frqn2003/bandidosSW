@@ -20,6 +20,7 @@ interface StudentFormModalProps {
   modo: ModoStudentModal;
   student: StudentUI | null;
   auditLogs: StudentAuditLog[];
+  catalogoMaterias?: { id: number; nombre: string }[];
   onClose: () => void;
   onSave: (data: Partial<StudentUI>) => Promise<void>;
   checkDuplicate: (dni: string, excludeId?: number) => StudentUI | undefined;
@@ -27,16 +28,6 @@ interface StudentFormModalProps {
   onDeactivateClick?: (student: StudentUI) => void;
   onReactivateClick?: (student: StudentUI) => void;
 }
-
-const CATALOGO_MATERIAS = [
-  { id: 1, nombre: "Matemática" },
-  { id: 2, nombre: "Física" },
-  { id: 3, nombre: "Química" },
-  { id: 4, nombre: "Inglés" },
-  { id: 5, nombre: "Lengua" },
-  { id: 6, nombre: "Biología" },
-  { id: 7, nombre: "Historia" },
-];
 
 function calcularEdad(fechaNacimiento: string): number | null {
   if (!fechaNacimiento || fechaNacimiento.length < 10) return null;
@@ -71,6 +62,7 @@ export function StudentFormModal({
   modo,
   student,
   auditLogs,
+  catalogoMaterias = [],
   onClose,
   onSave,
   checkDuplicate,
@@ -85,7 +77,7 @@ export function StudentFormModal({
   const [nombre, setNombre] = useState("");
   const [apellido, setApellido] = useState("");
   const [dni, setDni] = useState("");
-  const [fechaNacimiento, setFechaNacimiento] = useState("2008-05-14");
+  const [fechaNacimiento, setFechaNacimiento] = useState("");
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
   const [nivelEducativo, setNivelEducativo] = useState<NivelEducativo>("Secundario");
@@ -125,7 +117,7 @@ export function StudentFormModal({
         setNombre("");
         setApellido("");
         setDni("");
-        setFechaNacimiento("2008-05-14");
+        setFechaNacimiento("");
         setEmail("");
         setTelefono("");
         setNivelEducativo("Secundario");
@@ -228,42 +220,12 @@ export function StudentFormModal({
     }
   };
 
-  const materiasDisponiblesParaAgregar = CATALOGO_MATERIAS.filter(
+  const materiasDisponiblesParaAgregar = catalogoMaterias.filter(
     (cat) => !materiasInteres.some((m) => m.id === cat.id)
   );
 
-  // Bitácora para mostrar (si el array viene vacío en modo lectura, provee registros por defecto realistas)
-  const displayAuditLogs: StudentAuditLog[] =
-    auditLogs.length > 0
-      ? auditLogs
-      : student
-      ? [
-          {
-            id: 991,
-            alumnoId: student.id,
-            fecha: formatearFecha(student.fechaActualizacion || student.fechaCreacion),
-            hora: "10:42",
-            responsable: "Carlos Benítez",
-            accion: student.estado === "inactivo" ? "Baja" : "Modificación",
-            campo: student.estado === "inactivo" ? "Estado" : "Teléfono",
-            valorAnterior: student.estado === "inactivo" ? "Activo" : "3874000111",
-            valorNuevo: student.estado === "inactivo" ? "Inactivo" : student.telefono || "3874123456",
-            operacion: "UPDATE",
-          },
-          {
-            id: 992,
-            alumnoId: student.id,
-            fecha: formatearFecha(student.fechaCreacion),
-            hora: "09:14",
-            responsable: "Carlos Benítez",
-            accion: "Alta",
-            campo: "Alumno",
-            valorAnterior: "—",
-            valorNuevo: "Creado",
-            operacion: "INSERT",
-          },
-        ]
-      : [];
+  // Bitácora para mostrar
+  const displayAuditLogs: StudentAuditLog[] = auditLogs;
 
   return (
     <Modal
@@ -288,7 +250,7 @@ export function StudentFormModal({
       }
       subtitle={
         isRead && student
-          ? `Alta: ${formatearFecha(student.fechaCreacion)} por Carlos Benítez · Última modificación: ${formatearFecha(
+          ? `Alta: ${formatearFecha(student.fechaCreacion)} · Última modificación: ${formatearFecha(
               student.fechaActualizacion || student.fechaCreacion
             )}`
           : undefined
@@ -541,19 +503,6 @@ export function StudentFormModal({
               {errors.fechaNacimiento && (
                 <p className="text-xs text-error font-medium">{errors.fechaNacimiento}</p>
               )}
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label htmlFor="legajo" className="text-sm font-semibold text-on-surface">
-                N° de legajo
-              </label>
-              <input
-                id="legajo"
-                type="text"
-                disabled
-                value={student?.legajo || "Se generará automáticamente"}
-                className="h-11 rounded-sm border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface font-mono disabled:opacity-60 disabled:cursor-not-allowed"
-              />
             </div>
           </div>
         </fieldset>

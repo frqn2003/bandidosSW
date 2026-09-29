@@ -6,6 +6,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { ApiError, mensajeDeError } from "@/lib/api-client";
 
 export type ModoUserForm = "INSERCION" | "EDICION" | "LECTURA";
 
@@ -13,14 +14,32 @@ interface UserFormModalProps {
   open: boolean;
   modo: ModoUserForm;
   user: User | null;
+  roles?: { id: number; nombre: string }[];
   onClose: () => void;
-  onGuardar: (user: Omit<User, "id" | "status">) => void;
+  onGuardar: (user: {
+    firstName: string;
+    lastName: string;
+    dni: string;
+    email: string;
+    phone: string;
+    role: Role;
+  }) => Promise<void> | void;
   checkDuplicate: (dni: string, email: string, currentId?: number) => { dniExists: boolean; emailExists: boolean };
   onEditClick?: (user: User) => void;
   onDeactivateClick?: (user: User) => void;
 }
 
-export function UserFormModal({ open, modo, user, onClose, onGuardar, checkDuplicate, onEditClick, onDeactivateClick }: UserFormModalProps) {
+export function UserFormModal({
+  open,
+  modo,
+  user,
+  roles = [],
+  onClose,
+  onGuardar,
+  checkDuplicate,
+  onEditClick,
+  onDeactivateClick,
+}: UserFormModalProps) {
   const isRead = modo === "LECTURA";
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -31,6 +50,9 @@ export function UserFormModal({ open, modo, user, onClose, onGuardar, checkDupli
 
   const [dniError, setDniError] = useState("");
   const [emailError, setEmailError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  const [generalError, setGeneralError] = useState("");
+  const [guardando, setGuardando] = useState(false);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -52,14 +74,17 @@ export function UserFormModal({ open, modo, user, onClose, onGuardar, checkDupli
       }
       setDniError("");
       setEmailError("");
+      setPhoneError("");
+      setGeneralError("");
+      setGuardando(false);
     }
   }, [open, user]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const [phoneError, setPhoneError] = useState("");
-
   const handleNameChange = (val: string, setter: (v: string) => void) => {
-    setter(val.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, ""));
+    // Solo letras y acentos, máximo 50 caracteres (criterio HU-SIS-00)
+    const cleaned = val.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, "").slice(0, 50);
+    setter(cleaned);
   };
 
   const handleNumericChange = (val: string, setter: (v: string) => void, maxLen?: number) => {
@@ -71,45 +96,93 @@ export function UserFormModal({ open, modo, user, onClose, onGuardar, checkDupli
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isRead || guardando) return;
+
     setDniError("");
     setEmailError("");
     setPhoneError("");
+    setGeneralError("");
 
     let hasError = false;
 
-    if (phone && (phone.length < 10 || phone.length > 11)) {
-      setPhoneError("El teléfono debe tener entre 10 y 11 dígitos.");
+    // Validación Nombre y Apellido
+    if (!firstName.trim()) {
+      setGeneralError("El nombre es obligatorio.");
+      hasError = true;
+    }
+    if (!lastName.trim()) {
+      setGeneralError("El apellido es obligatorio.");
       hasError = true;
     }
 
+    // Validación DNI: 7 u 8 dígitos numéricos
+    if (!/^\d{7,8}$/.test(dni.trim())) {
+      setDniError("El DNI debe tener 7 u 8 dígitos numéricos.");
+      hasError = true;
+    }
+
+    // Validación Email: usuario@dominio
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setEmailError("El email debe tener el formato usuario@dominio.com");
+    if (!emailRegex.test(email.trim())) {
+      setEmailError("El email debe tener el formato válido (usuario@dominio).");
       hasError = true;
     }
 
+    // Validación Teléfono: opcional, 10 u 11 dígitos si se ingresa
+    if (phone.trim() && (phone.trim().length < 10 || phone.trim().length > 11)) {
+      setPhoneError("El teléfono debe tener 10 u 11 dígitos numéricos.");
+      hasError = true;
+    }
+
+    // Validación local de duplicados en usuarios activos
     const dups = checkDuplicate(dni, email, user?.id);
     if (dups.dniExists) {
       setDniError("Ya existe un usuario activo con este DNI.");
       hasError = true;
     }
-    if (dups.emailExists && emailRegex.test(email)) {
+    if (dups.emailExists && emailRegex.test(email.trim())) {
       setEmailError("Ya existe un usuario activo con este Email.");
       hasError = true;
     }
 
     if (hasError) return;
 
-    onGuardar({ firstName, lastName, dni, email, phone, role });
+    setGuardando(true);
+    try {
+      await onGuardar({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        dni: dni.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone.trim(),
+        role,
+      });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.campo === "dni" || err.codigo === "DNI_DUPLICADO") {
+          setDniError(err.message);
+        } else if (err.campo === "email" || err.codigo === "EMAIL_DUPLICADO") {
+          setEmailError(err.message);
+        } else if (err.campo === "telefono") {
+          setPhoneError(err.message);
+        } else {
+          setGeneralError(err.message);
+        }
+      } else {
+        setGeneralError(mensajeDeError(err));
+      }
+    } finally {
+      setGuardando(false);
+    }
   };
 
   return (
     <Modal
       open={open}
-      onClose={onClose}
-      title={isRead ? `Ficha de ${firstName} ${lastName}` : modo === "INSERCION" ? "Nuevo usuario" : `Modificar usuario`}
+      onClose={guardando ? () => {} : onClose}
+      title={isRead ? `Ficha de ${firstName} ${lastName}` : modo === "INSERCION" ? "Nuevo usuario" : "Modificar usuario"}
       maxWidth={isRead ? "max-w-4xl" : "max-w-2xl"}
       titleExtra={
         isRead && user ? (
@@ -120,7 +193,11 @@ export function UserFormModal({ open, modo, user, onClose, onGuardar, checkDupli
           />
         ) : undefined
       }
-      subtitle={isRead && user ? `Alta: 03/02/2026 por Carlos Benítez · Última modificación: 14/09/2026` : undefined}
+      subtitle={
+        isRead && user
+          ? `Alta: ${user.fechaCreacion ? new Date(user.fechaCreacion).toLocaleDateString("es-AR") : "—"}`
+          : undefined
+      }
       footer={
         !isRead ? (
           <div className="flex w-full items-center justify-between">
@@ -133,7 +210,7 @@ export function UserFormModal({ open, modo, user, onClose, onGuardar, checkDupli
                     onClose();
                     onDeactivateClick(user);
                   }}
-                  disabled={user.status === "Inactivo"}
+                  disabled={user.status === "Inactivo" || guardando}
                 >
                   <Icon name="delete" size={18} />
                   Dar de baja
@@ -141,12 +218,12 @@ export function UserFormModal({ open, modo, user, onClose, onGuardar, checkDupli
               )}
             </div>
             <div className="flex items-center gap-3">
-              <Button type="button" variant="outline" onClick={onClose}>
+              <Button type="button" variant="outline" onClick={onClose} disabled={guardando}>
                 Cancelar
               </Button>
-              <Button type="button" variant="primary" onClick={handleSubmit}>
-                <Icon name="save" size={18} />
-                {modo === "EDICION" ? "Guardar cambios" : "Guardar usuario"}
+              <Button type="button" variant="primary" onClick={handleSubmit} disabled={guardando}>
+                <Icon name={guardando ? "progress_activity" : "save"} size={18} className={guardando ? "animate-spin" : ""} />
+                {guardando ? "Guardando…" : modo === "EDICION" ? "Guardar cambios" : "Guardar usuario"}
               </Button>
             </div>
           </div>
@@ -189,6 +266,13 @@ export function UserFormModal({ open, modo, user, onClose, onGuardar, checkDupli
         )}
       </div>
 
+      {generalError && (
+        <div className="mb-4 flex items-center gap-2 rounded-sm border border-error/30 bg-error/10 p-3 text-sm text-error">
+          <Icon name="error" size={18} />
+          <span>{generalError}</span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         <fieldset className="rounded-md border border-outline-variant p-5">
           <legend className="px-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
@@ -196,89 +280,140 @@ export function UserFormModal({ open, modo, user, onClose, onGuardar, checkDupli
           </legend>
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
-              <label htmlFor="nombre" className="text-sm font-semibold text-on-surface">Nombre *</label>
+              <label htmlFor="nombre" className="text-sm font-semibold text-on-surface">
+                Nombre *
+              </label>
               <input
                 id="nombre"
                 type="text"
                 required
-                disabled={isRead}
+                maxLength={50}
+                disabled={isRead || guardando}
                 value={firstName}
                 onChange={(e) => handleNameChange(e.target.value, setFirstName)}
                 className="h-11 rounded-sm border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface focus:border-secondary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-secondary/20 disabled:opacity-60 disabled:cursor-not-allowed"
               />
+              {!isRead && <span className="text-[11px] text-on-surface-variant">{firstName.length}/50 caracteres</span>}
             </div>
+
             <div className="flex flex-col gap-1">
-              <label htmlFor="apellido" className="text-sm font-semibold text-on-surface">Apellido *</label>
+              <label htmlFor="apellido" className="text-sm font-semibold text-on-surface">
+                Apellido *
+              </label>
               <input
                 id="apellido"
                 type="text"
                 required
-                disabled={isRead}
+                maxLength={50}
+                disabled={isRead || guardando}
                 value={lastName}
                 onChange={(e) => handleNameChange(e.target.value, setLastName)}
                 className="h-11 rounded-sm border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface focus:border-secondary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-secondary/20 disabled:opacity-60 disabled:cursor-not-allowed"
               />
+              {!isRead && <span className="text-[11px] text-on-surface-variant">{lastName.length}/50 caracteres</span>}
             </div>
+
             <div className="flex flex-col gap-1">
-              <label htmlFor="dni" className="text-sm font-semibold text-on-surface">DNI *</label>
+              <label htmlFor="dni" className="text-sm font-semibold text-on-surface">
+                DNI *
+              </label>
               <input
                 id="dni"
                 type="text"
                 required
-                disabled={isRead}
+                maxLength={8}
+                disabled={isRead || guardando}
                 value={dni}
                 onChange={(e) => handleNumericChange(e.target.value, setDni, 8)}
-                className={`h-11 rounded-sm border bg-surface-container-low px-3 text-sm text-on-surface focus:bg-surface-container-lowest focus:outline-none focus:ring-2 disabled:opacity-60 disabled:cursor-not-allowed ${dniError ? 'border-error focus:border-error focus:ring-error/20' : 'border-outline-variant focus:border-secondary focus:ring-secondary/20'}`}
+                placeholder="7 u 8 dígitos numéricos"
+                className={`h-11 rounded-sm border bg-surface-container-low px-3 text-sm text-on-surface focus:bg-surface-container-lowest focus:outline-none focus:ring-2 disabled:opacity-60 disabled:cursor-not-allowed ${
+                  dniError ? "border-error focus:border-error focus:ring-error/20" : "border-outline-variant focus:border-secondary focus:ring-secondary/20"
+                }`}
               />
-              {dniError && <p className="text-xs text-error font-medium flex items-center gap-1"><Icon name="error" size={14} />{dniError}</p>}
+              {dniError ? (
+                <p className="flex items-center gap-1 text-xs font-medium text-error">
+                  <Icon name="error" size={14} />
+                  {dniError}
+                </p>
+              ) : (
+                !isRead && <span className="text-[11px] text-on-surface-variant">7 u 8 dígitos numéricos, obligatorio y único.</span>
+              )}
             </div>
+
             <div className="flex flex-col gap-1">
-              <label htmlFor="email" className="text-sm font-semibold text-on-surface">Email *</label>
+              <label htmlFor="email" className="text-sm font-semibold text-on-surface">
+                Email *
+              </label>
               <input
                 id="email"
                 type="email"
                 required
-                disabled={isRead}
+                maxLength={120}
+                disabled={isRead || guardando}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className={`h-11 rounded-sm border bg-surface-container-low px-3 text-sm text-on-surface focus:bg-surface-container-lowest focus:outline-none focus:ring-2 disabled:opacity-60 disabled:cursor-not-allowed ${emailError ? 'border-error focus:border-error focus:ring-error/20' : 'border-outline-variant focus:border-secondary focus:ring-secondary/20'}`}
+                placeholder="usuario@dominio.com"
+                className={`h-11 rounded-sm border bg-surface-container-low px-3 text-sm text-on-surface focus:bg-surface-container-lowest focus:outline-none focus:ring-2 disabled:opacity-60 disabled:cursor-not-allowed ${
+                  emailError ? "border-error focus:border-error focus:ring-error/20" : "border-outline-variant focus:border-secondary focus:ring-secondary/20"
+                }`}
               />
               {emailError ? (
-                 <p className="text-xs text-error font-medium flex items-center gap-1"><Icon name="error" size={14} />{emailError}</p>
+                <p className="flex items-center gap-1 text-xs font-medium text-error">
+                  <Icon name="error" size={14} />
+                  {emailError}
+                </p>
               ) : (
-                !isRead && <p className="text-xs text-on-surface-variant">Formato usuario@dominio. Debe ser único.</p>
+                !isRead && <span className="text-[11px] text-on-surface-variant">Formato usuario@dominio, obligatorio y único.</span>
               )}
             </div>
+
             <div className="flex flex-col gap-1">
-              <label htmlFor="telefono" className="text-sm font-semibold text-on-surface">Teléfono</label>
+              <label htmlFor="telefono" className="text-sm font-semibold text-on-surface">
+                Teléfono
+              </label>
               <input
                 id="telefono"
                 type="text"
-                disabled={isRead}
+                maxLength={11}
+                disabled={isRead || guardando}
                 value={phone}
                 onChange={(e) => handleNumericChange(e.target.value, setPhone, 11)}
                 placeholder="Ej: 3874123456"
-                className={`h-11 rounded-sm border bg-surface-container-low px-3 text-sm text-on-surface focus:bg-surface-container-lowest focus:outline-none focus:ring-2 disabled:opacity-60 disabled:cursor-not-allowed ${phoneError ? 'border-error focus:border-error focus:ring-error/20' : 'border-outline-variant focus:border-secondary focus:ring-secondary/20'}`}
+                className={`h-11 rounded-sm border bg-surface-container-low px-3 text-sm text-on-surface focus:bg-surface-container-lowest focus:outline-none focus:ring-2 disabled:opacity-60 disabled:cursor-not-allowed ${
+                  phoneError ? "border-error focus:border-error focus:ring-error/20" : "border-outline-variant focus:border-secondary focus:ring-secondary/20"
+                }`}
               />
               {phoneError ? (
-                 <p className="text-xs text-error font-medium flex items-center gap-1"><Icon name="error" size={14} />{phoneError}</p>
+                <p className="flex items-center gap-1 text-xs font-medium text-error">
+                  <Icon name="error" size={14} />
+                  {phoneError}
+                </p>
               ) : (
-                !isRead && <p className="text-xs text-on-surface-variant">Opcional - 10 u 11 dígitos, solo números.</p>
+                !isRead && <span className="text-[11px] text-on-surface-variant">Opcional — 10 u 11 dígitos numéricos.</span>
               )}
             </div>
+
             <div className="flex flex-col gap-1">
-              <label htmlFor="rol" className="text-sm font-semibold text-on-surface">Rol *</label>
+              <label htmlFor="rol" className="text-sm font-semibold text-on-surface">
+                Rol *
+              </label>
               <select
                 id="rol"
                 required
-                disabled={isRead}
+                disabled={isRead || guardando}
                 value={role}
                 onChange={(e) => setRole(e.target.value as Role)}
                 className="h-11 rounded-sm border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface focus:border-secondary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-secondary/20 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <option value="Profesor">Profesor</option>
-                <option value="Gerente">Gerente</option>
-                <option value="Mesa de Entrada">Mesa de Entrada</option>
+                {roles.length > 0 ? (
+                  roles.map((r) => (
+                    <option key={r.id} value={r.nombre}>
+                      {r.nombre}
+                    </option>
+                  ))
+                ) : (
+                  <option value={role}>{role}</option>
+                )}
               </select>
             </div>
           </div>
@@ -286,48 +421,63 @@ export function UserFormModal({ open, modo, user, onClose, onGuardar, checkDupli
 
         {modo === "INSERCION" && (
           <div className="flex items-start gap-3 rounded-md bg-primary-container/20 p-4">
-            <Icon name="mail" size={20} className="text-primary mt-0.5" />
-            <p className="text-sm text-primary font-medium">
-              Al guardar se generará una <strong>contraseña temporal</strong> alfanumérica de al menos 8 caracteres y se enviará al email registrado. El usuario deberá cambiarla en su primer inicio de sesión.
+            <Icon name="mail" size={20} className="mt-0.5 text-primary" />
+            <p className="text-sm font-medium text-primary">
+              Al dar de alta, el sistema genera automáticamente una <strong>contraseña temporal alfanumérica</strong> (mínimo 8 caracteres) y la envía al email registrado. El usuario estará obligado a cambiarla en su primer inicio de sesión.
             </p>
           </div>
         )}
       </form>
 
-      {isRead && (
+      {isRead && user && (
         <div className="mt-8">
-          <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-on-surface-variant">Bitácora de auditoría</h3>
-          <div className="rounded-md border border-outline-variant bg-surface-container-lowest overflow-x-auto shadow-card">
+          <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-on-surface-variant">
+            Bitácora de auditoría
+          </h3>
+          <div className="overflow-x-auto rounded-md border border-outline-variant bg-surface-container-lowest shadow-card">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-outline-variant bg-surface-container-low">
                 <tr className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
-                  <th className="px-4 py-3">Fecha</th>
-                  <th className="px-4 py-3">Hora</th>
+                  <th className="px-4 py-3">Fecha y Hora</th>
                   <th className="px-4 py-3">Responsable</th>
                   <th className="px-4 py-3">Acción</th>
-                  <th className="px-4 py-3">Campo</th>
+                  <th className="px-4 py-3">Campo modificado</th>
                   <th className="px-4 py-3">Valor anterior</th>
                   <th className="px-4 py-3">Valor nuevo</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/60">
+                {user.status === "Inactivo" && (
+                  <tr className="hover:bg-surface-container-low/50">
+                    <td className="px-4 py-3 text-on-surface-variant">
+                      {user.fechaBaja ? new Date(user.fechaBaja).toLocaleString("es-AR") : "Reciente"}
+                    </td>
+                    <td className="px-4 py-3 font-semibold">Gerencia</td>
+                    <td className="px-4 py-3">
+                      <span className="rounded bg-error/10 px-2 py-0.5 text-xs font-bold text-error">
+                        Baja lógica
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-on-surface-variant">Estado / Motivo</td>
+                    <td className="px-4 py-3 text-on-surface-variant">Activo</td>
+                    <td className="px-4 py-3 font-medium text-on-surface">
+                      Inactivo ({user.motivoBaja?.nombre ?? "Baja registrada"})
+                    </td>
+                  </tr>
+                )}
                 <tr className="hover:bg-surface-container-low/50">
-                  <td className="px-4 py-3 text-on-surface-variant">14/09/2026</td>
-                  <td className="px-4 py-3 text-on-surface-variant">10:42</td>
-                  <td className="px-4 py-3 font-semibold">Carlos Benítez</td>
-                  <td className="px-4 py-3"><span className="bg-orange-100 text-orange-700 font-bold px-2 py-0.5 rounded text-xs">Modificación</span></td>
-                  <td className="px-4 py-3 text-on-surface-variant">Teléfono</td>
-                  <td className="px-4 py-3 text-on-surface-variant">3874000111</td>
-                  <td className="px-4 py-3 font-medium text-on-surface">3874123456</td>
-                </tr>
-                <tr className="hover:bg-surface-container-low/50">
-                  <td className="px-4 py-3 text-on-surface-variant">03/02/2026</td>
-                  <td className="px-4 py-3 text-on-surface-variant">09:14</td>
-                  <td className="px-4 py-3 font-semibold">Carlos Benítez</td>
-                  <td className="px-4 py-3"><span className="bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded text-xs">Alta</span></td>
+                  <td className="px-4 py-3 text-on-surface-variant">
+                    {user.fechaCreacion ? new Date(user.fechaCreacion).toLocaleString("es-AR") : "Registro inicial"}
+                  </td>
+                  <td className="px-4 py-3 font-semibold">Sistema</td>
+                  <td className="px-4 py-3">
+                    <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700">
+                      Alta
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-on-surface-variant">Usuario</td>
                   <td className="px-4 py-3 text-on-surface-variant">—</td>
-                  <td className="px-4 py-3 font-medium text-on-surface">Creado</td>
+                  <td className="px-4 py-3 font-medium text-on-surface">Creado (Activo)</td>
                 </tr>
               </tbody>
             </table>

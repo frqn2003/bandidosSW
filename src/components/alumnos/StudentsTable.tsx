@@ -86,7 +86,7 @@ export function StudentsTable({
                     {student.legajo}
                   </td>
 
-                  {/* Apellido y Nombre con Avatar */}
+                  {/* Apellido y Nombre con Avatar y Badge de Estado */}
                   <td className="px-4 py-3 whitespace-nowrap">
                     <div className="flex items-center gap-3">
                       <span
@@ -97,9 +97,25 @@ export function StudentsTable({
                       >
                         {inicialesDe(student.nombre, student.apellido)}
                       </span>
-                      <span className="font-bold text-on-surface">
-                        {student.apellido}, {student.nombre}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-on-surface">
+                          {student.apellido}, {student.nombre}
+                        </span>
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                            isActive
+                              ? "bg-status-success/15 text-status-success-strong"
+                              : "bg-surface-container-high text-on-surface-variant"
+                          }`}
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              isActive ? "bg-status-success" : "bg-on-surface-variant/50"
+                            }`}
+                          />
+                          {isActive ? "Activo" : "Inactivo"}
+                        </span>
+                      </div>
                     </div>
                   </td>
 

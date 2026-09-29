@@ -45,7 +45,7 @@ export type Modulo = {
 
 /** El orden de este array es el orden del menú. */
 export const MODULOS: Modulo[] = [
-  { id: "dashboard", label: "Dashboard", href: "/reportes", icon: "dashboard", construido: true },
+  { id: "dashboard", label: "Indicadores", href: "/reportes", icon: "analytics", construido: true },
   { id: "sedes", label: "Sedes", href: "#", icon: "location_city", construido: false },
   {
     id: "calendario",
@@ -73,25 +73,19 @@ export const MODULOS: Modulo[] = [
   { id: "materias", label: "Materias", href: "/materias", icon: "menu_book", construido: true },
   { id: "cobranzas", label: "Cobranzas", href: "#", icon: "receipt_long", construido: false },
   { id: "usuarios", label: "Usuarios", href: "/usuarios", icon: "manage_accounts", construido: true },
-  { id: "reportes", label: "Reportes", href: "/reportes", icon: "analytics", construido: true },
 ];
 
 /**
- * Qué módulos ve cada rol, según el criterio de aceptación de HU-SIS-01.
+ * Qué módulos ve cada rol, según el criterio de aceptación de HU-SIS-01 y HU-IND-01.
  *
- * Nota sobre **Profesor**: el criterio dice "su ficha en modo LECTURA", no el
- * ABM del cuerpo docente. Por eso NO tiene `profesores` (que es el listado con
- * alta y baja) sino `mi-ficha`.
+ * - Gerente: todos los módulos (incluyendo Indicadores de gestión de forma exclusiva).
+ * - Mesa de Entrada: alumnos, turnos, calendarios y pagos (sin usuarios ni indicadores).
+ * - Profesor: calendario y su ficha en modo LECTURA.
  */
 export const PERMISOS_POR_ROL: Record<NombreRol, ModuloId[]> = {
-  // "Gerente: todos los módulos."
   Gerente: MODULOS.map((m) => m.id).filter((id) => id !== "mi-ficha"),
-  // "Mesa de Entrada: alumnos, turnos, calendarios y pagos
-  //  (sin usuarios ni indicadores de dirección)."
   "Mesa de Entrada": ["turnos", "calendario", "alumnos", "cobranzas"],
-  // "Profesor: su calendario, su ficha en modo LECTURA, asistencia de sus
-  //  clases e indicadores propios."
-  Profesor: ["calendario", "mi-ficha", "reportes"],
+  Profesor: ["calendario", "mi-ficha"],
 };
 
 /** Los módulos que le corresponden al rol, en el orden del menú. */

@@ -16,6 +16,7 @@ interface UsersTableProps {
   onView: (user: User) => void;
   onEdit: (user: User) => void;
   onDeactivate: (user: User) => void;
+  onReactivate?: (user: User) => void;
 }
 
 export function UsersTable({
@@ -31,6 +32,7 @@ export function UsersTable({
   onView,
   onEdit,
   onDeactivate,
+  onReactivate,
 }: UsersTableProps) {
   const getBadgeVariant = (status: string) => (status === "Activo" ? "success" : "neutral");
   const getBadgeIcon = (status: string) => (status === "Activo" ? "check_circle" : "cancel");
@@ -61,14 +63,21 @@ export function UsersTable({
               users.map((user) => (
                 <tr key={user.id} className="text-sm transition-colors hover:bg-surface-container-low/50">
                   <td className="px-4 py-3 font-semibold text-on-surface">
-                    {user.lastName}, {user.firstName}
+                    <div className="flex items-center gap-2">
+                      <span>{user.lastName}, {user.firstName}</span>
+                      {user.status === "Inactivo" && (
+                        <span className="rounded bg-outline-variant/50 px-1.5 py-0.5 text-[10px] font-bold uppercase text-on-surface-variant">
+                          Inactivo
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-on-surface-variant">{user.dni}</td>
                   <td className="px-4 py-3 text-on-surface-variant">{user.email}</td>
                   <td className="px-4 py-3 text-on-surface-variant">{user.phone || "—"}</td>
                   <td className="px-4 py-3">
                     <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-1 text-sm font-bold ${
+                      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${
                         user.role === "Profesor"
                           ? "bg-purple-100 text-purple-700"
                           : user.role === "Gerente"
@@ -90,6 +99,7 @@ export function UsersTable({
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => onView(user)}
+                        title="Ver usuario"
                         aria-label="Ver usuario"
                         className="flex h-8 w-8 items-center justify-center rounded-md text-secondary transition-colors hover:bg-primary/10 hover:text-primary focus:outline-none"
                       >
@@ -97,19 +107,34 @@ export function UsersTable({
                       </button>
                       <button
                         onClick={() => onEdit(user)}
+                        title="Editar usuario"
                         aria-label="Editar usuario"
                         className="flex h-8 w-8 items-center justify-center rounded-md text-secondary transition-colors hover:bg-primary/10 hover:text-primary focus:outline-none"
                       >
                         <Icon name="edit" size={20} />
                       </button>
-                      <button
-                        onClick={() => onDeactivate(user)}
-                        aria-label="Dar de baja usuario"
-                        disabled={user.status === "Inactivo"}
-                        className="flex h-8 w-8 items-center justify-center rounded-md text-error transition-colors hover:bg-error/10 hover:text-error focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Icon name="delete" size={20} />
-                      </button>
+
+                      {user.status === "Inactivo" ? (
+                        onReactivate && (
+                          <button
+                            onClick={() => onReactivate(user)}
+                            title="Reactivar usuario"
+                            aria-label="Reactivar usuario"
+                            className="flex h-8 w-8 items-center justify-center rounded-md text-status-success-strong transition-colors hover:bg-status-success-strong/10 focus:outline-none"
+                          >
+                            <Icon name="restore" size={20} />
+                          </button>
+                        )
+                      ) : (
+                        <button
+                          onClick={() => onDeactivate(user)}
+                          title="Dar de baja usuario"
+                          aria-label="Dar de baja usuario"
+                          className="flex h-8 w-8 items-center justify-center rounded-md text-error transition-colors hover:bg-error/10 hover:text-error focus:outline-none"
+                        >
+                          <Icon name="person_remove" size={20} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

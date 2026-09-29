@@ -174,6 +174,17 @@ export class ServicioAuthNoDisponibleError extends AppError {
 }
 
 /**
+ * 500 — error en el envío de correo electrónico (HU-SIS-00).
+ */
+export class EnvioEmailError extends AppError {
+  readonly status = 500;
+
+  constructor(mensaje = "No se pudo enviar el correo electrónico con la contraseña temporal.") {
+    super("ERROR_ENVIO_EMAIL", mensaje);
+  }
+}
+
+/**
  * Traduce un error de Postgres a error de dominio.
  *
  * Es la red de seguridad de los índices UNIQUE: el service chequea antes para
@@ -433,6 +444,18 @@ export function traducirErrorPostgres(e: unknown): AppError | null {
     }
     if (/está inactiva y no puede asignarse/i.test(mensaje)) {
       return new ValidationError("MATERIA_INACTIVA", mensaje, "materias");
+    }
+    if (/desactivar su propio usuario/i.test(mensaje)) {
+      return new BusinessRuleError("AUTOBAJA_NO_PERMITIDA", "No podés desactivar tu propia cuenta de usuario.");
+    }
+    if (/último Gerente activo/i.test(mensaje)) {
+      return new BusinessRuleError("ULTIMO_GERENTE_ACTIVO", "No se puede desactivar al último Gerente activo del sistema.");
+    }
+    if (/motivo de baja .* requiere un detalle/i.test(mensaje)) {
+      return new ValidationError("DETALLE_MOTIVO_BAJA_REQUERIDO", "El motivo de baja requiere un detalle.", "detalleMotivoBaja");
+    }
+    if (/motivo de baja .* está inactivo/i.test(mensaje)) {
+      return new ValidationError("MOTIVO_BAJA_INACTIVO", "El motivo de baja seleccionado está inactivo.", "motivoBajaId");
     }
     return new BusinessRuleError(
       "REGLA_RECHAZADA",

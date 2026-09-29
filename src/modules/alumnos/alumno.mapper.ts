@@ -11,13 +11,17 @@ function formatearFechaNacimiento(val: string | Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function toApi(row: AlumnoRow): AlumnoResponse {
+export function toApi(
+  row: AlumnoRow,
+  materiasInteres: { id: number; nombre: string }[] = [],
+  deudaPendiente: boolean = false,
+): AlumnoResponse {
   const responsable = row.responsable_nombre
     ? {
-        nombre: row.responsable_nombre,
-        dni: row.responsable_dni ?? "",
-        telefono: row.responsable_telefono ?? "",
-      }
+      nombre: row.responsable_nombre,
+      dni: row.responsable_dni ?? "",
+      telefono: row.responsable_telefono ?? "",
+    }
     : null;
 
   const legajo = row.legajo || `ALU-${String(row.id).padStart(6, "0")}`;
@@ -34,10 +38,10 @@ export function toApi(row: AlumnoRow): AlumnoResponse {
     nivelEducativo: row.nivel_educativo,
     responsable,
     estado: row.estado,
-    institucionOrigen: (row as unknown as { institucion_origen?: string }).institucion_origen ?? null,
-    observacionesGenerales: (row as unknown as { observaciones_generales?: string }).observaciones_generales ?? null,
-    materiasInteres: [],
-    deudaPendiente: false,
+    institucionOrigen: row.institucion_origen ?? null,
+    observacionesGenerales: row.observaciones_generales ?? null,
+    materiasInteres,
+    deudaPendiente,
     fechaCreacion:
       row.created_at instanceof Date
         ? row.created_at.toISOString()
@@ -49,6 +53,12 @@ export function toApi(row: AlumnoRow): AlumnoResponse {
   };
 }
 
-export function toApiList(rows: AlumnoRow[]): AlumnoResponse[] {
-  return rows.map(toApi);
+export function toApiList(
+  rows: AlumnoRow[],
+  materiasMapa: Map<number, { id: number; nombre: string }[]> = new Map(),
+  deudasSet: Set<number> = new Set(),
+): AlumnoResponse[] {
+  return rows.map((r) =>
+    toApi(r, materiasMapa.get(r.id) ?? [], deudasSet.has(r.id)),
+  );
 }

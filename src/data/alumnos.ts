@@ -8,22 +8,34 @@ import {
   RUTA_POSIBLES_DUPLICADOS,
   rutaAlumno,
   rutaInactivar,
+  rutaReactivar,
   type AlumnoResponse,
   type CrearAlumnoBody,
   type EditarAlumnoBody,
+  type InactivarAlumnoBody,
   type ListarAlumnosQuery,
   type NivelEducativo,
   type PosiblesDuplicadosQuery,
+  type ErrorAlumno,
 } from "@/contracts/alumno";
 import { apiGet, apiGetOpcional, apiSend } from "@/lib/api-client";
 import { edadEnAnios } from "@/funciones/formato";
 
-export type { AlumnoResponse, NivelEducativo };
+export type {
+  AlumnoResponse,
+  NivelEducativo,
+  CrearAlumnoBody,
+  EditarAlumnoBody,
+  InactivarAlumnoBody,
+  ListarAlumnosQuery,
+  PosiblesDuplicadosQuery,
+  ErrorAlumno,
+};
 export type EstadoAlumno = AlumnoResponse["estado"];
 
 // Las rutas del contrato se re-exportan para que la pantalla no las importe de
 // dos lados distintos.
-export { RUTA, RUTA_POSIBLES_DUPLICADOS, rutaAlumno, rutaInactivar };
+export { RUTA, RUTA_POSIBLES_DUPLICADOS, rutaAlumno, rutaInactivar, rutaReactivar };
 
 
 // ─── Helpers de dominio ──────────────────────────────────────────────────
@@ -55,7 +67,11 @@ export async function listarAlumnos(
   const params = new URLSearchParams();
   if (filtros.busqueda) params.set("busqueda", filtros.busqueda);
   if (filtros.nivelEducativo) params.set("nivelEducativo", filtros.nivelEducativo);
+  if (filtros.materiaInteresId) params.set("materiaInteresId", String(filtros.materiaInteresId));
   if (filtros.estado) params.set("estado", filtros.estado);
+  if (filtros.verInactivos !== undefined) {
+    params.set("verInactivos", String(filtros.verInactivos));
+  }
   const qs = params.toString();
   const url = qs ? `${RUTA}?${qs}` : RUTA;
   return apiGet<AlumnoResponse[]>(url);
@@ -86,10 +102,23 @@ export async function editarAlumno(
 }
 
 /**
- * Baja lógica de alumno.
+ * Baja lógica de alumno con soporte para confirmar con deuda.
  */
-export async function inactivarAlumno(id: number): Promise<AlumnoResponse> {
-  return apiSend<AlumnoResponse>("POST", rutaInactivar(id));
+export async function inactivarAlumno(
+  id: number,
+  options: { confirmarConDeuda?: boolean } = {},
+): Promise<AlumnoResponse> {
+  const body: InactivarAlumnoBody = {
+    confirmarConDeuda: Boolean(options.confirmarConDeuda),
+  };
+  return apiSend<AlumnoResponse>("POST", rutaInactivar(id), body);
+}
+
+/**
+ * Reactivación lógica de un alumno inactivo (revalida unicidad de DNI).
+ */
+export async function reactivarAlumno(id: number): Promise<AlumnoResponse> {
+  return apiSend<AlumnoResponse>("POST", rutaReactivar(id), {});
 }
 
 /**

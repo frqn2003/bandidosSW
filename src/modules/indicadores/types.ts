@@ -97,6 +97,10 @@ export interface KPICardData {
   icono: string;
   colorAcento?: "primary" | "warning" | "success" | "info";
   esGlobal?: boolean; // Si es true, aclara que no es afectado por filtros de materia/profesor
+  linkOrigen?: {
+    href: string;
+    label: string;
+  };
 }
 
 /**

@@ -134,6 +134,33 @@ export function useDashboardMetrics() {
     };
   }, [filtros.materiaId]);
 
+  /**
+   * Ejecuta la consulta de indicadores al backend.
+   */
+  const ejecutarConsulta = useCallback(async () => {
+    if (errorFechas) return;
+    setCargando(true);
+    setErrorApi(null);
+    try {
+      // BACKEND: GET /api/indicadores?desde=...&hasta=...
+      const resultado = await consultarIndicadores({
+        desde: filtros.desde,
+        hasta: filtros.hasta,
+        materiaId: filtros.materiaId !== "Todas" ? filtros.materiaId : undefined,
+        profesorId: filtros.profesorId !== "Todos" ? filtros.profesorId : undefined,
+      });
+      setMetricas(resultado);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setErrorApi(err.message);
+      } else {
+        setErrorApi("No se pudieron cargar los indicadores del período.");
+      }
+    } finally {
+      setCargando(false);
+    }
+  }, [errorFechas, filtros]);
+
   // 3. Ejecutar consulta de indicadores AUTOMÁTICAMENTE ante cualquier cambio de filtro válido
   useEffect(() => {
     if (errorFechas) return;
@@ -141,31 +168,8 @@ export function useDashboardMetrics() {
 
     // Debounce para evitar ráfagas de consultas mientras el usuario interactúa
     const timer = setTimeout(async () => {
-      setCargando(true);
-      setErrorApi(null);
-      try {
-        // BACKEND: GET /api/indicadores?desde=...&hasta=...
-        const resultado = await consultarIndicadores({
-          desde: filtros.desde,
-          hasta: filtros.hasta,
-          materiaId: filtros.materiaId !== "Todas" ? filtros.materiaId : undefined,
-          profesorId: filtros.profesorId !== "Todos" ? filtros.profesorId : undefined,
-        });
-        if (activo) {
-          setMetricas(resultado);
-        }
-      } catch (err) {
-        if (activo) {
-          if (err instanceof ApiError) {
-            setErrorApi(err.message);
-          } else {
-            setErrorApi("No se pudieron cargar los indicadores del período.");
-          }
-        }
-      } finally {
-        if (activo) {
-          setCargando(false);
-        }
+      if (activo) {
+        await ejecutarConsulta();
       }
     }, 200);
 
@@ -173,7 +177,7 @@ export function useDashboardMetrics() {
       activo = false;
       clearTimeout(timer);
     };
-  }, [filtros.desde, filtros.hasta, filtros.materiaId, filtros.profesorId, errorFechas]);
+  }, [ejecutarConsulta, errorFechas]);
 
   /**
    * Actualiza el valor de un filtro individual con reseteo de error previo
@@ -197,12 +201,11 @@ export function useDashboardMetrics() {
   );
 
   /**
-   * Validador manual de filtros para compatibilidad o reintentos.
+   * Recalcula manualmente los indicadores al presionar "Actualizar".
    */
   const aplicarFiltros = useCallback(() => {
-    setErrorApi(null);
-    return !errorFechas;
-  }, [errorFechas]);
+    void ejecutarConsulta();
+  }, [ejecutarConsulta]);
 
   /**
    * Restablece los filtros al mes en curso sin filtros de materia ni profesor.
@@ -239,6 +242,7 @@ export function useDashboardMetrics() {
           "Suma la totalidad de clases programadas en el período seleccionado, independientemente de si se realizaron o cancelaron.",
         icono: "calendar_month",
         colorAcento: "primary",
+        linkOrigen: { href: "/turnos", label: "Ver turnos" },
       },
       {
         id: "porcentajeCancelaciones",
@@ -256,6 +260,7 @@ export function useDashboardMetrics() {
           "Proporción de turnos que no llegaron a dictarse por cancelación sobre el total generado en el período. Si no hay turnos, se muestra '—'.",
         icono: "event_busy",
         colorAcento: "warning",
+        linkOrigen: { href: "/turnos", label: "Ver cancelaciones" },
       },
       {
         id: "porcentajeOcupacion",
@@ -270,6 +275,7 @@ export function useDashboardMetrics() {
           "Mide el aprovechamiento real de la capacidad horaria ofertada por los profesores. Si no hay disponibilidad registrada en las agendas, muestra '—'.",
         icono: "trending_up",
         colorAcento: "info",
+        linkOrigen: { href: "/calendario", label: "Ver agenda" },
       },
       {
         id: "alumnosActivos",
@@ -282,6 +288,7 @@ export function useDashboardMetrics() {
         icono: "school",
         colorAcento: "success",
         esGlobal: true,
+        linkOrigen: { href: "/alumnos", label: "Ver alumnos" },
       },
       {
         id: "ingresosCobrados",
@@ -293,6 +300,7 @@ export function useDashboardMetrics() {
           "Monto total en pesos percibido efectivamente por el centro académico durante el rango de fechas seleccionado.",
         icono: "payments",
         colorAcento: "success",
+        linkOrigen: { href: "/turnos", label: "Ver detalle" },
       },
     ];
   }, [metricas]);

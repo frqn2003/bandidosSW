@@ -71,8 +71,6 @@ export function StudentForm({
   const isEdit = modo === "EDIT";
   const isInsert = modo === "INSERT";
 
-  const legajoId = useId();
-  const fechaAltaId = useId();
   const nombreId = useId();
   const apellidoId = useId();
   const dniId = useId();
@@ -238,40 +236,7 @@ export function StudentForm({
       </div>
 
       <form onSubmit={handleSubmit} className="p-6 space-y-6">
-        {/* SECCIÓN 1: LEGAJO (Campos inmutables en edición) */}
-        <div>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">
-            Legajo
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor={legajoId} className="block text-xs font-bold text-on-surface mb-1">
-                N° de legajo
-              </label>
-              <input
-                id={legajoId}
-                type="text"
-                disabled
-                value={student?.legajo || "Se generará automáticamente"}
-                className="w-full rounded-sm border border-outline-variant bg-surface-container-high px-3 py-2 text-sm text-on-surface-variant font-mono cursor-not-allowed"
-              />
-            </div>
-            <div>
-              <label htmlFor={fechaAltaId} className="block text-xs font-bold text-on-surface mb-1">
-                Fecha de alta
-              </label>
-              <input
-                id={fechaAltaId}
-                type="text"
-                disabled
-                value={formatearFechaVisual(student?.fechaCreacion)}
-                className="w-full rounded-sm border border-outline-variant bg-surface-container-high px-3 py-2 text-sm text-on-surface-variant cursor-not-allowed"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* SECCIÓN 2: DATOS PERSONALES */}
+        {/* DATOS PERSONALES */}
         <div>
           <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">
             Datos personales

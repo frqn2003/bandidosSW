@@ -6,15 +6,16 @@ import { UsersTable } from "./UsersTable";
 import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
-
 import { Sidebar } from "@/components/layout/Sidebar";
 import { UserFormModal, ModoUserForm } from "./UserFormModal";
 import { DeactivateUserModal } from "./DeactivateUserModal";
 import { usuariosACsv, descargarCsv } from "./exportar";
+import { ApiError, mensajeDeError } from "@/lib/api-client";
 
 export function UsersPage() {
   const {
     users,
+    allUsers,
     totalItems,
     totalPages,
     pageStart,
@@ -29,10 +30,18 @@ export function UsersPage() {
     setRoleFilter,
     statusFilter,
     setStatusFilter,
+    loading,
+    error,
+    reload,
+    roles,
+    motivosBaja,
+    currentSessionUser,
+    activeGerentesCount,
     addUser,
     updateUser,
     deactivateUser,
-    checkDuplicate
+    reactivateUser,
+    checkDuplicate,
   } = useUsers();
 
   const [formModal, setFormModal] = useState<{ open: boolean; modo: ModoUserForm; user: User | null }>({
@@ -46,7 +55,21 @@ export function UsersPage() {
     user: null,
   });
 
-  const [createdUserAuth, setCreatedUserAuth] = useState<{ email: string; tempPass: string } | null>(null);
+  const [reactivateModal, setReactivateModal] = useState<{ open: boolean; user: User | null }>({
+    open: false,
+    user: null,
+  });
+
+  const [createdUserSuccess, setCreatedUserSuccess] = useState<{ email: string } | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [reactivating, setReactivating] = useState(false);
+
+  const showFeedback = (type: "success" | "error", text: string) => {
+    setFeedbackMessage({ type, text });
+    setTimeout(() => {
+      setFeedbackMessage((prev) => (prev?.text === text ? null : prev));
+    }, 5000);
+  };
 
   const handleLimpiarFiltros = () => {
     setSearchTerm("");
@@ -56,7 +79,7 @@ export function UsersPage() {
   };
 
   const handleExportExcel = () => {
-    const csv = usuariosACsv(users);
+    const csv = usuariosACsv(allUsers);
     descargarCsv(csv, "usuarios.csv");
   };
 
@@ -76,27 +99,56 @@ export function UsersPage() {
     setDeactivateModal({ open: true, user });
   };
 
+  const handleReactivatePrompt = (user: User) => {
+    setReactivateModal({ open: true, user });
+  };
+
   const handleNewUser = () => {
     setFormModal({ open: true, modo: "INSERCION", user: null });
   };
 
-  const handleSaveUser = (userData: Omit<User, "id" | "status">) => {
+  const handleSaveUser = async (userData: {
+    firstName: string;
+    lastName: string;
+    dni: string;
+    email: string;
+    phone: string;
+    role: Role;
+  }) => {
     if (formModal.modo === "INSERCION") {
-      addUser({ ...userData, status: "Activo" });
-      const tempPass = Math.random().toString(36).slice(-8).toUpperCase();
-      setCreatedUserAuth({ email: userData.email, tempPass });
+      await addUser(userData);
+      setFormModal({ open: false, modo: "INSERCION", user: null });
+      setCreatedUserSuccess({ email: userData.email });
+      showFeedback("success", `Usuario ${userData.firstName} ${userData.lastName} dado de alta con éxito.`);
     } else if (formModal.modo === "EDICION" && formModal.user) {
-      updateUser(formModal.user.id, userData);
+      await updateUser(formModal.user.id, userData);
+      setFormModal({ open: false, modo: "INSERCION", user: null });
+      showFeedback("success", `Datos del usuario ${userData.firstName} ${userData.lastName} actualizados.`);
     }
-    setFormModal({ open: false, modo: "INSERCION", user: null });
   };
 
-  const handleConfirmDeactivate = (motivo: string, detalle: string) => {
+  const handleConfirmDeactivate = async (motivoBajaId: number, detalle: string) => {
     if (deactivateModal.user) {
-      deactivateUser(deactivateModal.user.id);
-      console.log("Motivo de baja:", motivo, "Detalle:", detalle);
+      const targetUser = deactivateModal.user;
+      await deactivateUser(targetUser.id, motivoBajaId, detalle);
+      showFeedback("success", `El usuario ${targetUser.firstName} ${targetUser.lastName} fue dado de baja lógica.`);
     }
     setDeactivateModal({ open: false, user: null });
+  };
+
+  const handleConfirmReactivate = async () => {
+    if (!reactivateModal.user) return;
+    setReactivating(true);
+    try {
+      await reactivateUser(reactivateModal.user.id);
+      showFeedback("success", `El usuario ${reactivateModal.user.firstName} ${reactivateModal.user.lastName} fue reactivado con éxito.`);
+      setReactivateModal({ open: false, user: null });
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : mensajeDeError(err);
+      showFeedback("error", msg);
+    } finally {
+      setReactivating(false);
+    }
   };
 
   return (
@@ -113,9 +165,11 @@ export function UsersPage() {
                 <Icon name="manage_accounts" size={24} className="text-primary" />
               </span>
               <div>
-                <h1 className="font-display text-2xl font-bold text-on-surface print:text-xl print:text-black">Usuarios del sistema</h1>
+                <h1 className="font-display text-2xl font-bold text-on-surface print:text-xl print:text-black">
+                  Usuarios del sistema
+                </h1>
                 <p className="text-sm font-medium text-on-surface-variant print:text-black/70">
-                  Listado completo del personal.
+                  Gestión integral del personal y credenciales de acceso (HU-SIS-00).
                 </p>
               </div>
             </div>
@@ -135,11 +189,45 @@ export function UsersPage() {
             </div>
           </header>
 
+          {feedbackMessage && (
+            <div
+              className={`flex items-center justify-between rounded-md p-4 text-sm font-medium shadow-sm transition-all print:hidden ${
+                feedbackMessage.type === "success"
+                  ? "border border-status-success-strong/30 bg-status-success-strong/10 text-status-success-strong"
+                  : "border border-error/30 bg-error/10 text-error"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Icon name={feedbackMessage.type === "success" ? "check_circle" : "error"} size={20} />
+                <span>{feedbackMessage.text}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFeedbackMessage(null)}
+                className="text-on-surface-variant hover:text-on-surface"
+              >
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-center justify-between rounded-md border border-error/30 bg-error/10 p-4 text-sm text-error print:hidden">
+              <div className="flex items-center gap-2">
+                <Icon name="error" size={20} />
+                <span>{error}</span>
+              </div>
+              <Button size="sm" variant="outline" onClick={reload}>
+                Reintentar
+              </Button>
+            </div>
+          )}
+
           {/* Filtros */}
           <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-4 shadow-card print:hidden">
             <div className="flex flex-wrap items-end gap-4">
-              <div className="flex flex-1 flex-col gap-1 min-w-[240px]">
-                <label htmlFor="search" className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+              <div className="flex min-w-[240px] flex-1 flex-col gap-1">
+                <label htmlFor="search" className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                   Buscar
                 </label>
                 <div className="relative">
@@ -161,7 +249,7 @@ export function UsersPage() {
               </div>
 
               <div className="flex flex-col gap-1">
-                <label htmlFor="role" className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                <label htmlFor="role" className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                   Rol
                 </label>
                 <select
@@ -174,14 +262,16 @@ export function UsersPage() {
                   className="h-11 rounded-sm border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface focus:border-secondary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-secondary/20"
                 >
                   <option value="Todos">Todos los roles</option>
-                  <option value="Profesor">Profesor</option>
-                  <option value="Gerente">Gerente</option>
-                  <option value="Mesa de Entrada">Mesa de Entrada</option>
+                  {roles.map((r) => (
+                    <option key={r.id} value={r.nombre}>
+                      {r.nombre}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <div className="flex flex-col gap-1">
-                <label htmlFor="status" className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                <label htmlFor="status" className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                   Estado
                 </label>
                 <select
@@ -193,9 +283,9 @@ export function UsersPage() {
                   }}
                   className="h-11 rounded-sm border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface focus:border-secondary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-secondary/20"
                 >
-                  <option value="Todos">Todos</option>
-                  <option value="Activo">Activo</option>
+                  <option value="Activo">Activo (por defecto)</option>
                   <option value="Inactivo">Inactivo</option>
+                  <option value="Todos">Todos los estados</option>
                 </select>
               </div>
 
@@ -210,20 +300,28 @@ export function UsersPage() {
             </div>
           </div>
 
-          <UsersTable
-            users={users}
-            page={page}
-            totalPages={totalPages}
-            totalItems={totalItems}
-            pageStart={pageStart}
-            pageEnd={pageEnd}
-            pageSize={pageSize}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-            onView={handleView}
-            onEdit={handleEdit}
-            onDeactivate={handleDeactivate}
-          />
+          {loading ? (
+            <div className="flex min-h-[300px] flex-col items-center justify-center gap-3 rounded-md border border-outline-variant bg-surface-container-lowest p-12">
+              <Icon name="progress_activity" size={32} className="animate-spin text-primary" />
+              <p className="text-sm font-medium text-on-surface-variant">Cargando usuarios del sistema…</p>
+            </div>
+          ) : (
+            <UsersTable
+              users={users}
+              page={page}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageStart={pageStart}
+              pageEnd={pageEnd}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              onView={handleView}
+              onEdit={handleEdit}
+              onDeactivate={handleDeactivate}
+              onReactivate={handleReactivatePrompt}
+            />
+          )}
         </div>
       </main>
 
@@ -231,6 +329,7 @@ export function UsersPage() {
         open={formModal.open}
         modo={formModal.modo}
         user={formModal.user}
+        roles={roles}
         onClose={() => setFormModal({ ...formModal, open: false })}
         onGuardar={handleSaveUser}
         checkDuplicate={checkDuplicate}
@@ -243,49 +342,72 @@ export function UsersPage() {
         user={deactivateModal.user}
         onClose={() => setDeactivateModal({ ...deactivateModal, open: false })}
         onConfirm={handleConfirmDeactivate}
+        motivos={motivosBaja}
+        currentUser={currentSessionUser}
+        activeGerentesCount={activeGerentesCount}
       />
 
+      {/* Modal de confirmación para Reactivar usuario */}
       <Modal
-        open={createdUserAuth !== null}
-        onClose={() => setCreatedUserAuth(null)}
-        title="Usuario creado exitosamente"
+        open={reactivateModal.open}
+        onClose={() => setReactivateModal({ open: false, user: null })}
+        title={`Reactivar a ${reactivateModal.user?.firstName} ${reactivateModal.user?.lastName}`}
         maxWidth="max-w-md"
         icon={
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-status-success-strong/10 text-status-success-strong">
-            <Icon name="check_circle" size={24} />
+            <Icon name="restore" size={24} />
           </div>
         }
         footer={
-          <Button type="button" variant="primary" onClick={() => setCreatedUserAuth(null)}>
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setReactivateModal({ open: false, user: null })}
+              disabled={reactivating}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={handleConfirmReactivate}
+              disabled={reactivating}
+            >
+              <Icon name={reactivating ? "progress_activity" : "check_circle"} size={18} className={reactivating ? "animate-spin" : ""} />
+              {reactivating ? "Reactivando…" : "Confirmar reactivación"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-on-surface-variant">
+          El usuario pasará a estado <strong>Activo</strong>. Podrá volver a iniciar sesión y ser seleccionado en turnos y asignaciones de otros módulos.
+        </p>
+      </Modal>
+
+      {/* Modal de alta exitosa de usuario */}
+      <Modal
+        open={createdUserSuccess !== null}
+        onClose={() => setCreatedUserSuccess(null)}
+        title="Usuario dado de alta exitosamente"
+        maxWidth="max-w-md"
+        icon={
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-status-success-strong/10 text-status-success-strong">
+            <Icon name="mark_email_read" size={24} />
+          </div>
+        }
+        footer={
+          <Button type="button" variant="primary" onClick={() => setCreatedUserSuccess(null)}>
             Entendido
           </Button>
         }
       >
-        <div className="flex flex-col gap-4">
-          <p className="text-sm text-on-surface-variant">
-            Como el envío de correos aún no está implementado, copiá la contraseña temporal para compartirla con el usuario <strong>{createdUserAuth?.email}</strong>.
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-on-surface">
+            Se ha creado la cuenta para <strong>{createdUserSuccess?.email}</strong>.
           </p>
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-              Contraseña temporal
-            </span>
-            <div className="flex items-center justify-between rounded-md border border-outline-variant bg-surface-container-low p-4">
-              <span className="font-mono text-xl font-bold tracking-widest text-on-surface">
-                {createdUserAuth?.tempPass}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  if (createdUserAuth?.tempPass) {
-                    navigator.clipboard.writeText(createdUserAuth.tempPass);
-                  }
-                }}
-                className="flex items-center gap-2 rounded-sm px-3 py-1.5 text-sm font-bold text-secondary transition-colors hover:bg-secondary/10"
-              >
-                <Icon name="content_copy" size={18} />
-                Copiar
-              </button>
-            </div>
+          <div className="rounded-md border border-primary/20 bg-primary-container/20 p-3 text-sm text-primary">
+            El sistema generó una contraseña temporal alfanumérica y la envió por email. El usuario estará obligado a cambiarla en su primer inicio de sesión.
           </div>
         </div>
       </Modal>

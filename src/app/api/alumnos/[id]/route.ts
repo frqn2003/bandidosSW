@@ -15,3 +15,6 @@ export const PUT = withRoute<{ id: string }>(async ({ req, session, params }) =>
   const input = await parseBody(req, editarAlumnoBody);
   return ok(await service.editar(id, input, session.usuarioId));
 });
+
+// No hay DELETE a propósito: la baja es LÓGICA y va por
+// POST /api/alumnos/:id/inactivar (criterio HU-ALU-02).

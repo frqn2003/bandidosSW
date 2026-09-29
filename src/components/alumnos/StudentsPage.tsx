@@ -29,6 +29,7 @@ interface LocalFilters {
   nivelEducativo: NivelEducativo | "Todos";
   materiaInteres: string | "Todas";
   estado: EstadoAlumno | "Todos";
+  verInactivos: boolean;
 }
 
 export function StudentsPage() {
@@ -36,11 +37,13 @@ export function StudentsPage() {
   const nivelSelectId = useId();
   const materiaSelectId = useId();
   const estadoSelectId = useId();
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const { showToast } = useToast();
 
   const {
     students,
+    materiasActivas,
     createStudent,
     updateStudent,
     deactivateStudent,
@@ -69,12 +72,13 @@ export function StudentsPage() {
     student: null,
   });
 
-  // Filtros combinables (sin checkbox de inactivos; controlado por el desplegable de Estado)
+  // Filtros combinables con opción "Ver inactivos" (criterio obligatorio HU-ALU-02)
   const [filters, setFilters] = useState<LocalFilters>({
     busqueda: "",
     nivelEducativo: "Todos",
     materiaInteres: "Todas",
     estado: "Todos",
+    verInactivos: true,
   });
 
   // Paginación
@@ -84,18 +88,19 @@ export function StudentsPage() {
 
   const availableMaterias = useMemo(() => {
     const set = new Set<string>();
+    materiasActivas.forEach((m) => set.add(m.nombre));
     students.forEach((s) => {
       s.materiasInteres?.forEach((m) => set.add(m.nombre));
     });
     return Array.from(set).sort();
-  }, [students]);
+  }, [students, materiasActivas]);
 
-  // Filtrado de alumnos en memoria
+  // Filtrado de alumnos: el filtro "Todos" muestra tanto activos como inactivos
   const filteredStudents = useMemo(() => {
     const q = filters.busqueda.trim().toLowerCase();
 
     return students.filter((s) => {
-      // Filtro de estado desplegable
+      // Filtro de estado: "Todos" no filtra por estado (muestra activos e inactivos)
       if (filters.estado !== "Todos" && s.estado !== filters.estado) {
         return false;
       }
@@ -211,6 +216,7 @@ export function StudentsPage() {
       nivelEducativo: "Todos",
       materiaInteres: "Todas",
       estado: "Todos",
+      verInactivos: true,
     });
     setPage(1);
   };
@@ -238,6 +244,72 @@ export function StudentsPage() {
     showToast("success", "Archivo alumnos.csv exportado.");
   };
 
+  const handleImportCsv = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (lines.length <= 1) {
+        showToast("error", "El archivo CSV no contiene registros para importar.");
+        return;
+      }
+
+      let imported = 0;
+      for (let i = 1; i < lines.length; i++) {
+        const parts = lines[i].split(",").map((p) => p.trim());
+        if (parts.length >= 3) {
+          const col1 = parts[0];
+          const col2 = parts[1];
+          const col3 = parts[2];
+          const col4 = parts[3] ?? "";
+          const col5 = parts[4] ?? "";
+
+          let apellido = col1;
+          let nombre = col2;
+          let dni = col3;
+          let nivel: NivelEducativo = "Secundario";
+
+          if (col1.startsWith("A-") || col1.startsWith("ALU-")) {
+            apellido = col2;
+            nombre = col3;
+            dni = col4;
+            nivel = (col5 === "Primario" || col5 === "Universitario" ? col5 : "Secundario") as NivelEducativo;
+          } else {
+            nivel = (col4 === "Primario" || col4 === "Universitario" ? col4 : "Secundario") as NivelEducativo;
+          }
+
+          if (nombre && apellido && dni) {
+            try {
+              await createStudent({
+                nombre,
+                apellido,
+                dni: dni.replace(/\D/g, "").slice(0, 8),
+                fechaNacimiento: "2006-01-01",
+                telefono: "3874000000",
+                email: null,
+                nivelEducativo: nivel,
+                responsable: null,
+                institucionOrigen: null,
+                observacionesGenerales: "Importado vía CSV",
+                materiasInteres: [],
+              });
+              imported++;
+            } catch {
+              // Si falla duplicado u otro motivo, continúa con el siguiente
+            }
+          }
+        }
+      }
+      showToast("success", `Se procesó la importación: ${imported} alumnos registrados.`);
+    } catch {
+      showToast("error", "Error al leer el archivo CSV.");
+    } finally {
+      if (event.target) event.target.value = "";
+    }
+  };
+
   return (
     <RequiereSesion>
       <div className="flex min-h-screen bg-surface">
@@ -262,6 +334,22 @@ export function StudentsPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  className="hidden"
+                  onChange={handleImportCsv}
+                />
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Importar lista de alumnos desde un archivo CSV"
+                >
+                  <Icon name="upload" size={18} />
+                  Importar CSV
+                </Button>
                 <Button variant="outline" type="button" onClick={handleExportCsv}>
                   <Icon name="download" size={18} />
                   Exportar CSV
@@ -370,9 +458,11 @@ export function StudentsPage() {
                     id={estadoSelectId}
                     value={filters.estado}
                     onChange={(e) => {
+                      const nuevoEstado = e.target.value as EstadoAlumno | "Todos";
                       setFilters((prev) => ({
                         ...prev,
-                        estado: e.target.value as EstadoAlumno | "Todos",
+                        estado: nuevoEstado,
+                        verInactivos: nuevoEstado === "Todos" || nuevoEstado === "inactivo",
                       }));
                       setPage(1);
                     }}
@@ -382,6 +472,26 @@ export function StudentsPage() {
                     <option value="activo">Activo</option>
                     <option value="inactivo">Inactivo</option>
                   </select>
+                </div>
+
+                {/* Opción Ver inactivos (HU-ALU-02) */}
+                <div className="flex items-center h-10 pb-0.5">
+                  <label className="flex items-center gap-2 text-xs font-bold text-on-surface cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={filters.verInactivos}
+                      onChange={(e) => {
+                        setFilters((prev) => ({
+                          ...prev,
+                          verInactivos: e.target.checked,
+                          estado: e.target.checked ? "Todos" : "activo",
+                        }));
+                        setPage(1);
+                      }}
+                      className="h-4 w-4 rounded border-outline-variant text-primary focus:ring-secondary cursor-pointer"
+                    />
+                    <span>Ver inactivos</span>
+                  </label>
                 </div>
 
                 {/* Botón Limpiar filtros según diseño adjuntado en captura */}
@@ -434,6 +544,7 @@ export function StudentsPage() {
           open={formModal.open}
           modo={formModal.modo}
           student={formModal.student}
+          catalogoMaterias={materiasActivas}
           auditLogs={
             formModal.student ? getAuditLogsForStudent(formModal.student.id) : []
           }

@@ -1,20 +1,32 @@
 // src/modules/alumnos/useStudents.ts
 //
 // Custom hook `useStudents` para la gestión completa de alumnos e historial
-// (HU-ALU-02). Simula el CRUD en frontend con estado reactivo y aplica
-// estrictamente las reglas de negocio acordadas en contratos de API:
+// (HU-ALU-02). Conecta con la API mediante los contratos oficiales y proporciona
+// fallback reactivo para desarrollo. Aplica estrictamente las reglas de negocio:
 //
 // 1. Unicidad de DNI en alumnos activos (creación, edición y reactivación).
 // 2. Bloqueo de baja si posee turnos futuros reservados (ALUMNO_CON_TURNOS_FUTUROS).
 // 3. Advertencia de deuda pendiente al inactivar (ALUMNO_CON_DEUDA) con confirmación explícita.
 // 4. Registro continuo en bitácora de auditoría (Alta, Modificación, Baja, Reactivación).
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type {
   StudentUI,
   StudentAuditLog,
 } from "./types";
-import { INITIAL_STUDENTS_MOCK, INITIAL_AUDIT_LOGS_MOCK } from "./mock-students";
+import {
+  listarAlumnos,
+  crearAlumno,
+  editarAlumno,
+  inactivarAlumno,
+  reactivarAlumno,
+  type AlumnoResponse,
+  type CrearAlumnoBody,
+  type EditarAlumnoBody,
+} from "@/data/alumnos";
+import { listarMaterias } from "@/data/materias";
+import { sesionActual } from "@/data/auth";
+import { ApiError } from "@/lib/api-client";
 
 export interface DeactivateResult {
   success: boolean;
@@ -31,10 +43,22 @@ export interface ReactivateResult {
   conflictStudent?: StudentUI;
 }
 
+function toStudentUI(resp: AlumnoResponse, existing?: StudentUI): StudentUI {
+  return {
+    ...resp,
+    futureTurnsCount: existing?.futureTurnsCount ?? 0,
+    hasPendingDebt: resp.deudaPendiente ?? existing?.hasPendingDebt ?? false,
+    turnosFuturos: existing?.turnosFuturos ?? [],
+    detalleDeuda: existing?.detalleDeuda,
+  };
+}
+
 export function useStudents() {
-  const [students, setStudents] = useState<StudentUI[]>(INITIAL_STUDENTS_MOCK);
-  const [auditLogs, setAuditLogs] = useState<StudentAuditLog[]>(INITIAL_AUDIT_LOGS_MOCK);
-  const [loading, setLoading] = useState(false);
+  const [students, setStudents] = useState<StudentUI[]>([]);
+  const [auditLogs, setAuditLogs] = useState<StudentAuditLog[]>([]);
+  const [materiasActivas, setMateriasActivas] = useState<{ id: number; nombre: string }[]>([]);
+  const [currentUserName, setCurrentUserName] = useState<string>("Sistema");
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   /**
@@ -58,6 +82,46 @@ export function useStudents() {
   }, []);
 
   /**
+   * Carga inicial desde la API mediante los contratos de backend.
+   */
+  const cargarDatos = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [alumnosRes, materiasRes, sesionRes] = await Promise.all([
+        listarAlumnos({ verInactivos: true }),
+        listarMaterias({ estado: "activo" }).catch(() => []),
+        sesionActual().catch(() => null),
+      ]);
+
+      if (alumnosRes) {
+        setStudents((prev) => {
+          const prevMap = new Map(prev.map((s) => [s.id, s]));
+          return alumnosRes.map((r) => toStudentUI(r, prevMap.get(r.id)));
+        });
+      }
+
+      if (materiasRes) {
+        setMateriasActivas(materiasRes.map((m) => ({ id: m.id, nombre: m.nombre })));
+      }
+
+      if (sesionRes?.usuario) {
+        const u = sesionRes.usuario;
+        setCurrentUserName(u.nombre ? `${u.nombre} ${u.apellido}` : u.email);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Error al cargar alumnos.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void cargarDatos();
+  }, [cargarDatos]);
+
+  /**
    * Valida si un DNI ya pertenece a otro alumno ACTIVO.
    */
   const checkDniDuplicate = useCallback(
@@ -71,7 +135,7 @@ export function useStudents() {
   );
 
   /**
-   * Alta de nuevo alumno (simula POST /api/alumnos).
+   * Alta de nuevo alumno conectada a POST /api/alumnos.
    */
   const createStudent = useCallback(
     async (
@@ -83,44 +147,76 @@ export function useStudents() {
       setLoading(true);
       setError(null);
 
-      // Simular latencia de red
-      await new Promise((r) => setTimeout(r, 200));
-
-      const conflict = checkDniDuplicate(data.dni);
-      if (conflict) {
+      const conflictLocal = checkDniDuplicate(data.dni);
+      if (conflictLocal) {
         setLoading(false);
-        const msg = `Ya existe un alumno activo con el DNI ${data.dni} (${conflict.apellido}, ${conflict.nombre} - ${conflict.legajo}).`;
+        const msg = `Ya existe un alumno activo con el DNI ${data.dni} (${conflictLocal.apellido}, ${conflictLocal.nombre} - ${conflictLocal.legajo}).`;
         setError(msg);
         throw new Error(msg);
       }
 
-      const { fecha, hora, iso } = getNowAR();
-      const nextId = students.length > 0 ? Math.max(...students.map((s) => s.id)) + 1 : 1;
-      const legajoNum = (150 + nextId).toString().padStart(4, "0");
-      const legajo = `A-${legajoNum}`;
-
-      const newStudent: StudentUI = {
-        ...data,
-        id: nextId,
-        legajo,
-        estado: "activo",
-        deudaPendiente: false,
-        hasPendingDebt: false,
-        futureTurnsCount: 0,
-        turnosFuturos: [],
-        fechaCreacion: iso,
-        fechaActualizacion: iso,
+      const body: CrearAlumnoBody = {
+        nombre: data.nombre.trim(),
+        apellido: data.apellido.trim(),
+        dni: data.dni.trim(),
+        fechaNacimiento: data.fechaNacimiento,
+        telefono: data.telefono.trim(),
+        email: data.email?.trim() || null,
+        nivelEducativo: data.nivelEducativo,
+        responsableNombre: data.responsable?.nombre?.trim() || null,
+        responsableDni: data.responsable?.dni?.trim() || null,
+        responsableTelefono: data.responsable?.telefono?.trim() || null,
+        institucionOrigen: data.institucionOrigen?.trim() || null,
+        observacionesGenerales: data.observacionesGenerales?.trim() || null,
+        materiasInteresIds: data.materiasInteres?.map((m) => m.id) ?? [],
       };
+
+      let newStudent: StudentUI;
+      const { fecha, hora, iso } = getNowAR();
+
+      try {
+        const created = await crearAlumno(body);
+        newStudent = toStudentUI(created);
+      } catch (err) {
+        if (err instanceof ApiError) {
+          setLoading(false);
+          if (err.codigo === "DNI_DUPLICADO") {
+            const msg = `Ya existe un alumno activo con el DNI ${data.dni}.`;
+            setError(msg);
+            throw new Error(msg);
+          }
+          setError(err.message);
+          throw err;
+        }
+
+        // Fallback local si el servidor no está disponible
+        const nextId = students.length > 0 ? Math.max(...students.map((s) => s.id)) + 1 : 1;
+        const legajoNum = (150 + nextId).toString().padStart(4, "0");
+        const legajo = `A-${legajoNum}`;
+
+        newStudent = {
+          ...data,
+          id: nextId,
+          legajo,
+          estado: "activo",
+          deudaPendiente: false,
+          hasPendingDebt: false,
+          futureTurnsCount: 0,
+          turnosFuturos: [],
+          fechaCreacion: iso,
+          fechaActualizacion: iso,
+        };
+      }
 
       setStudents((prev) => [newStudent, ...prev]);
 
       // Registrar en Bitácora
       const newLog: StudentAuditLog = {
         id: Date.now(),
-        alumnoId: nextId,
+        alumnoId: newStudent.id,
         fecha,
         hora,
-        responsable: "Laura Gómez",
+        responsable: currentUserName,
         accion: "Alta",
         campo: "Estado",
         valorAnterior: "—",
@@ -132,18 +228,16 @@ export function useStudents() {
       setLoading(false);
       return newStudent;
     },
-    [checkDniDuplicate, getNowAR, students]
+    [checkDniDuplicate, currentUserName, getNowAR, students]
   );
 
   /**
-   * Edición de alumno (simula PUT /api/alumnos/:id).
+   * Edición de alumno conectada a PUT /api/alumnos/:id.
    */
   const updateStudent = useCallback(
     async (id: number, data: Partial<StudentUI>): Promise<StudentUI> => {
       setLoading(true);
       setError(null);
-
-      await new Promise((r) => setTimeout(r, 200));
 
       const current = students.find((s) => s.id === id);
       if (!current) {
@@ -161,22 +255,75 @@ export function useStudents() {
         }
       }
 
-      const { fecha, hora, iso } = getNowAR();
-      const updated: StudentUI = {
-        ...current,
-        ...data,
-        id: current.id,
-        legajo: current.legajo, // Inmutable
-        fechaCreacion: current.fechaCreacion, // Inmutable
-        fechaActualizacion: iso,
+      const body: EditarAlumnoBody = {
+        nombre: (data.nombre ?? current.nombre).trim(),
+        apellido: (data.apellido ?? current.apellido).trim(),
+        dni: (data.dni ?? current.dni).trim(),
+        fechaNacimiento: data.fechaNacimiento ?? current.fechaNacimiento,
+        telefono: (data.telefono ?? current.telefono).trim(),
+        email: data.email !== undefined ? (data.email?.trim() || null) : current.email,
+        nivelEducativo: data.nivelEducativo ?? current.nivelEducativo,
+        responsableNombre:
+          data.responsable !== undefined
+            ? data.responsable?.nombre?.trim() || null
+            : current.responsable?.nombre ?? null,
+        responsableDni:
+          data.responsable !== undefined
+            ? data.responsable?.dni?.trim() || null
+            : current.responsable?.dni ?? null,
+        responsableTelefono:
+          data.responsable !== undefined
+            ? data.responsable?.telefono?.trim() || null
+            : current.responsable?.telefono ?? null,
+        institucionOrigen:
+          data.institucionOrigen !== undefined
+            ? data.institucionOrigen?.trim() || null
+            : current.institucionOrigen,
+        observacionesGenerales:
+          data.observacionesGenerales !== undefined
+            ? data.observacionesGenerales?.trim() || null
+            : current.observacionesGenerales,
+        materiasInteresIds:
+          data.materiasInteres !== undefined
+            ? data.materiasInteres.map((m) => m.id)
+            : current.materiasInteres?.map((m) => m.id) ?? [],
       };
 
-      setStudents((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      let updatedStudent: StudentUI;
+      const { fecha, hora, iso } = getNowAR();
+
+      try {
+        const updated = await editarAlumno(id, body);
+        updatedStudent = toStudentUI(updated, current);
+      } catch (err) {
+        if (err instanceof ApiError) {
+          setLoading(false);
+          if (err.codigo === "DNI_DUPLICADO") {
+            const msg = `Ya existe otro alumno activo con el DNI ${data.dni}.`;
+            setError(msg);
+            throw new Error(msg);
+          }
+          setError(err.message);
+          throw err;
+        }
+
+        // Fallback local
+        updatedStudent = {
+          ...current,
+          ...data,
+          id: current.id,
+          legajo: current.legajo, // Inmutable
+          fechaCreacion: current.fechaCreacion, // Inmutable
+          fechaActualizacion: iso,
+        };
+      }
+
+      setStudents((prev) => prev.map((s) => (s.id === id ? updatedStudent : s)));
 
       // Detectar cambios clave y registrar en bitácora
       const logsToAdd: StudentAuditLog[] = [];
       if (data.materiasInteres) {
-        const oldMat = current.materiasInteres.map((m) => m.nombre).join(", ");
+        const oldMat = current.materiasInteres?.map((m) => m.nombre).join(", ") || "";
         const newMat = data.materiasInteres.map((m) => m.nombre).join(", ");
         if (oldMat !== newMat) {
           logsToAdd.push({
@@ -184,7 +331,7 @@ export function useStudents() {
             alumnoId: id,
             fecha,
             hora,
-            responsable: "Laura Gómez",
+            responsable: currentUserName,
             accion: "Modificación",
             campo: "Materias de interés",
             valorAnterior: oldMat || "—",
@@ -200,7 +347,7 @@ export function useStudents() {
           alumnoId: id,
           fecha,
           hora,
-          responsable: "Laura Gómez",
+          responsable: currentUserName,
           accion: "Modificación",
           campo: "Institución de origen",
           valorAnterior: current.institucionOrigen || "—",
@@ -215,7 +362,7 @@ export function useStudents() {
           alumnoId: id,
           fecha,
           hora,
-          responsable: "Laura Gómez",
+          responsable: currentUserName,
           accion: "Modificación",
           campo: "DNI",
           valorAnterior: current.dni,
@@ -230,7 +377,7 @@ export function useStudents() {
           alumnoId: id,
           fecha,
           hora,
-          responsable: "Laura Gómez",
+          responsable: currentUserName,
           accion: "Modificación",
           campo: "Datos personales",
           valorAnterior: "Ficha anterior",
@@ -242,17 +389,17 @@ export function useStudents() {
       setAuditLogs((prev) => [...logsToAdd, ...prev]);
 
       setLoading(false);
-      return updated;
+      return updatedStudent;
     },
-    [checkDniDuplicate, getNowAR, students]
+    [checkDniDuplicate, currentUserName, getNowAR, students]
   );
 
   /**
-   * Baja lógica de alumno (simula POST /api/alumnos/:id/inactivar).
+   * Baja lógica de alumno conectada a POST /api/alumnos/:id/inactivar.
    *
-   * Aplica reglas de negocio estrictas:
-   * - Caso A (Bloqueo): futureTurnsCount > 0
-   * - Caso B (Advertencia): hasPendingDebt === true y no confirmó con deuda
+   * Reglas de negocio:
+   * - Caso A (Bloqueo): turnos futuros reservados
+   * - Caso B (Advertencia): deuda pendiente sin confirmar
    */
   const deactivateStudent = useCallback(
     async (
@@ -262,15 +409,13 @@ export function useStudents() {
       setLoading(true);
       setError(null);
 
-      await new Promise((r) => setTimeout(r, 150));
-
       const student = students.find((s) => s.id === id);
       if (!student) {
         setLoading(false);
         return { success: false, code: "NO_ENCONTRADO", message: "Alumno no encontrado." };
       }
 
-      // CASO A: Bloqueo duro por turnos futuros
+      // Prechequeo rápido en cliente si ya se conocen turnos o deudas
       const turnosFuturos = student.futureTurnsCount ?? 0;
       if (turnosFuturos > 0) {
         setLoading(false);
@@ -282,7 +427,6 @@ export function useStudents() {
         };
       }
 
-      // CASO B: Advertencia por deuda pendiente
       const tieneDeuda = Boolean(student.hasPendingDebt || student.deudaPendiente);
       if (tieneDeuda && !options?.confirmarConDeuda) {
         setLoading(false);
@@ -296,13 +440,48 @@ export function useStudents() {
         };
       }
 
-      // Efectuar baja lógica
       const { fecha, hora, iso } = getNowAR();
-      setStudents((prev) =>
-        prev.map((s) =>
-          s.id === id ? { ...s, estado: "inactivo", fechaActualizacion: iso } : s
-        )
-      );
+
+      try {
+        const inactivado = await inactivarAlumno(id, {
+          confirmarConDeuda: Boolean(options?.confirmarConDeuda),
+        });
+        const updated = toStudentUI(inactivado, student);
+        setStudents((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      } catch (err) {
+        if (err instanceof ApiError) {
+          setLoading(false);
+          if (err.codigo === "ALUMNO_CON_TURNOS_FUTUROS") {
+            const cantidad =
+              (err.datos as { cantidadTurnosFuturos?: number } | undefined)
+                ?.cantidadTurnosFuturos ?? 1;
+            return {
+              success: false,
+              code: "ALUMNO_CON_TURNOS_FUTUROS",
+              message: `Tiene ${cantidad} turnos futuros en estado Reservado. Cancelalos antes de continuar con la baja.`,
+              turnosFuturos: student.turnosFuturos ?? [],
+            };
+          }
+          if (err.codigo === "ALUMNO_CON_DEUDA") {
+            return {
+              success: false,
+              code: "ALUMNO_CON_DEUDA",
+              message:
+                student.detalleDeuda?.descripcion ??
+                "El alumno posee deuda pendiente. Podés continuar con la baja; la deuda queda registrada.",
+              detalleDeuda: student.detalleDeuda,
+            };
+          }
+          return { success: false, message: err.message };
+        }
+
+        // Fallback local
+        setStudents((prev) =>
+          prev.map((s) =>
+            s.id === id ? { ...s, estado: "inactivo", fechaActualizacion: iso } : s
+          )
+        );
+      }
 
       // Registrar en Bitácora
       const logBaja: StudentAuditLog = {
@@ -310,7 +489,7 @@ export function useStudents() {
         alumnoId: id,
         fecha,
         hora,
-        responsable: "Laura Gómez",
+        responsable: currentUserName,
         accion: "Baja",
         campo: "Estado",
         valorAnterior: "Activo",
@@ -322,21 +501,16 @@ export function useStudents() {
       setLoading(false);
       return { success: true };
     },
-    [getNowAR, students]
+    [currentUserName, getNowAR, students]
   );
 
   /**
-   * Reactivación de alumno inactivo (simula POST /api/alumnos/:id/reactivar).
-   *
-   * Regla de negocio:
-   * - Valida que el DNI del alumno a reactivar NO colisione con otro alumno activo.
+   * Reactivación de alumno inactivo conectada a POST /api/alumnos/:id/reactivar.
    */
   const reactivateStudent = useCallback(
     async (id: number): Promise<ReactivateResult> => {
       setLoading(true);
       setError(null);
-
-      await new Promise((r) => setTimeout(r, 150));
 
       const student = students.find((s) => s.id === id);
       if (!student) {
@@ -344,24 +518,45 @@ export function useStudents() {
         return { success: false, code: "NO_ENCONTRADO", message: "Alumno no encontrado." };
       }
 
-      // Validar choque de DNI con otro alumno ACTIVO
-      const conflict = checkDniDuplicate(student.dni, id);
-      if (conflict) {
-        setLoading(false);
-        return {
-          success: false,
-          code: "DNI_DUPLICADO",
-          message: `No se puede reactivar: ya existe un alumno activo con el DNI ${student.dni} (${conflict.apellido}, ${conflict.nombre} - ${conflict.legajo}).`,
-          conflictStudent: conflict,
-        };
-      }
-
       const { fecha, hora, iso } = getNowAR();
-      setStudents((prev) =>
-        prev.map((s) =>
-          s.id === id ? { ...s, estado: "activo", fechaActualizacion: iso } : s
-        )
-      );
+
+      try {
+        const reactivado = await reactivarAlumno(id);
+        const updated = toStudentUI(reactivado, student);
+        setStudents((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      } catch (err) {
+        if (err instanceof ApiError) {
+          setLoading(false);
+          if (err.codigo === "DNI_DUPLICADO") {
+            return {
+              success: false,
+              code: "DNI_DUPLICADO",
+              message:
+                err.message ||
+                `No se puede reactivar: ya existe un alumno activo con el DNI ${student.dni}.`,
+            };
+          }
+          return { success: false, message: err.message };
+        }
+
+        // Fallback local
+        const conflict = checkDniDuplicate(student.dni, id);
+        if (conflict) {
+          setLoading(false);
+          return {
+            success: false,
+            code: "DNI_DUPLICADO",
+            message: `No se puede reactivar: ya existe un alumno activo con el DNI ${student.dni} (${conflict.apellido}, ${conflict.nombre} - ${conflict.legajo}).`,
+            conflictStudent: conflict,
+          };
+        }
+
+        setStudents((prev) =>
+          prev.map((s) =>
+            s.id === id ? { ...s, estado: "activo", fechaActualizacion: iso } : s
+          )
+        );
+      }
 
       // Registrar en Bitácora
       const logReactivar: StudentAuditLog = {
@@ -369,7 +564,7 @@ export function useStudents() {
         alumnoId: id,
         fecha,
         hora,
-        responsable: "Laura Gómez",
+        responsable: currentUserName,
         accion: "Reactivación",
         campo: "Estado",
         valorAnterior: "Inactivo",
@@ -381,7 +576,7 @@ export function useStudents() {
       setLoading(false);
       return { success: true };
     },
-    [checkDniDuplicate, getNowAR, students]
+    [checkDniDuplicate, currentUserName, getNowAR, students]
   );
 
   /**
@@ -407,8 +602,10 @@ export function useStudents() {
   return {
     students,
     auditLogs,
+    materiasActivas,
     loading,
     error,
+    reload: cargarDatos,
     createStudent,
     updateStudent,
     deactivateStudent,
