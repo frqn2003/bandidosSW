@@ -1,6 +1,6 @@
 import { withRoute } from "@/lib/http/handler";
 import { ok } from "@/lib/http/responses";
-import { agendaQuery } from "@/contracts/calendario";
+import { calendarioMesQuery } from "@/contracts/calendario";
 import * as service from "@/modules/calendario/calendario.service";
 
 export const GET = withRoute(async ({ req, session }) => {
@@ -13,6 +13,6 @@ export const GET = withRoute(async ({ req, session }) => {
     }
   }
 
-  const filtros = agendaQuery.parse(raw);
-  return ok(await service.agenda(filtros, session));
+  const filtros = calendarioMesQuery.parse(raw);
+  return ok(await service.resumenMes(filtros, session));
 });

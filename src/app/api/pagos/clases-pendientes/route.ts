@@ -1,8 +1,11 @@
 import { withRoute } from "@/lib/http/handler";
 import { ok } from "@/lib/http/responses";
-import { agendaQuery } from "@/contracts/calendario";
-import * as service from "@/modules/calendario/calendario.service";
+import { clasesPendientesQuery } from "@/contracts/pago";
+import * as service from "@/modules/pagos/pago.service";
 
+/**
+ * GET /api/pagos/clases-pendientes?alumnoId=:id -> Clases pasadas impagas del alumno
+ */
 export const GET = withRoute(async ({ req, session }) => {
   const sp = new URL(req.url).searchParams;
   const raw: Record<string, string> = {};
@@ -13,6 +16,6 @@ export const GET = withRoute(async ({ req, session }) => {
     }
   }
 
-  const filtros = agendaQuery.parse(raw);
-  return ok(await service.agenda(filtros, session));
+  const { alumnoId } = clasesPendientesQuery.parse(raw);
+  return ok(await service.listarClasesPendientes(alumnoId, session));
 });

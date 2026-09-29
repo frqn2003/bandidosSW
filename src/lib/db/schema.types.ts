@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // GENERADO AUTOMÁTICAMENTE — NO EDITAR A MANO.
 //
-//   Fuente:    docs/esquema-bd-front.md (diccionario de datos)
-//   Generador: scripts/db-types.mjs (adaptado a esquema Centro Académico)
+//   Regenerar:  npm run db:types
+//   Generador:  scripts/db-types.mjs
 //
 // Describe el esquema REAL de la base, con los tipos que devuelve el driver
 // `pg` (ojo: numeric y bigint llegan como string, no como number).
@@ -13,9 +13,9 @@
 //
 //   import type { Row } from "@/lib/db/schema.types";
 //
-//   export type AlumnoRow = Pick<
-//     Row<"alumno">,
-//     "id" | "legajo" | "nombre" | "apellido" | "dni" | "estado"
+//   export type ProveedorRow = Pick<
+//     Row<"proveedor">,
+//     "id" | "razon_social" | "cuit" | "estado"
 //   >;
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -45,6 +45,7 @@ export interface DbTables {
     estado: EstadoActivoInactivo;  // auto (default)
     created_at: Date;  // auto (default)
     updated_at: Date;  // auto (default)
+    logo_url: string | null;
   };
   agenda: {
     id: number;  // auto (identity)
@@ -75,18 +76,18 @@ export interface DbTables {
     nombre: string;
     apellido: string;
     dni: string;
-    fecha_nacimiento: Date | string;
+    fecha_nacimiento: Date;
     telefono: string;
     email: string | null;
     nivel_educativo: NivelMateria;
     responsable_nombre: string | null;
     responsable_dni: string | null;
     responsable_telefono: string | null;
+    estado: EstadoActivoInactivo;  // auto (default)
+    created_at: Date;  // auto (default)
+    updated_at: Date;  // auto (default)
     institucion_origen: string | null;
     observaciones_generales: string | null;
-    estado: EstadoActivoInactivo;  // auto (default)
-    created_at: Date | string;  // auto (default)
-    updated_at: Date | string;  // auto (default)
   };
   alumno_materia_interes: {
     id: number;  // auto (identity)
@@ -94,7 +95,7 @@ export interface DbTables {
     materia_id: number;
   };
   auditoria: {
-    id: string;  // auto (default)
+    id: string;  // auto (identity)
     tabla: string;
     operacion: TipoOperacionAuditoria;
     registro_id: number;
@@ -104,12 +105,20 @@ export interface DbTables {
     valores_nuevos: unknown | null;
   };
   auditoria_sesion: {
-    id: number;  // auto (identity)
+    id: string;  // auto (identity)
     usuario_id: number | null;
     evento: TipoEventoSesion;
     fecha_hora: Date;  // auto (default)
     ip_origen: string | null;
     detalle: unknown | null;
+  };
+  forma_pago: {
+    id: number;  // auto (identity)
+    nombre: string;
+    requiere_nro_operacion: boolean;  // auto (default)
+    estado: EstadoActivoInactivo;  // auto (default)
+    created_at: Date;  // auto (default)
+    updated_at: Date;  // auto (default)
   };
   materia: {
     id: number;  // auto (identity)
@@ -119,6 +128,53 @@ export interface DbTables {
     duracion_clase_minutos: number;
     valor_clase: string;
     estado: EstadoActivoInactivo;  // auto (default)
+    created_at: Date;  // auto (default)
+    updated_at: Date;  // auto (default)
+  };
+  motivo_baja: {
+    id: number;  // auto (identity)
+    nombre: string;
+    requiere_detalle: boolean;  // auto (default)
+    estado: EstadoActivoInactivo;  // auto (default)
+    created_at: Date;  // auto (default)
+    updated_at: Date;  // auto (default)
+  };
+  motivo_cancelacion: {
+    id: number;  // auto (identity)
+    nombre: string;
+    requiere_detalle: boolean;  // auto (default)
+    estado: EstadoActivoInactivo;  // auto (default)
+    created_at: Date;  // auto (default)
+    updated_at: Date;  // auto (default)
+  };
+  pago: {
+    id: number;  // auto (identity)
+    comprobante: string | null;
+    alumno_id: number;
+    monto: string;
+    fecha_pago: Date;  // auto (default)
+    observaciones: string | null;
+    usuario_id: number;
+    created_at: Date;  // auto (default)
+  };
+  pago_forma_pago: {
+    id: number;  // auto (identity)
+    pago_id: number;
+    forma_pago_id: number;
+    nro_operacion: string | null;
+  };
+  pago_turno: {
+    id: number;  // auto (identity)
+    pago_id: number;
+    turno_id: number;
+    importe: string;
+  };
+  parametro: {
+    id: number;  // auto (identity)
+    clave: string;
+    valor: number;
+    unidad: string | null;
+    descripcion: string | null;
     created_at: Date;  // auto (default)
     updated_at: Date;  // auto (default)
   };
@@ -138,29 +194,9 @@ export interface DbTables {
   };
   profesor_materia: {
     id: number;  // auto (identity)
-    nombre: string;
-    duracion_estimada_minutos: number | null;
-    estado: EstadoActivoInactivo;  // auto (default)
-  };
-  presentacion: {
-    id: number;  // auto (default)
-    nombre: string;
-  };
-  proveedor: {
-    id: number;  // auto (default)
-    razon_social: string;
-    cuit: string;
-    direccion: string | null;
-    telefono: string | null;
-    email: string | null;
-    contacto: string | null;
-    plazo_entrega_dias: number | null;
-    estado: EstadoActivoInactivo;  // auto (default)
-    calificacion: string | null;
-  };
-  proveedor_forma_pago: {
-    proveedor_id: number;
-    forma_pago_id: number;
+    profesor_id: number;
+    materia_id: number;
+    capacidad_maxima: number;  // auto (default)
   };
   rol: {
     id: number;  // auto (identity)
@@ -180,14 +216,12 @@ export interface DbTables {
     observaciones: string | null;
     usuario_id: number;
     created_at: Date;  // auto (default)
-  };
-  motivo_baja: {
-    id: number;
-    nombre: string;
-    requiere_detalle: boolean;
-    estado: EstadoActivoInactivo;
-    created_at: Date;
-    updated_at: Date;
+    cantidad_modificaciones: number;  // auto (default)
+    motivo_cancelacion_id: number | null;
+    detalle_cancelacion: string | null;
+    fecha_cancelacion: Date | null;
+    cancelacion_tardia: boolean;  // auto (default)
+    pagado: boolean;  // auto (default)
   };
   usuario: {
     id: number;  // auto (identity)
@@ -202,12 +236,12 @@ export interface DbTables {
     intentos_fallidos: number;  // auto (default)
     bloqueado_hasta: Date | null;
     fecha_creacion: Date;  // auto (default)
-    cambiar_contraseña: boolean | null;
+    "cambiar_contraseña": boolean | null;  // auto (default)
     telefono: string | null;
     motivo_baja_id: number | null;
     detalle_motivo_baja: string | null;
     fecha_baja: Date | null;
-    debe_cambiar_password: boolean;
+    debe_cambiar_password: boolean;  // auto (default)
   };
 }
 
@@ -225,8 +259,8 @@ export interface DbViews {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** La fila de una tabla: `Row<"alumno">`. */
+/** La fila de una tabla: `Row<"proveedor">`. */
 export type Row<T extends keyof DbTables> = DbTables[T];
 
-/** La fila de una vista: `ViewRow<"vw_huecos_disponibles">`. */
+/** La fila de una vista: `ViewRow<"vista_cuenta_corriente_proveedor">`. */
 export type ViewRow<T extends keyof DbViews> = DbViews[T];

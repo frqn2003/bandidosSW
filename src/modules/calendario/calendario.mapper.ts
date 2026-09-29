@@ -2,12 +2,15 @@ import type {
   HuecoResponse,
   TurnoCalendarioResponse,
   AgendaDiaResponse,
+  BloqueHorarioResponse,
+  DiaResumenMesResponse,
 } from "@/contracts/calendario";
 import type {
   HuecoRow,
   TurnoCalendarioRow,
   BloqueHorarioRow,
   ProfesorInfoRow,
+  TurnosPorDiaRow,
 } from "./calendario.types";
 
 const hhmm = (t: string) => t.slice(0, 5);
@@ -36,7 +39,39 @@ export function huecoToApi(row: HuecoRow): HuecoResponse {
   };
 }
 
-export function turnoCalendarioToApi(row: TurnoCalendarioRow): TurnoCalendarioResponse {
+export function calcularAccionesTurno(
+  row: TurnoCalendarioRow,
+  esProfesor: boolean,
+  ahora: Date = new Date(),
+): { puedeModificar: boolean; puedeCancelar: boolean } {
+  if (esProfesor) {
+    return { puedeModificar: false, puedeCancelar: false };
+  }
+  if (row.estado === "Cancelado" || row.pagado) {
+    return { puedeModificar: false, puedeCancelar: false };
+  }
+
+  const [hh, mm] = row.hora_inicio.slice(0, 5).split(":").map(Number);
+  const [y, m, d] = row.fecha.slice(0, 10).split("-").map(Number);
+  const fechaTurno = new Date(y, m - 1, d, hh, mm, 0);
+
+  if (fechaTurno.getTime() <= ahora.getTime()) {
+    return { puedeModificar: false, puedeCancelar: false };
+  }
+
+  const diffHoras = (fechaTurno.getTime() - ahora.getTime()) / (1000 * 60 * 60);
+  if (row.cantidad_modificaciones >= 2 || diffHoras < 2) {
+    return { puedeModificar: false, puedeCancelar: true };
+  }
+
+  return { puedeModificar: true, puedeCancelar: true };
+}
+
+export function turnoCalendarioToApi(
+  row: TurnoCalendarioRow,
+  esProfesor = false,
+): TurnoCalendarioResponse {
+  const { puedeModificar, puedeCancelar } = calcularAccionesTurno(row, esProfesor);
   return {
     id: row.id,
     codigo: row.codigo ?? `TUR-${String(row.id).padStart(6, "0")}`,
@@ -57,13 +92,55 @@ export function turnoCalendarioToApi(row: TurnoCalendarioRow): TurnoCalendarioRe
     horaInicio: hhmm(row.hora_inicio),
     horaFin: hhmm(row.hora_fin),
     estado: row.estado,
+    puedeModificar,
+    puedeCancelar,
+    cantidadModificaciones: row.cantidad_modificaciones,
+    cancelacionTardia: row.cancelacion_tardia,
+    pagado: row.pagado,
   };
 }
 
-export function bloqueHorarioToApi(row: BloqueHorarioRow): { horaInicio: string; horaFin: string } {
+export function bloqueHorarioToApi(row: BloqueHorarioRow): BloqueHorarioResponse {
   return {
+    profesorId: row.profesor_id,
     horaInicio: hhmm(row.hora_inicio),
     horaFin: hhmm(row.hora_fin),
+  };
+}
+
+export function diaResumenMesToApi(row: TurnosPorDiaRow): DiaResumenMesResponse {
+  return {
+    fecha: row.fecha.slice(0, 10),
+    cantidadTurnos: row.cantidad_turnos,
+  };
+}
+
+export function agendaToApi(
+  profesor: ProfesorInfoRow | null,
+  profesores: ProfesorInfoRow[],
+  fecha: string,
+  bloques: BloqueHorarioRow[],
+  turnos: TurnoCalendarioRow[],
+  huecos: HuecoRow[],
+  esProfesor = false,
+): AgendaDiaResponse {
+  return {
+    profesor: profesor
+      ? {
+          id: profesor.id,
+          nombre: profesor.nombre,
+          apellido: profesor.apellido,
+        }
+      : null,
+    profesores: profesores.map((p) => ({
+      id: p.id,
+      nombre: p.nombre,
+      apellido: p.apellido,
+    })),
+    fecha: fecha.slice(0, 10),
+    bloques: bloques.map(bloqueHorarioToApi),
+    turnos: turnos.map((t) => turnoCalendarioToApi(t, esProfesor)),
+    huecos: huecos.map(huecoToApi),
   };
 }
 
@@ -73,16 +150,7 @@ export function agendaDiaToApi(
   bloques: BloqueHorarioRow[],
   turnos: TurnoCalendarioRow[],
   huecos: HuecoRow[],
+  esProfesor = false,
 ): AgendaDiaResponse {
-  return {
-    profesor: {
-      id: profesor.id,
-      nombre: profesor.nombre,
-      apellido: profesor.apellido,
-    },
-    fecha: fecha.slice(0, 10),
-    bloques: bloques.map(bloqueHorarioToApi),
-    turnos: turnos.map(turnoCalendarioToApi),
-    huecos: huecos.map(huecoToApi),
-  };
+  return agendaToApi(profesor, [profesor], fecha, bloques, turnos, huecos, esProfesor);
 }

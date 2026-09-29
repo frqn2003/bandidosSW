@@ -118,8 +118,40 @@ export function useStudents() {
   }, []);
 
   useEffect(() => {
-    void cargarDatos();
-  }, [cargarDatos]);
+    let cancelado = false;
+    Promise.all([
+      listarAlumnos({ verInactivos: true }),
+      listarMaterias({ estado: "activo" }).catch(() => []),
+      sesionActual().catch(() => null),
+    ])
+      .then(([alumnosRes, materiasRes, sesionRes]) => {
+        if (cancelado) return;
+        if (alumnosRes) {
+          setStudents((prev) => {
+            const prevMap = new Map(prev.map((s) => [s.id, s]));
+            return alumnosRes.map((r) => toStudentUI(r, prevMap.get(r.id)));
+          });
+        }
+        if (materiasRes) {
+          setMateriasActivas(materiasRes.map((m) => ({ id: m.id, nombre: m.nombre })));
+        }
+        if (sesionRes?.usuario) {
+          const u = sesionRes.usuario;
+          setCurrentUserName(u.nombre ? `${u.nombre} ${u.apellido}` : u.email);
+        }
+        setLoading(false);
+      })
+      .catch((e) => {
+        if (cancelado) return;
+        const msg = e instanceof Error ? e.message : "Error al cargar alumnos.";
+        setError(msg);
+        setLoading(false);
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, []);
 
   /**
    * Valida si un DNI ya pertenece a otro alumno ACTIVO.

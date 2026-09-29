@@ -115,8 +115,38 @@ export function useUsers() {
   }, []);
 
   useEffect(() => {
-    void cargarDatos();
-  }, [cargarDatos]);
+    let cancelado = false;
+    Promise.all([
+      listarUsuarios({ verInactivos: true }),
+      listarRoles(),
+      listarMotivosBaja(),
+      sesionActual(),
+    ])
+      .then(([usuariosRes, rolesRes, motivosRes, sesionRes]) => {
+        if (cancelado) return;
+        setUsers(usuariosRes.map(aUser));
+        setRoles(rolesRes);
+        setMotivosBaja(motivosRes);
+        if (sesionRes?.usuario) {
+          setCurrentSessionUser({
+            id: sesionRes.usuario.id,
+            email: sesionRes.usuario.email,
+            rol: sesionRes.usuario.rol.nombre,
+          });
+        }
+        setLoading(false);
+      })
+      .catch((e) => {
+        if (cancelado) return;
+        const msg = e instanceof Error ? e.message : "Error al cargar usuarios.";
+        setError(msg);
+        setLoading(false);
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, []);
 
   // Derived state: filtered and sorted users
   // Criterios:

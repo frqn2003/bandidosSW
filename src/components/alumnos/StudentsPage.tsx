@@ -294,6 +294,7 @@ export function StudentsPage() {
                 institucionOrigen: null,
                 observacionesGenerales: "Importado vía CSV",
                 materiasInteres: [],
+                deudaPendiente: false,
               });
               imported++;
             } catch {
