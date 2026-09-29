@@ -227,7 +227,7 @@ export async function bloquesEnRango(
       AND ags.dia_semana = ANY($2)
       AND ap.estado = 'activo'
       AND ags.estado = 'activo'
-    ORDER BY ap.hora_inicio ASC
+    ORDER BY ap.profesor_id ASC, hora_inicio ASC
   `;
 
   const params = [profesorIds, diasSemana];
