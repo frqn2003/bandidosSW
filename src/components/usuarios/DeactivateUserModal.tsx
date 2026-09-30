@@ -127,7 +127,7 @@ export function DeactivateUserModal({
       maxWidth="max-w-xl"
       icon={
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-error/10 text-error">
-          <Icon name="person_remove" size={24} />
+          <Icon name="delete" size={24} />
         </div>
       }
       footer={

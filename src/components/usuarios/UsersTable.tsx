@@ -132,7 +132,7 @@ export function UsersTable({
                           aria-label="Dar de baja usuario"
                           className="flex h-8 w-8 items-center justify-center rounded-md text-error transition-colors hover:bg-error/10 hover:text-error focus:outline-none"
                         >
-                          <Icon name="person_remove" size={20} />
+                          <Icon name="delete" size={20} />
                         </button>
                       )}
                     </div>

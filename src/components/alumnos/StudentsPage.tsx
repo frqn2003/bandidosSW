@@ -29,7 +29,6 @@ interface LocalFilters {
   nivelEducativo: NivelEducativo | "Todos";
   materiaInteres: string | "Todas";
   estado: EstadoAlumno | "Todos";
-  verInactivos: boolean;
 }
 
 export function StudentsPage() {
@@ -72,13 +71,12 @@ export function StudentsPage() {
     student: null,
   });
 
-  // Filtros combinables con opción "Ver inactivos" (criterio obligatorio HU-ALU-02)
+  // Filtros combinables
   const [filters, setFilters] = useState<LocalFilters>({
     busqueda: "",
     nivelEducativo: "Todos",
     materiaInteres: "Todas",
     estado: "Todos",
-    verInactivos: true,
   });
 
   // Paginación
@@ -216,7 +214,6 @@ export function StudentsPage() {
       nivelEducativo: "Todos",
       materiaInteres: "Todas",
       estado: "Todos",
-      verInactivos: true,
     });
     setPage(1);
   };
@@ -459,11 +456,9 @@ export function StudentsPage() {
                     id={estadoSelectId}
                     value={filters.estado}
                     onChange={(e) => {
-                      const nuevoEstado = e.target.value as EstadoAlumno | "Todos";
                       setFilters((prev) => ({
                         ...prev,
-                        estado: nuevoEstado,
-                        verInactivos: nuevoEstado === "Todos" || nuevoEstado === "inactivo",
+                        estado: e.target.value as EstadoAlumno | "Todos",
                       }));
                       setPage(1);
                     }}
@@ -473,26 +468,6 @@ export function StudentsPage() {
                     <option value="activo">Activo</option>
                     <option value="inactivo">Inactivo</option>
                   </select>
-                </div>
-
-                {/* Opción Ver inactivos (HU-ALU-02) */}
-                <div className="flex items-center h-10 pb-0.5">
-                  <label className="flex items-center gap-2 text-xs font-bold text-on-surface cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={filters.verInactivos}
-                      onChange={(e) => {
-                        setFilters((prev) => ({
-                          ...prev,
-                          verInactivos: e.target.checked,
-                          estado: e.target.checked ? "Todos" : "activo",
-                        }));
-                        setPage(1);
-                      }}
-                      className="h-4 w-4 rounded border-outline-variant text-primary focus:ring-secondary cursor-pointer"
-                    />
-                    <span>Ver inactivos</span>
-                  </label>
                 </div>
 
                 {/* Botón Limpiar filtros según diseño adjuntado en captura */}

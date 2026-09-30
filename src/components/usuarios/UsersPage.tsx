@@ -83,7 +83,7 @@ export function UsersPage() {
     setPage(1);
   };
 
-  const handleExportExcel = () => {
+  const handleExportCsv = () => {
     const csv = usuariosACsv(allUsers);
     descargarCsv(csv, "usuarios.csv");
   };
@@ -178,14 +178,14 @@ export function UsersPage() {
                   Usuarios del sistema
                 </h1>
                 <p className="text-sm font-medium text-on-surface-variant print:text-black/70">
-                  Gestión integral del personal y credenciales de acceso (HU-SIS-00).
+                  Gestión integral del personal y credenciales de acceso.
                 </p>
               </div>
             </div>
             <div className="flex gap-2 print:hidden">
-              <Button variant="outline" type="button" onClick={handleExportExcel}>
+              <Button variant="outline" type="button" onClick={handleExportCsv}>
                 <Icon name="download" size={18} />
-                Exportar Excel
+                Exportar CSV
               </Button>
               <Button variant="outline" type="button" onClick={handleExportPDF}>
                 <Icon name="picture_as_pdf" size={18} />
