@@ -67,19 +67,23 @@ export function TarjetaTurnoCalendario({
       aria-label={etiqueta}
       className={`flex h-full min-h-11 w-full cursor-pointer flex-col items-start justify-center gap-0.5 rounded-sm border border-outline-variant border-l-4 px-2 py-1 text-left transition-colors duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-1 ${color.borde} ${color.fondo} hover:brightness-95`}
     >
-      <span className="flex w-full items-center justify-between gap-1">
+      <div className="flex w-full items-start justify-between gap-1">
         <span className="truncate text-xs font-bold leading-tight text-on-surface">
           {turno.materia.nombre}
         </span>
-        {/* Solo el ícono: "Cancelado" no entra sin comerle el nombre de la
-            materia. El texto del estado sigue en el detalle lateral. */}
-        {cancelado && <TurnoCalendarioBadge estado={turno.estado} soloIcono />}
-      </span>
+        <div className="flex flex-col items-end shrink-0 text-right leading-none">
+          <span className="text-[10px] font-bold text-slate-700">
+            {turno.horaInicio}
+          </span>
+          {cancelado && (
+            <span className="text-[9px] font-bold text-red-700 uppercase mt-0.5">
+              Cancelado
+            </span>
+          )}
+        </div>
+      </div>
       <span className="w-full truncate text-[11px] font-medium leading-tight text-on-surface-variant">
         {turno.alumno.apellido}, {turno.alumno.nombre}
-      </span>
-      <span className="w-full truncate text-[10px] font-medium leading-tight text-on-surface-variant/80">
-        {turno.horaInicio} – {turno.horaFin}
       </span>
       {mostrarProfesor && (
         <span className="w-full truncate text-[11px] font-medium leading-tight text-on-surface-variant">

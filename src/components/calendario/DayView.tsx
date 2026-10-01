@@ -239,16 +239,16 @@ export function DayView({
                               }`}
                               title={`${turno.materia.nombre} - ${turno.alumno.apellido}, ${turno.alumno.nombre} · ${turno.horaInicio} - ${turno.horaFin}`}
                             >
-                              <div className="flex items-center justify-between">
+                              <div className="flex items-start justify-between gap-1 leading-tight">
                                 <span className={`text-xs ${estilos.materiaText}`}>
                                   {turno.materia.nombre}
                                 </span>
-                                <div className="flex items-center gap-1 shrink-0">
-                                  <span className="text-[10px] font-bold text-slate-700">
+                                <div className="flex flex-col items-end shrink-0 text-right">
+                                  <span className="text-[10px] font-bold text-slate-700 leading-tight">
                                     {turno.horaInicio}
                                   </span>
                                   {turno.estado === "Cancelado" && (
-                                    <span className="text-[10px] font-extrabold text-red-700 uppercase">
+                                    <span className="text-[9px] font-extrabold text-red-700 uppercase leading-tight mt-0.5">
                                       Cancelado
                                     </span>
                                   )}

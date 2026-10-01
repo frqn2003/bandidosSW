@@ -296,16 +296,16 @@ export function WeekView({
                               }`}
                               title={`${turno.materia.nombre} · ${turno.alumno.apellido} (${turno.profesor.apellido}) · ${turno.horaInicio} - ${turno.horaFin}`}
                             >
-                              <div className="flex items-center justify-between gap-1 leading-tight">
+                              <div className="flex items-start justify-between gap-1 leading-tight">
                                 <span className="font-bold text-[11px] truncate">
                                   {turno.materia.nombre}
                                 </span>
-                                <div className="flex items-center gap-1 shrink-0">
-                                  <span className="text-[10px] font-bold text-slate-700">
+                                <div className="flex flex-col items-end shrink-0 text-right">
+                                  <span className="text-[10px] font-bold text-slate-700 leading-tight">
                                     {turno.horaInicio}
                                   </span>
                                   {turno.estado === "Cancelado" && (
-                                    <span className="text-[10px] font-bold text-red-700 uppercase">
+                                    <span className="text-[9px] font-bold text-red-700 uppercase leading-tight mt-0.5">
                                       Cancelado
                                     </span>
                                   )}
@@ -421,9 +421,21 @@ export function WeekView({
                     }}
                     className={`rounded-md border p-2.5 transition-all cursor-pointer ${estilos.bg} hover:shadow-xs`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs">{t.materia.nombre}</span>
-                      <span className="font-mono text-xs font-semibold">{t.codigo}</span>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="font-bold text-xs">{t.materia.nombre}</span>
+                        <span className="font-mono text-xs font-semibold ml-2">{t.codigo}</span>
+                      </div>
+                      <div className="flex flex-col items-end shrink-0 text-right">
+                        <span className="text-[10px] font-bold text-slate-700 leading-tight">
+                          {t.horaInicio}
+                        </span>
+                        {t.estado === "Cancelado" && (
+                          <span className="text-[9px] font-bold text-red-700 uppercase leading-tight mt-0.5">
+                            Cancelado
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="mt-1 text-xs text-slate-700">
                       Alumno: <strong>{t.alumno.apellido}, {t.alumno.nombre}</strong> · Profesor: <strong>{t.profesor.apellido}</strong>
