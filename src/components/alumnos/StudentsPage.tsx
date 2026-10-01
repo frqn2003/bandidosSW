@@ -6,6 +6,7 @@
 "use client";
 
 import React, { useState, useMemo, useId } from "react";
+import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
 import { Pagination } from "@/components/ui/Pagination";
@@ -32,6 +33,7 @@ interface LocalFilters {
 }
 
 export function StudentsPage() {
+  const router = useRouter();
   const searchInputId = useId();
   const nivelSelectId = useId();
   const materiaSelectId = useId();
@@ -542,11 +544,28 @@ export function StudentsPage() {
           student={deactivateModal.student}
           onClose={() => setDeactivateModal({ open: false, student: null })}
           onConfirm={handleConfirmDeactivate}
-          onNavigateToCancelTurns={(student) => {
-            showToast(
-              "error",
-              `Navegando a Turnos para cancelar reservas de ${student.apellido}, ${student.nombre}`
-            );
+          onNavigateToCancelTurns={(student, turno) => {
+            const turnos = student.turnosFuturos ?? [];
+            const primerTurno = turnos[0];
+            const ultimoTurno = turnos[turnos.length - 1];
+
+            const params = new URLSearchParams();
+            params.set("busqueda", student.legajo);
+            params.set("estado", "Reservado");
+
+            if (turno?.fecha) {
+              params.set("desde", turno.fecha);
+              params.set("hasta", turno.fecha);
+              if (turno.turnoId) {
+                params.set("turnoId", String(turno.turnoId));
+                params.set("accion", "cancelar");
+              }
+            } else if (primerTurno?.fecha) {
+              params.set("desde", primerTurno.fecha);
+              params.set("hasta", ultimoTurno?.fecha ?? primerTurno.fecha);
+            }
+
+            router.push(`/turnos?${params.toString()}`);
           }}
         />
       </div>

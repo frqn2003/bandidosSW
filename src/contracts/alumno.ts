@@ -200,6 +200,15 @@ export type PosiblesDuplicadosQuery = z.output<typeof posiblesDuplicadosQuery>;
 export type NivelEducativo = "Primario" | "Secundario" | "Universitario";
 export type EstadoAlumno = "activo" | "inactivo";
 
+export type TurnoFuturoResumen = {
+  id: string;
+  turnoId?: number;
+  fecha?: string;
+  fechaHora: string;
+  materia: string;
+  estado: "Reservado" | "Confirmado";
+};
+
 export type AlumnoResponse = {
   id: number;
   /** Generado por la base: "ALU-000123". */
@@ -220,6 +229,10 @@ export type AlumnoResponse = {
   materiasInteres: { id: number; nombre: string }[];
   /** Indica si posee clases dictadas impagas (HU-ALU-02: advertencia previa a la baja). */
   deudaPendiente: boolean;
+  /** Cantidad de turnos futuros reservados (HU-ALU-02: bloqueo de baja). */
+  cantidadTurnosFuturos?: number;
+  /** Detalle de turnos futuros reservados para mostrar en el modal de baja. */
+  turnosFuturos?: TurnoFuturoResumen[];
   /** ISO 8601. */
   fechaCreacion: string;
   /** ISO 8601. */

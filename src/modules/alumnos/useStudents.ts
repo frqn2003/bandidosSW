@@ -44,11 +44,21 @@ export interface ReactivateResult {
 }
 
 function toStudentUI(resp: AlumnoResponse, existing?: StudentUI): StudentUI {
+  const futureTurns =
+    resp.cantidadTurnosFuturos ??
+    resp.turnosFuturos?.length ??
+    existing?.futureTurnsCount ??
+    0;
+  const turnos =
+    (resp.turnosFuturos as StudentUI["turnosFuturos"]) ??
+    existing?.turnosFuturos ??
+    [];
+
   return {
     ...resp,
-    futureTurnsCount: existing?.futureTurnsCount ?? 0,
+    futureTurnsCount: futureTurns,
     hasPendingDebt: resp.deudaPendiente ?? existing?.hasPendingDebt ?? false,
-    turnosFuturos: existing?.turnosFuturos ?? [],
+    turnosFuturos: turnos,
     detalleDeuda: existing?.detalleDeuda,
   };
 }
@@ -487,6 +497,11 @@ export function useStudents() {
             const cantidad =
               (err.datos as { cantidadTurnosFuturos?: number } | undefined)
                 ?.cantidadTurnosFuturos ?? 1;
+            setStudents((prev) =>
+              prev.map((s) =>
+                s.id === id ? { ...s, futureTurnsCount: cantidad } : s
+              )
+            );
             return {
               success: false,
               code: "ALUMNO_CON_TURNOS_FUTUROS",

@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EstadoProfesorBadge } from "@/components/profesores/EstadoProfesorBadge";
+import { EncabezadoImpresion } from "@/components/layout/EncabezadoImpresion";
 import {
   DIAS_SEMANA_LARGOS,
   aMin,
@@ -54,6 +55,15 @@ export function ProfesorFichaModal({ profesor, open, onClose, onEditar }: Profes
     return { label, rangos };
   }).filter((d) => d.rangos.length > 0);
 
+  const handleImprimir = () => {
+    const originalTitle = document.title;
+    document.title = `Ficha_Docente_${profesor.apellido}_${profesor.nombre}`;
+    window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 1000);
+  };
+
   return (
     <Modal
       open={open}
@@ -75,6 +85,7 @@ export function ProfesorFichaModal({ profesor, open, onClose, onEditar }: Profes
         </>
       }
       maxWidth="max-w-4xl"
+      hideHeaderOnPrint
       footer={
         <>
           <Button type="button" variant="outline" onClick={onClose}>
@@ -84,7 +95,7 @@ export function ProfesorFichaModal({ profesor, open, onClose, onEditar }: Profes
             type="button"
             variant="outline"
             size="md"
-            onClick={() => window.print()}
+            onClick={handleImprimir}
             title="Imprime la ficha docente del profesor"
           >
             <Icon name="download" size={16} />
@@ -98,6 +109,14 @@ export function ProfesorFichaModal({ profesor, open, onClose, onEditar }: Profes
       }
     >
       <div className="flex flex-col gap-5">
+        <EncabezadoImpresion
+          titulo={`Ficha del Docente · ${profesor.nombre} ${profesor.apellido}`}
+          subtitulo={profesor.tituloEspecialidad ? `Especialidad: ${profesor.tituloEspecialidad}` : undefined}
+          filtrosAplicados={[
+            `Estado: ${profesor.estado === "activo" ? "Activo" : "Inactivo"}`,
+            `Alta en sistema: ${formatearFecha(profesor.fechaCreacion)}`,
+          ]}
+        />
         {/* Identidad + Título + Contacto */}
         <section
           aria-label="Datos del profesor"

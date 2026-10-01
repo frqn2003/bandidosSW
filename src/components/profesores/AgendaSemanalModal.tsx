@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
+import { EncabezadoImpresion } from "@/components/layout/EncabezadoImpresion";
 import {
   DIAS_SEMANA_CORTOS,
   aMin,
@@ -206,6 +207,19 @@ export function AgendaSemanalModal({
 
   const esSemanaActual = lunes === lunesDe(hoyISO);
 
+  const handleImprimir = () => {
+    const originalTitle = document.title;
+    document.title = `Agenda_Semanal_${profesor.apellido}_${profesor.nombre}`;
+    window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 1000);
+  };
+
+  const nombreMateriaFiltro = materia
+    ? profesor.materias.find((m) => String(m.materia.id) === materia)?.materia.nombre ?? materia
+    : null;
+
   return (
     <Modal
       open={open}
@@ -214,6 +228,7 @@ export function AgendaSemanalModal({
       subtitle={`Profesor: ${profesor.nombre} ${profesor.apellido} · ${cargaHorariaSemanal(profesor).toFixed(1)} hs semanales habilitadas`}
       icon={<Icon name="calendar_month" size={22} className="text-primary" />}
       maxWidth="max-w-4xl"
+      hideHeaderOnPrint
       footer={
         <>
           <Button type="button" variant="outline" onClick={onClose}>
@@ -223,7 +238,7 @@ export function AgendaSemanalModal({
             type="button"
             variant="outline"
             size="md"
-            onClick={() => window.print()}
+            onClick={handleImprimir}
             title="Imprime la agenda semanal del profesor"
           >
             <Icon name="download" size={16} />
@@ -237,8 +252,16 @@ export function AgendaSemanalModal({
       }
     >
       <div className="flex flex-col gap-4">
+        <EncabezadoImpresion
+          titulo={`Agenda Semanal · ${profesor.nombre} ${profesor.apellido}`}
+          subtitulo={`Semana del ${diaMes(fechas[0])} al ${diaMes(fechas[5])}, ${fechas[5].slice(0, 4)}`}
+          filtrosAplicados={[
+            `Carga: ${cargaHorariaSemanal(profesor).toFixed(1)} hs semanales`,
+            nombreMateriaFiltro ? `Materia: ${nombreMateriaFiltro}` : "Todas las materias",
+          ]}
+        />
         {/* Navegación de la semana */}
-        <div className="flex flex-wrap items-end justify-between gap-3 rounded-md border border-outline-variant bg-surface-container-low px-4 py-3">
+        <div className="flex flex-wrap items-end justify-between gap-3 rounded-md border border-outline-variant bg-surface-container-low px-4 py-3 print:hidden">
           <div className="flex items-center gap-2">
             <Button
               type="button"

@@ -15,6 +15,7 @@ export function toApi(
   row: AlumnoRow,
   materiasInteres: { id: number; nombre: string }[] = [],
   deudaPendiente: boolean = false,
+  turnosFuturos: { id: string; turnoId?: number; fecha?: string; fechaHora: string; materia: string; estado: "Reservado" | "Confirmado" }[] = [],
 ): AlumnoResponse {
   const responsable = row.responsable_nombre
     ? {
@@ -42,6 +43,8 @@ export function toApi(
     observacionesGenerales: row.observaciones_generales ?? null,
     materiasInteres,
     deudaPendiente,
+    cantidadTurnosFuturos: turnosFuturos.length,
+    turnosFuturos,
     fechaCreacion:
       row.created_at instanceof Date
         ? row.created_at.toISOString()
@@ -57,8 +60,14 @@ export function toApiList(
   rows: AlumnoRow[],
   materiasMapa: Map<number, { id: number; nombre: string }[]> = new Map(),
   deudasSet: Set<number> = new Set(),
+  turnosFuturosMapa: Map<number, { id: string; turnoId?: number; fecha?: string; fechaHora: string; materia: string; estado: "Reservado" | "Confirmado" }[]> = new Map(),
 ): AlumnoResponse[] {
   return rows.map((r) =>
-    toApi(r, materiasMapa.get(r.id) ?? [], deudasSet.has(r.id)),
+    toApi(
+      r,
+      materiasMapa.get(r.id) ?? [],
+      deudasSet.has(r.id),
+      turnosFuturosMapa.get(r.id) ?? [],
+    ),
   );
 }

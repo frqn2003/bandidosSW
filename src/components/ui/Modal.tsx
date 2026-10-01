@@ -17,6 +17,7 @@ interface ModalProps {
   footer?: ReactNode;
   maxWidth?: string;
   labelledBy?: string;
+  hideHeaderOnPrint?: boolean;
 }
 
 export function Modal({
@@ -30,6 +31,7 @@ export function Modal({
   footer,
   maxWidth = "max-w-lg",
   labelledBy = "modal-title",
+  hideHeaderOnPrint = false,
 }: ModalProps) {
   const reduceMotion = useReducedMotion();
 
@@ -59,7 +61,7 @@ export function Modal({
       <AnimatePresence>
         {open && (
           <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 print:static print:inset-auto print:p-0 print:block"
             role="dialog"
             aria-modal="true"
             aria-labelledby={labelledBy}
@@ -71,17 +73,21 @@ export function Modal({
             <button
               type="button"
               aria-label="Cerrar ventana"
-              className="absolute inset-0 h-full w-full cursor-pointer bg-primary/45 focus-visible:outline-none"
+              className="absolute inset-0 h-full w-full cursor-pointer bg-primary/45 focus-visible:outline-none print:hidden"
               onClick={onClose}
             />
             <motion.div
-              className={`relative flex max-h-[90vh] w-full flex-col overflow-hidden rounded-md bg-surface-container-lowest shadow-modal ${maxWidth}`}
+              className={`relative flex max-h-[90vh] w-full flex-col overflow-hidden rounded-md bg-surface-container-lowest shadow-modal print:max-h-none print:overflow-visible print:rounded-none print:shadow-none print:border-none print:w-full print:m-0 print:p-0 ${maxWidth}`}
               initial={reduceMotion ? { opacity: 0 } : { y: 24, opacity: 0, scale: 0.98 }}
               animate={{ y: 0, opacity: 1, scale: 1 }}
               exit={reduceMotion ? { opacity: 0 } : { y: 16, opacity: 0, scale: 0.98 }}
               transition={{ duration: reduceMotion ? 0 : 0.25, ease: "easeOut" }}
             >
-              <div className="flex items-center justify-between gap-4 border-b border-outline-variant px-6 py-4">
+              <div
+                className={`flex items-center justify-between gap-4 border-b border-outline-variant px-6 py-4 ${
+                  hideHeaderOnPrint ? "print:hidden" : ""
+                }`}
+              >
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   {icon}
                   <div className="min-w-0">
@@ -101,14 +107,14 @@ export function Modal({
                   type="button"
                   onClick={onClose}
                   aria-label="Cerrar"
-                  className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors duration-fast ease-out hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
+                  className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors duration-fast ease-out hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary print:hidden"
                 >
                   <Icon name="close" size={20} />
                 </button>
               </div>
-              <div className="overflow-y-auto px-6 py-5">{children}</div>
+              <div className="overflow-y-auto px-6 py-5 print:overflow-visible print:p-0">{children}</div>
               {footer && (
-                <div className="flex flex-col-reverse gap-3 border-t border-outline-variant bg-surface-container-low px-6 py-4 sm:flex-row sm:justify-end">
+                <div className="flex flex-col-reverse gap-3 border-t border-outline-variant bg-surface-container-low px-6 py-4 sm:flex-row sm:justify-end print:hidden">
                   {footer}
                 </div>
               )}

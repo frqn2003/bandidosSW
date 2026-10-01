@@ -67,12 +67,13 @@ export async function listar(
 ): Promise<AlumnoResponse[]> {
   const rows = await repo.findAll(filtros);
   const ids = rows.map((r) => r.id);
-  const [materiasMapa, deudasSet] = await Promise.all([
+  const [materiasMapa, deudasSet, turnosFuturosMapa] = await Promise.all([
     repo.materiasInteresDe(ids),
     repo.deudaPendienteDe(ids),
+    repo.turnosFuturosDe(ids),
   ]);
 
-  return mapper.toApiList(rows, materiasMapa, deudasSet);
+  return mapper.toApiList(rows, materiasMapa, deudasSet, turnosFuturosMapa);
 }
 
 /**
@@ -84,12 +85,13 @@ export async function obtener(id: number): Promise<AlumnoResponse> {
     throw new NotFoundError("el alumno", id);
   }
 
-  const [materias, deuda] = await Promise.all([
+  const [materias, deuda, turnosFuturosMap] = await Promise.all([
     repo.materiasInteresDeAlumno(id),
     repo.tieneDeudaPendiente(id),
+    repo.turnosFuturosDe([id]),
   ]);
 
-  return mapper.toApi(row, materias, deuda);
+  return mapper.toApi(row, materias, deuda, turnosFuturosMap.get(id) ?? []);
 }
 
 export const obtenerPorId = obtener;
@@ -219,13 +221,14 @@ export async function editar(
     // 8. Reemplazar materias de interés
     await repo.reemplazarMateriasInteres(id, materiasIds, client);
 
-    // 9. Releer materias y deuda
-    const [materias, deuda] = await Promise.all([
+    // 9. Releer materias, deuda y turnos futuros
+    const [materias, deuda, turnosFuturosMap] = await Promise.all([
       repo.materiasInteresDeAlumno(id, client),
       repo.tieneDeudaPendiente(id, client),
+      repo.turnosFuturosDe([id], client),
     ]);
 
-    return mapper.toApi(row, materias, deuda);
+    return mapper.toApi(row, materias, deuda, turnosFuturosMap.get(id) ?? []);
   });
 }
 

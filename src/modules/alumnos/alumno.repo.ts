@@ -407,6 +407,92 @@ export async function contarTurnosFuturos(
   return Number(filas[0]?.total ?? 0);
 }
 
+export interface TurnoFuturoItem {
+  id: string;
+  turnoId: number;
+  fecha: string;
+  fechaHora: string;
+  materia: string;
+  estado: "Reservado" | "Confirmado";
+}
+
+/**
+ * Obtiene los turnos futuros reservados de una lista de alumnos sin N+1 (Receta 15).
+ */
+export async function turnosFuturosDe(
+  alumnoIds: number[],
+  ejecutor: Ejecutor = pool,
+): Promise<Map<number, TurnoFuturoItem[]>> {
+  const resultado = new Map<number, TurnoFuturoItem[]>();
+  if (alumnoIds.length === 0) return resultado;
+
+  const sql = `
+    SELECT
+      t.id,
+      t.codigo,
+      t.alumno_id,
+      t.fecha,
+      t.hora_inicio,
+      m.nombre AS materia_nombre,
+      t.estado
+    FROM turno t
+    JOIN materia m ON m.id = t.materia_id
+    WHERE t.alumno_id = ANY($1::int[])
+      AND t.estado = 'Reservado'
+      AND (
+        t.fecha > (now() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
+        OR (
+          t.fecha = (now() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date
+          AND t.hora_inicio > (now() AT TIME ZONE 'America/Argentina/Buenos_Aires')::time
+        )
+      )
+    ORDER BY t.fecha ASC, t.hora_inicio ASC
+  `;
+
+  type FilaTurno = {
+    id: number;
+    codigo: string | null;
+    alumno_id: number;
+    fecha: string | Date;
+    hora_inicio: string;
+    materia_nombre: string;
+    estado: string;
+  };
+
+  let filas: FilaTurno[];
+  if ("query" in ejecutor && ejecutor !== pool) {
+    const { rows } = await ejecutor.query<FilaTurno>(sql, [alumnoIds]);
+    filas = rows;
+  } else {
+    filas = await query<FilaTurno>(sql, [alumnoIds]);
+  }
+
+  for (const fila of filas) {
+    const lista = resultado.get(fila.alumno_id) ?? [];
+    const fechaISO = typeof fila.fecha === "string" ? fila.fecha.slice(0, 10) : fila.fecha.toISOString().slice(0, 10);
+    const hora = fila.hora_inicio.slice(0, 5);
+
+    const [y, m, d] = fechaISO.split("-").map(Number);
+    const dateObj = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+    const diaSemana = dateObj.toLocaleDateString("es-AR", { weekday: "short", timeZone: "America/Argentina/Buenos_Aires" });
+    const diaMes = `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}`;
+    const diaCap = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1).replace(".", "");
+    const fechaHora = `${diaCap} ${diaMes} · ${hora}`;
+
+    lista.push({
+      id: fila.codigo || `TUR-${String(fila.id).padStart(6, "0")}`,
+      turnoId: fila.id,
+      fecha: fechaISO,
+      fechaHora,
+      materia: fila.materia_nombre,
+      estado: fila.estado as "Reservado" | "Confirmado",
+    });
+    resultado.set(fila.alumno_id, lista);
+  }
+
+  return resultado;
+}
+
 /**
  * Comprueba si un alumno tiene clases pasadas impagas (deuda pendiente).
  */

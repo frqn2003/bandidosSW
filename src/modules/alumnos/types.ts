@@ -28,7 +28,9 @@ export type {
  * Detalle simulado de turnos futuros de un alumno (para HU-ALU-02 / HU-TUR-02).
  */
 export interface TurnoFuturoResumen {
-  id: string; // ej: "T-004512"
+  id: string; // ej: "TUR-004512"
+  turnoId?: number;
+  fecha?: string; // "aaaa-mm-dd"
   fechaHora: string; // ej: "Lun 28/09 · 15:00"
   materia: string; // ej: "Matemática"
   estado: "Reservado" | "Confirmado";

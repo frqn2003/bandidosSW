@@ -34,6 +34,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { RequiereSesion } from "@/components/auth/RequiereSesion";
+import { EncabezadoImpresion } from "@/components/layout/EncabezadoImpresion";
 import { AgendaSemanalModal } from "@/components/profesores/AgendaSemanalModal";
 import { FiltrosProfesores, type FiltrosProfesoresState } from "@/components/profesores/FiltrosProfesores";
 import { BloquesDisponibilidadModal } from "@/components/profesores/BloquesDisponibilidadModal";
@@ -448,11 +449,25 @@ function CuerpoDocenteContent() {
   };
 
   return (
-    <div className="flex min-h-screen bg-surface">
-      <Sidebar />
-      <main className="flex-1 px-6 py-6 lg:px-8">
-        <div className="mx-auto flex max-w-6xl flex-col gap-5">
-          <header className="flex flex-wrap items-center justify-between gap-4">
+    <div className="flex min-h-screen bg-surface print:block print:bg-white print:min-h-0">
+      <div className="print:hidden">
+        <Sidebar />
+      </div>
+      <main
+        className={`flex-1 px-6 py-6 lg:px-8 ${fichaDe || agendaDe ? "print:hidden" : "print:p-0 print:m-0 print:max-w-none"
+          }`}
+      >
+        <div className="mx-auto flex max-w-6xl flex-col gap-5 print:max-w-none print:gap-4">
+          <EncabezadoImpresion
+            titulo="Cuerpo Docente"
+            subtitulo="Gestión de profesores, materias asignadas y disponibilidad"
+            filtrosAplicados={[
+              `Estado: ${filtros.estado === "activo" ? "Solo activos" : filtros.estado === "inactivo" ? "Solo inactivos" : "Todos"}`,
+              ...(filtros.busqueda.trim() ? [`Búsqueda: "${filtros.busqueda.trim()}"`] : []),
+            ]}
+          />
+
+          <header className="flex flex-wrap items-center justify-between gap-4 print:hidden">
             <div className="flex items-center gap-3">
               <span className="flex h-11 w-11 items-center justify-center rounded-md bg-primary-container/30">
                 <Icon name="groups" size={24} className="text-primary" />
@@ -470,11 +485,13 @@ function CuerpoDocenteContent() {
             </Button>
           </header>
 
-          <FiltrosProfesores
-            estado={filtros}
-            onChange={cambiarFiltros}
-            totalActivos={activos}
-          />
+          <div className="print:hidden">
+            <FiltrosProfesores
+              estado={filtros}
+              onChange={cambiarFiltros}
+              totalActivos={activos}
+            />
+          </div>
 
           {estadoCarga === "cargando" && (
             <div
@@ -552,17 +569,19 @@ function CuerpoDocenteContent() {
                   onVerAgenda={abrirAgenda}
                   onBaja={abrirBaja}
                 />
-                <Pagination
-                  page={paginaActual}
-                  totalPages={totalPages}
-                  totalItems={filas.length}
-                  pageStart={pageStart}
-                  pageEnd={pageEnd}
-                  pageSize={pageSize}
-                  itemLabel="profesores"
-                  onPageChange={setPagina}
-                  onPageSizeChange={setPageSize}
-                />
+                <div className="print:hidden">
+                  <Pagination
+                    page={paginaActual}
+                    totalPages={totalPages}
+                    totalItems={filas.length}
+                    pageStart={pageStart}
+                    pageEnd={pageEnd}
+                    pageSize={pageSize}
+                    itemLabel="profesores"
+                    onPageChange={setPagina}
+                    onPageSizeChange={setPageSize}
+                  />
+                </div>
               </div>
             ))}
         </div>
@@ -591,18 +610,18 @@ function CuerpoDocenteContent() {
         datosIniciales={
           modalForm?.profesor
             ? {
-                usuarioId: String(modalForm.profesor.usuarioId),
-                titulo: modalForm.profesor.tituloEspecialidad ?? "",
-                telefono: modalForm.profesor.telefono,
-                materias: modalForm.profesor.materias.map((m) => ({
-                  materia: m.materia,
-                  capacidad: String(m.capacidadMaxima),
-                })),
-                capacidadDefault:
-                  modalForm.profesor.capacidadDefault ?? capacidadMaxDe(modalForm.profesor),
-                franjas: franjasDesdeBloques(modalForm.profesor.bloquesPorDia),
-                estado: modalForm.profesor.estado === "activo",
-              }
+              usuarioId: String(modalForm.profesor.usuarioId),
+              titulo: modalForm.profesor.tituloEspecialidad ?? "",
+              telefono: modalForm.profesor.telefono,
+              materias: modalForm.profesor.materias.map((m) => ({
+                materia: m.materia,
+                capacidad: String(m.capacidadMaxima),
+              })),
+              capacidadDefault:
+                modalForm.profesor.capacidadDefault ?? capacidadMaxDe(modalForm.profesor),
+              franjas: franjasDesdeBloques(modalForm.profesor.bloquesPorDia),
+              estado: modalForm.profesor.estado === "activo",
+            }
             : undefined
         }
         usuariosSinFicha={usuariosSinFicha}
