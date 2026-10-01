@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Centro Académico",
+  title: "Nexo Académico",
   description: "Sistema de gestión académica — alumnos, docentes, turnos, asistencia y cobranzas",
 };
 

@@ -256,6 +256,30 @@ body {
     padding: 0;
   }
 
+  /* Ocultar elementos de notificación, feedback y elementos marcados con print:hidden */
+  .toast,
+  [role="alert"],
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Eliminar desbordamientos y barras de scroll en impresión */
+  body,
+  main,
+  div,
+  table,
+  .overflow-x-auto,
+  .overflow-y-auto,
+  .overflow-auto {
+    overflow: visible !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  ::-webkit-scrollbar {
+    display: none !important;
+  }
+
   /* Que la tabla no se corte a la mitad de una fila. */
   tr,
   img {

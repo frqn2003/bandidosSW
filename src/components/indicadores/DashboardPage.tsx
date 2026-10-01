@@ -15,6 +15,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { EncabezadoImpresion } from "@/components/layout/EncabezadoImpresion";
 import { useDashboardMetrics } from "@/modules/indicadores/useDashboardMetrics";
 import { DashboardFilters } from "./DashboardFilters";
 import { KPIGrid } from "./KPIGrid";
@@ -36,16 +37,33 @@ export function DashboardPage() {
     exportarPDF,
   } = useDashboardMetrics();
 
+  const materiaSeleccionada = materias.find((m) => m.id === filtros.materiaId)?.nombre;
+  const profesorSeleccionado = profesores.find((p) => p.id === filtros.profesorId)?.nombre;
+
+  const filtrosParaImpresion = [
+    `Desde: ${filtros.desde}`,
+    `Hasta: ${filtros.hasta}`,
+    ...(materiaSeleccionada ? [`Materia: ${materiaSeleccionada}`] : []),
+    ...(profesorSeleccionado ? [`Profesor: ${profesorSeleccionado}`] : []),
+  ];
+
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-slate-50 print:block print:bg-white print:min-h-0">
       <div className="print:hidden">
         <Sidebar />
       </div>
 
-      <div className="flex flex-1 flex-col overflow-y-auto">
-        <main className="flex-1 p-6 sm:p-8 max-w-7xl w-full mx-auto space-y-6">
-          {/* ── 1. ENCABEZADO PRINCIPAL DE LA PÁGINA ── */}
-          <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-outline-variant pb-5">
+      <div className="flex flex-1 flex-col overflow-y-auto print:overflow-visible">
+        <main className="flex-1 p-6 sm:p-8 max-w-7xl w-full mx-auto space-y-6 print:p-0 print:m-0 print:max-w-none print:w-full print:space-y-4">
+          {/* ── ENCABEZADO DE IMPRESIÓN (PDF) ── */}
+          <EncabezadoImpresion
+            titulo="Indicadores de Gestión"
+            subtitulo="Métricas analíticas del centro académico para la toma de decisiones directivas"
+            filtrosAplicados={filtrosParaImpresion}
+          />
+
+          {/* ── 1. ENCABEZADO PRINCIPAL DE LA PÁGINA (PANTALLA) ── */}
+          <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-outline-variant pb-5 print:hidden">
             <div className="space-y-1">
               <div className="flex items-center gap-3">
                 <span className="flex h-11 w-11 items-center justify-center rounded-md bg-primary-container/30 print:hidden">

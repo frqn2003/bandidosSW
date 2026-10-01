@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { EncabezadoImpresion } from "@/components/layout/EncabezadoImpresion";
 import { UserFormModal, ModoUserForm } from "./UserFormModal";
 import { DeactivateUserModal } from "./DeactivateUserModal";
 import { usuariosACsv, descargarCsv } from "./exportar";
@@ -168,28 +169,44 @@ export function UsersPage() {
 
       <main className="flex-1 px-6 py-6 lg:px-8 print:p-0">
         <div className="mx-auto flex max-w-6xl flex-col gap-5 print:max-w-none print:gap-4">
-          <header className="flex flex-wrap items-center justify-between gap-3">
+          <EncabezadoImpresion
+            titulo="Listado de Usuarios Registrados"
+            subtitulo="Gestión integral del personal y credenciales de acceso"
+            filtrosAplicados={[
+              `Rol: ${roleFilter}`,
+              `Estado: ${statusFilter}`,
+              ...(searchTerm.trim() ? [`Búsqueda: "${searchTerm.trim()}"`] : []),
+            ]}
+          />
+
+          <header className="flex flex-wrap items-center justify-between gap-3 print:hidden">
             <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-md bg-primary-container/30 print:hidden">
+              <span className="flex h-11 w-11 items-center justify-center rounded-md bg-primary-container/30">
                 <Icon name="manage_accounts" size={24} className="text-primary" />
               </span>
               <div>
-                <h1 className="font-display text-2xl font-bold text-on-surface print:text-xl print:text-black">
+                <h1 className="font-display text-2xl font-bold text-on-surface">
                   Usuarios del sistema
                 </h1>
-                <p className="text-sm font-medium text-on-surface-variant print:text-black/70">
+                <p className="text-sm font-medium text-on-surface-variant">
                   Gestión integral del personal y credenciales de acceso.
                 </p>
               </div>
             </div>
-            <div className="flex gap-2 print:hidden">
+            <div className="flex gap-2">
               <Button variant="outline" type="button" onClick={handleExportCsv}>
                 <Icon name="download" size={18} />
                 Exportar CSV
               </Button>
-              <Button variant="outline" type="button" onClick={handleExportPDF}>
-                <Icon name="picture_as_pdf" size={18} />
-                Exportar PDF
+              <Button
+                variant="outline"
+                size="md"
+                type="button"
+                onClick={handleExportPDF}
+                title="Abre el diálogo de impresión: elegí «Guardar como PDF»"
+              >
+                <Icon name="download" size={16} />
+                PDF
               </Button>
               <Button variant="primary" type="button" onClick={handleNewUser}>
                 <Icon name="add" size={18} />

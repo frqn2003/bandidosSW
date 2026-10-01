@@ -66,6 +66,7 @@ export function useCalendar(options: UseCalendarOptions = {}) {
   const [bloques, setBloques] = useState<BloqueHorarioResponse[]>([]);
   const [profesores, setProfesores] = useState<ProfesorCalendario[]>([]);
   const [materias, setMaterias] = useState<MateriaCalendario[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const [turnoSeleccionado, setTurnoSeleccionado] = useState<TurnoCalendario | null>(null);
   const [reprogramacionPendiente, setReprogramacionPendiente] = useState<ReprogramarTurnoData | null>(null);
@@ -154,6 +155,7 @@ export function useCalendar(options: UseCalendarOptions = {}) {
     obtenerTurnosApi()
       .then((res) => {
         if (cancelado) return;
+        setError(null);
         setTurnos(
           res.turnos.map((t) => ({
             ...t,
@@ -163,8 +165,16 @@ export function useCalendar(options: UseCalendarOptions = {}) {
         setBloques(res.bloques ?? []);
         setSegundosActualizado(0);
       })
-      .catch((err) => {
-        if (!cancelado) console.error("Error al cargar turnos:", err);
+      .catch((err: unknown) => {
+        if (!cancelado) {
+          const mensaje =
+            err && typeof err === "object" && "mensaje" in err
+              ? String((err as { mensaje: string }).mensaje)
+              : err instanceof Error
+              ? err.message
+              : "Error al cargar los turnos.";
+          setError(mensaje);
+        }
       });
 
     return () => {
@@ -643,6 +653,7 @@ export function useCalendar(options: UseCalendarOptions = {}) {
     tituloPeriodo,
     segundosActualizado,
     isRefreshing,
+    error,
 
     // Colecciones y datos
     profesores,

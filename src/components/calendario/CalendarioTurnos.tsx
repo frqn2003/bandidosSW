@@ -67,6 +67,7 @@ export function CalendarioTurnos({
     tituloPeriodo,
     segundosActualizado,
     isRefreshing,
+    error,
     profesores,
     materias,
     bloques,
@@ -134,6 +135,12 @@ export function CalendarioTurnos({
 
   return (
     <div className="flex w-full flex-col gap-5">
+      {error && (
+        <div className="flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900 shadow-sm">
+          <span className="material-symbols-outlined text-amber-600">warning</span>
+          <div className="text-sm font-medium">{error}</div>
+        </div>
+      )}
       {/* Barra de herramientas superior */}
       <CalendarToolbar
         vista={vista}

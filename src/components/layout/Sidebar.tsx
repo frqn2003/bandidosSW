@@ -196,7 +196,7 @@ export function Sidebar() {
 
         {!rail && (
           <div className="min-w-0">
-            <p className="text-sm font-bold leading-tight text-on-surface">Centro Académico</p>
+            <p className="text-sm font-bold leading-tight text-on-surface">Nexo Académico</p>
           </div>
         )}
 
