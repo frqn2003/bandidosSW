@@ -452,6 +452,7 @@ function TurnosContent() {
         onClose={() => setCancelar(null)}
         onCancelado={(t) => {
           guardado(t, `Turno ${t.codigo} cancelado.`);
+          traer();
           setCancelar(null);
         }}
       />

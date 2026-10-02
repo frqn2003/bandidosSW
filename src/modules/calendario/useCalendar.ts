@@ -634,7 +634,7 @@ export function useCalendar(options: UseCalendarOptions = {}) {
       try {
         await apiSend("POST", `/api/turnos/${turnoId}/cancelar`, {
           motivoCancelacionId: 1,
-          detalleMotivo: motivo ?? null,
+          detalleCancelacion: motivo ?? null,
         });
         refrescarTurnos();
       } catch (e) {

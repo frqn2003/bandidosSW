@@ -22,6 +22,9 @@ export const GET = withRoute(async ({ req, session }) => {
   const estado = sp.get("estado")?.trim();
   if (estado && estado !== "todos") raw.estado = estado;
 
+  const verCancelados = sp.get("verCancelados")?.trim();
+  if (verCancelados) raw.verCancelados = verCancelados;
+
   const desde = sp.get("desde")?.trim();
   if (desde) raw.desde = desde;
 
