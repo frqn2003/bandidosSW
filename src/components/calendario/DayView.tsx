@@ -135,13 +135,16 @@ export function DayView({
   };
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white shadow-xs overflow-hidden">
-      <div className="overflow-x-auto">
+    <div className="w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs">
+      <div className="w-full overflow-x-auto">
         <table className="w-full border-collapse text-left text-xs">
           {/* Cabecera: Columnas dinámicas agrupadas por Profesor */}
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-slate-700">
-              <th scope="col" className="w-16 py-3.5 px-3 text-center font-bold text-slate-400">
+              <th
+                scope="col"
+                className="sticky left-0 z-20 w-16 bg-slate-50 px-3 py-3.5 text-center font-bold text-slate-400 shadow-[1px_0_0_0_#e2e8f0]"
+              >
                 HORA
               </th>
               {columnas.map((col) => (
@@ -168,7 +171,7 @@ export function DayView({
             {FRANJAS_HORARIAS.map((hora) => (
               <tr key={hora} className="divide-x divide-slate-100">
                 {/* Columna de Hora (Eje Y) */}
-                <td className="w-16 py-2 px-2 text-center font-mono text-[11px] font-semibold text-slate-400 bg-slate-50/40 select-none align-middle">
+                <td className="sticky left-0 z-10 w-16 bg-slate-50 px-2 py-2 text-center font-mono text-[11px] font-semibold text-slate-400 shadow-[1px_0_0_0_#e2e8f0] select-none align-middle">
                   {hora}
                 </td>
 

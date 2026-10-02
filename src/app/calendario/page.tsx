@@ -65,10 +65,10 @@ function CalendarioContent() {
         <Sidebar />
       </div>
 
-      <main className="flex-1 px-6 py-6 lg:px-8">
+      <main className="flex-1 min-w-0 px-6 py-6 lg:px-8">
         {/* Sin `max-w-*`: la grilla necesita todo el ancho disponible — son 6
             columnas de profesor y el detalle lateral se come 20rem al abrirse. */}
-        <div className="flex w-full flex-col gap-5">
+        <div className="flex w-full min-w-0 flex-col gap-5">
           {cargandoProfs ? (
             <div
               role="status"

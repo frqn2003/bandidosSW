@@ -134,7 +134,7 @@ export function CalendarioTurnos({
     : null;
 
   return (
-    <div className="flex w-full flex-col gap-5">
+    <div className="flex w-full min-w-0 flex-col gap-5">
       {error && (
         <div className="flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900 shadow-sm">
           <span className="material-symbols-outlined text-amber-600">warning</span>
@@ -176,7 +176,7 @@ export function CalendarioTurnos({
       />
 
       {/* Contenedor principal con Vistas y Panel Lateral */}
-      <div className="flex flex-col items-start gap-5 lg:flex-row">
+      <div className="flex w-full min-w-0 flex-col items-start gap-5 lg:flex-row">
         {/* Grilla de calendario según vista activa */}
         <div className="w-full min-w-0 flex-1 overflow-hidden transition-all duration-200">
           {vista === "dia" && (
