@@ -28,6 +28,7 @@ import {
 } from "@/components/materias/MateriaFormModal";
 import { MateriasTable, type OrdenMaterias } from "@/components/materias/MateriasTable";
 import { descargarCsv, imprimirListado } from "@/components/materias/exportar";
+import { EncabezadoImpresion } from "@/components/layout/EncabezadoImpresion";
 import {
   VACIO_COPY,
   crearMateria,
@@ -261,14 +262,24 @@ function MateriasContent() {
     : undefined;
 
   return (
-    <div className="flex min-h-screen bg-surface">
+    <div className="flex min-h-screen bg-surface print:block print:bg-white print:min-h-0">
       <div className="print:hidden">
         <Sidebar />
       </div>
 
-      <main className="flex-1 px-6 py-6 lg:px-8">
-        <div className="mx-auto flex max-w-6xl flex-col gap-5">
-          <header className="flex flex-wrap items-center justify-between gap-3">
+      <main className="flex-1 px-6 py-6 lg:px-8 print:p-0 print:m-0 print:max-w-none">
+        <div className="mx-auto flex max-w-6xl flex-col gap-5 print:max-w-none print:gap-4">
+          <EncabezadoImpresion
+            titulo="Catálogo de Materias"
+            subtitulo="Nivel, duración de clase y valor por clase"
+            filtrosAplicados={[
+              `Estado: ${filtros.estado === "activo" ? "Solo activas" : filtros.estado === "inactivo" ? "Solo inactivas" : "Todas"}`,
+              ...(filtros.nivel ? [`Nivel: ${filtros.nivel}`] : []),
+              ...(filtros.busqueda.trim() ? [`Búsqueda: "${filtros.busqueda.trim()}"`] : []),
+            ]}
+          />
+
+          <header className="flex flex-wrap items-center justify-between gap-3 print:hidden">
             <div className="flex items-center gap-3">
               <span className="flex h-11 w-11 items-center justify-center rounded-md bg-primary-container/30">
                 <Icon name="menu_book" size={24} className="text-primary" />

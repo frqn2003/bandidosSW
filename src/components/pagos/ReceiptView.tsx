@@ -12,6 +12,7 @@ import { Icon } from "@/components/ui/Icon";
 import type { PaymentReceipt } from "@/modules/pagos/types";
 import { formatearFecha } from "@/funciones/formato";
 import { useToast } from "@/components/ui/Toast";
+import { EncabezadoImpresion } from "@/components/layout/EncabezadoImpresion";
 
 interface ReceiptViewProps {
   receipt: PaymentReceipt;
@@ -88,8 +89,19 @@ export function ReceiptView({ receipt, onVolver }: ReceiptViewProps) {
 
       {/* Ticket / Comprobante Imprimible */}
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden print:border-none print:shadow-none print:rounded-none print:m-0 print:p-0 print:w-full print:max-w-none">
-        {/* Cabecera del ticket */}
-        <div className="border-b border-slate-200 bg-slate-50/70 p-6 flex flex-wrap items-center justify-between gap-4">
+        {/* Encabezado institucional para impresión / PDF */}
+        <EncabezadoImpresion
+          titulo={`Comprobante de Pago · ${receipt.comprobante}`}
+          subtitulo={`Alumno: ${receipt.alumno.apellido}, ${receipt.alumno.nombre} · Legajo: ${receipt.alumno.legajo}`}
+          filtrosAplicados={[
+            `DNI: ${receipt.alumno.dni}`,
+            `Medio: ${formaPago?.nombre ?? "Efectivo"}${formaPago?.nroOperacion ? ` (${formaPago.nroOperacion})` : ""}`,
+            `Fecha de pago: ${formatearFecha(receipt.fechaPago)}`,
+          ]}
+        />
+
+        {/* Cabecera del ticket (pantalla) */}
+        <div className="border-b border-slate-200 bg-slate-50/70 p-6 flex flex-wrap items-center justify-between gap-4 print:hidden">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-900 text-white">
               <Icon name="school" size={24} />
