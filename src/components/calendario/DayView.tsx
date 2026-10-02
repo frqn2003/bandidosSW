@@ -8,6 +8,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { aISO } from "@/funciones/fechas-calendario";
 import type { TurnoCalendario, ColumnaProfesorDia } from "./types";
 
 interface DayViewProps {
@@ -48,6 +49,11 @@ export function DayView({
 }: DayViewProps) {
   const [arrastrandoTurnoId, setArrastrandoTurnoId] = useState<number | null>(null);
   const [hoveredCellKey, setHoveredCellKey] = useState<string | null>(null);
+
+  const hoyISO = aISO(new Date());
+  const ahora = new Date();
+  const minutoActual = ahora.getHours() * 60 + ahora.getMinutes();
+  const esHoy = fecha === hoyISO;
 
   const getEstilosMateria = (materiaNombre: string, estado: string) => {
     if (estado === "Cancelado") {
@@ -190,8 +196,8 @@ export function DayView({
                     return tIni >= slotIni && tIni < slotFin;
                   });
 
-                  // Turno en curso iniciado en una franja previa
-                  const turnoEnCurso =
+                  // Turno iniciado previamente que continúa en este slot
+                  const turnoContinuacion =
                     !turno &&
                     col.turnos.find((t) => {
                       if (t.estado === "Cancelado") return false;
@@ -202,10 +208,28 @@ export function DayView({
                       return slotIni < tFin && slotFin > tIni;
                     });
 
+                  const estaEnCursoTurno = (() => {
+                    if (!turno || !esHoy || turno.estado === "Cancelado") return false;
+                    const [tih, tim] = turno.horaInicio.split(":").map(Number);
+                    const [tfh, tfm] = turno.horaFin.split(":").map(Number);
+                    const tIni = tih * 60 + tim;
+                    const tFin = tfh * 60 + tfm;
+                    return minutoActual >= tIni && minutoActual < tFin;
+                  })();
+
+                  const estaEnCursoContinuacion = (() => {
+                    if (!turnoContinuacion || !esHoy || turnoContinuacion.estado === "Cancelado") return false;
+                    const [tih, tim] = turnoContinuacion.horaInicio.split(":").map(Number);
+                    const [tfh, tfm] = turnoContinuacion.horaFin.split(":").map(Number);
+                    const tIni = tih * 60 + tim;
+                    const tFin = tfh * 60 + tfm;
+                    return minutoActual >= tIni && minutoActual < tFin;
+                  })();
+
                   const isHovered = hoveredCellKey === cellKey;
                   const esFranjaLibre =
                     !turno &&
-                    !turnoEnCurso &&
+                    !turnoContinuacion &&
                     col.franjasLibres.some((f) => {
                       const [fh, fm] = f.horaInicio.split(":").map(Number);
                       const fIni = fh * 60 + fm;
@@ -250,11 +274,16 @@ export function DayView({
                                   <span className="text-[10px] font-bold text-slate-700 leading-tight">
                                     {turno.horaInicio}
                                   </span>
-                                  {turno.estado === "Cancelado" && (
+                                  {turno.estado === "Cancelado" ? (
                                     <span className="text-[9px] font-extrabold text-red-700 uppercase leading-tight mt-0.5">
                                       Cancelado
                                     </span>
-                                  )}
+                                  ) : estaEnCursoTurno ? (
+                                    <span className="inline-flex items-center gap-1 rounded bg-blue-100 px-1 py-0.5 text-[9px] font-extrabold text-blue-800 uppercase leading-tight mt-0.5">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse inline-block" />
+                                      En curso
+                                    </span>
+                                  ) : null}
                                 </div>
                               </div>
                               <div className="text-xs mt-0.5 font-medium truncate">
@@ -268,31 +297,41 @@ export function DayView({
                             </div>
                           );
                         })()
-                      ) : turnoEnCurso ? (
-                        /* Turno en curso iniciado previamente */
+                      ) : turnoContinuacion ? (
+                        /* Turno iniciado previamente que continúa en este horario */
                         (() => {
-                          const estilos = getEstilosMateria(turnoEnCurso.materia.nombre, turnoEnCurso.estado);
+                          const estilos = getEstilosMateria(turnoContinuacion.materia.nombre, turnoContinuacion.estado);
                           return (
                             <div
-                              onClick={() => onSelectTurno(turnoEnCurso)}
+                              onClick={() => onSelectTurno(turnoContinuacion)}
                               className={`h-full w-full rounded-md border p-2.5 shadow-2xs flex flex-col justify-center transition-all cursor-pointer select-none opacity-85 ${
                                 estilos.bg
                               }`}
-                              title={`${turnoEnCurso.materia.nombre} - ${turnoEnCurso.alumno.apellido}, ${turnoEnCurso.alumno.nombre} (${turnoEnCurso.horaInicio} – ${turnoEnCurso.horaFin})`}
+                              title={`${turnoContinuacion.materia.nombre} - ${turnoContinuacion.alumno.apellido}, ${turnoContinuacion.alumno.nombre} (${turnoContinuacion.horaInicio} – ${turnoContinuacion.horaFin})`}
                             >
                               <div className="flex items-center justify-between">
                                 <span className={`text-xs ${estilos.materiaText}`}>
-                                  {turnoEnCurso.materia.nombre}
+                                  {turnoContinuacion.materia.nombre}
                                 </span>
-                                <span className="text-[10px] font-bold text-slate-600">
-                                  {turnoEnCurso.horaInicio}
-                                </span>
+                                <div className="flex flex-col items-end shrink-0 text-right">
+                                  <span className="text-[10px] font-bold text-slate-600">
+                                    {turnoContinuacion.horaInicio}
+                                  </span>
+                                  {estaEnCursoContinuacion && (
+                                    <span className="inline-flex items-center gap-1 rounded bg-blue-100 px-1 py-0.5 text-[9px] font-extrabold text-blue-800 uppercase leading-tight mt-0.5">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse inline-block" />
+                                      En curso
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                               <div className="text-xs mt-0.5 font-medium truncate">
-                                <span>{turnoEnCurso.alumno.apellido}, {turnoEnCurso.alumno.nombre}</span>
+                                <span>{turnoContinuacion.alumno.apellido}, {turnoContinuacion.alumno.nombre}</span>
                               </div>
                               <div className="text-[10px] font-semibold text-slate-500 mt-0.5">
-                                Clase en curso (hasta {turnoEnCurso.horaFin})
+                                {estaEnCursoContinuacion
+                                  ? `Clase en curso (hasta ${turnoContinuacion.horaFin})`
+                                  : `Continuación (hasta ${turnoContinuacion.horaFin})`}
                               </div>
                             </div>
                           );

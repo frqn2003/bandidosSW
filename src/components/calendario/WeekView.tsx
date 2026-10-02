@@ -340,21 +340,31 @@ export function WeekView({
                           </button>
                         )}
 
-                        {/* Clase en curso iniciada en franja previa */}
-                        {turnosEnFranja.length === 0 && turnosOcupandoSlot.length > 0 && (
-                          <div
-                            onClick={() => onSelectTurno(turnosOcupandoSlot[0])}
-                            className="h-full w-full rounded-md border border-slate-200 bg-slate-100/70 p-1.5 flex flex-col justify-center cursor-pointer hover:bg-slate-100 transition-all select-none shadow-2xs"
-                            title={`${turnosOcupandoSlot[0].materia.nombre} · Clase en curso (${turnosOcupandoSlot[0].horaInicio} – ${turnosOcupandoSlot[0].horaFin})`}
-                          >
-                            <span className="font-bold text-[11px] text-slate-800 truncate">
-                              {turnosOcupandoSlot[0].materia.nombre}
-                            </span>
-                            <span className="text-[10px] text-slate-500 font-medium">
-                              Hasta {turnosOcupandoSlot[0].horaFin} hs
-                            </span>
-                          </div>
-                        )}
+                        {/* Clase iniciada en franja previa que continúa en este horario */}
+                        {turnosEnFranja.length === 0 && turnosOcupandoSlot.length > 0 && (() => {
+                          const tPrimer = turnosOcupandoSlot[0];
+                          const [tih, tim] = tPrimer.horaInicio.split(":").map(Number);
+                          const [tfh, tfm] = tPrimer.horaFin.split(":").map(Number);
+                          const tIni = tih * 60 + tim;
+                          const tFin = tfh * 60 + tfm;
+                          const ahoraMin = new Date().getHours() * 60 + new Date().getMinutes();
+                          const estaEnCursoSlot = dia.esHoy && tPrimer.estado !== "Cancelado" && ahoraMin >= tIni && ahoraMin < tFin;
+
+                          return (
+                            <div
+                              onClick={() => onSelectTurno(tPrimer)}
+                              className="h-full w-full rounded-md border border-slate-200 bg-slate-100/70 p-1.5 flex flex-col justify-center cursor-pointer hover:bg-slate-100 transition-all select-none shadow-2xs"
+                              title={`${tPrimer.materia.nombre} · ${estaEnCursoSlot ? "Clase en curso" : "Continuación"} (${tPrimer.horaInicio} – ${tPrimer.horaFin})`}
+                            >
+                              <span className="font-bold text-[11px] text-slate-800 truncate">
+                                {tPrimer.materia.nombre}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-medium">
+                                {estaEnCursoSlot ? "En curso · " : ""}Hasta {tPrimer.horaFin} hs
+                              </span>
+                            </div>
+                          );
+                        })()}
 
                         {/* Celda vacía sin turnos ni clases en curso */}
                         {turnosEnFranja.length === 0 && turnosOcupandoSlot.length === 0 && (
