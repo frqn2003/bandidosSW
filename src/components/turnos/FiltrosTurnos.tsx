@@ -49,7 +49,12 @@ export function rangoMaximo() {
 
 export function FILTROS_TURNOS_INICIALES(): FiltrosTurnosState {
   const hoy = hoyAR();
-  return { busqueda: "", estado: "Reservado", desde: hoy, hasta: hoy };
+  return {
+    busqueda: "",
+    estado: "Reservado",
+    desde: sumarDias(hoy, -7),
+    hasta: sumarDias(hoy, 7),
+  };
 }
 
 interface FiltrosTurnosProps {
@@ -120,13 +125,6 @@ export function FiltrosTurnos({ estado, conteo, onChange, onLimpiar }: FiltrosTu
         </Button>
       </div>
 
-      {estado.estado === "Finalizado" && (
-        <p className="inline-flex items-start gap-1.5 rounded-sm bg-status-info/10 px-3 py-2 text-xs font-semibold text-on-surface">
-          <Icon name="info" size={14} className="mt-0.5 shrink-0 text-status-info-strong" />
-          Finalizado se calcula acá, en el navegador: el turno ya pasó el día de la clase.
-          Para verlos, el rango tiene que incluir días pasados.
-        </p>
-      )}
 
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium text-on-surface-variant" aria-live="polite">
         {(["Reservado", "Finalizado", "Cancelado"] as const).map((estadoFiltro) => (
