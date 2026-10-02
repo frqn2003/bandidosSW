@@ -42,9 +42,7 @@ import {
 } from "@/data/fixtures/turnos.fixture";
 import {
   RUTA_AGENDA,
-  RUTA_HUECOS,
   type AgendaDiaResponse,
-  type HuecoResponse,
 } from "@/contracts/calendario";
 import type { AlumnoResponse } from "@/contracts/alumno";
 import type { MateriaOpcion } from "@/contracts/materia";
@@ -309,58 +307,83 @@ export async function listarFranjas(q: FranjasQuery): Promise<FranjaTurnoRespons
   return calcularFranjas(q.fecha, agenda, pm.capacidad, pm.duracion, turnosAlumno, Date.now());
 }
 
+function diaSemanaISO(fechaISO: string): number {
+  const d = new Date(`${fechaISO}T12:00:00`).getDay();
+  return d === 0 ? 7 : d;
+}
+
 /**
  * Próximo horario libre del profesor desde `desde`, dentro de los 60 días.
- * Usa los huecos de la vista `vw_huecos_disponibles` (GET /api/calendario/huecos):
- * un hueco no tiene NINGÚN turno, así que la sugerencia es siempre una franja
- * con el cupo completo. null si no hay ninguno.
+ * Consulta la agenda del profesor y calcula las franjas disponibles respetando
+ * capacidad, anticipación y turnos del alumno, devolviendo el primer horario real.
  */
 export async function sugerirProximaFranja(
   q: Omit<FranjasQuery, "fecha"> & { desde: string },
 ): Promise<SugerenciaFranja | null> {
-  const hasta = sumarDias(hoyISO(), DIAS_MAXIMOS_RESERVA);
+  const limiteMax = sumarDias(hoyISO(), DIAS_MAXIMOS_RESERVA);
+  if (q.desde > limiteMax) return null;
+  const hastaCalculado = sumarDias(q.desde, Math.min(DIAS_MAXIMOS_RESERVA, 60));
+  const hasta = hastaCalculado > limiteMax ? limiteMax : hastaCalculado;
   const pm = await datosProfesorMateria(q.profesorId, q.materiaId);
   if (!pm) return null;
 
-  const params = new URLSearchParams({
-    profesorId: String(q.profesorId),
-    desde: q.desde,
-    hasta,
-    duracionMinutos: String(pm.duracion),
-  });
-  const [huecos, turnosAlumno] = await Promise.all([
-    apiGet<HuecoResponse[]>(`${RUTA_HUECOS}?${params.toString()}`),
-    q.alumnoId ? turnosReservadosDelAlumno(q.alumnoId, q.desde, hasta) : Promise.resolve([]),
+  const [agenda, turnosAlumno] = await Promise.all([
+    apiGet<AgendaDiaResponse>(
+      `${RUTA_AGENDA}?profesorId=${q.profesorId}&desde=${q.desde}&hasta=${hasta}`,
+    ).catch(() => null),
+    q.alumnoId ? turnosReservadosDelAlumno(q.alumnoId, q.desde, hasta).catch(() => []) : Promise.resolve([]),
   ]);
+
+  if (!agenda) return null;
 
   const ahora = Date.now();
   const limite = ahora + ANTICIPACION_MINIMA_HORAS * 3_600_000;
-  const ordenados = [...huecos].sort((a, b) =>
-    a.fecha === b.fecha ? aMin(a.horaInicio) - aMin(b.horaInicio) : a.fecha.localeCompare(b.fecha),
-  );
 
-  for (const h of ordenados) {
-    const finHueco = aMin(h.horaFin);
-    // Alineado a 30' (los bloques arrancan en :00 o :30).
-    let ini = Math.ceil(aMin(h.horaInicio) / PASO_FRANJA_MIN) * PASO_FRANJA_MIN;
-    for (; ini + pm.duracion <= finHueco; ini += PASO_FRANJA_MIN) {
-      if (inicioDe(h.fecha, ini) < limite) continue;
-      const fin = ini + pm.duracion;
-      const cruza = turnosAlumno.some(
-        (t) => t.fecha === h.fecha && seSuperponen(ini, fin, aMin(t.horaInicio), aMin(t.horaFin)),
-      );
-      if (cruza) continue;
-      return {
-        fecha: h.fecha,
-        horaInicio: minAString(ini),
-        horaFin: minAString(fin),
-        capacidad: pm.capacidad,
-        cuposDisponibles: pm.capacidad,
-        disponible: true,
-        motivo: null,
-      };
+  let fechaActual = q.desde;
+  while (fechaActual <= hasta) {
+    const dow = diaSemanaISO(fechaActual);
+    const bloquesDelDia = agenda.bloques
+      .filter((b) => b.diaSemana === dow)
+      .sort((a, b) => aMin(a.horaInicio) - aMin(b.horaInicio));
+
+    const reservadosDelDia = agenda.turnos.filter(
+      (t) => t.fecha === fechaActual && t.estado === "Reservado",
+    );
+    const alumnoDelDia = turnosAlumno.filter((t) => t.fecha === fechaActual);
+
+    for (const bloque of bloquesDelDia) {
+      const finBloque = aMin(bloque.horaFin);
+      for (let ini = aMin(bloque.horaInicio); ini + pm.duracion <= finBloque; ini += PASO_FRANJA_MIN) {
+        const fin = ini + pm.duracion;
+        const inicio = inicioDe(fechaActual, ini);
+        if (inicio < limite) continue;
+
+        const usados = reservadosDelDia.filter((t) =>
+          seSuperponen(ini, fin, aMin(t.horaInicio), aMin(t.horaFin)),
+        ).length;
+        const cuposDisponibles = Math.max(0, pm.capacidad - usados);
+        if (cuposDisponibles === 0) continue;
+
+        const alumnoOcupado = alumnoDelDia.some((t) =>
+          seSuperponen(ini, fin, aMin(t.horaInicio), aMin(t.horaFin)),
+        );
+        if (alumnoOcupado) continue;
+
+        return {
+          fecha: fechaActual,
+          horaInicio: minAString(ini),
+          horaFin: minAString(fin),
+          capacidad: pm.capacidad,
+          cuposDisponibles,
+          disponible: true,
+          motivo: null,
+        };
+      }
     }
+
+    fechaActual = sumarDias(fechaActual, 1);
   }
+
   return null;
 }
 

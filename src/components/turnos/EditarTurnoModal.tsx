@@ -87,7 +87,8 @@ export function EditarTurnoModal({
   const idTurno = turno?.id ?? null;
   const claveProfesores = useMemo(() => String(idTurno), [idTurno]);
   const claveFranjas = profesorId && fecha ? `${profesorId}|${fecha}|${idTurno}` : null;
-  const claveSugerencia = profesorId ? `${profesorId}|${idTurno}` : null;
+  const desdeSugerencia = fecha && fecha >= hoy ? fecha : hoy;
+  const claveSugerencia = profesorId ? `${profesorId}|${idTurno}|${desdeSugerencia}` : null;
 
   // Reset del formulario cada vez que abre con un turno distinto.
   useEffect(() => {
@@ -138,8 +139,9 @@ export function EditarTurnoModal({
   // BACKEND: GET /api/turnos/proxima-franja?profesorId=&materiaId=&desde=
   useEffect(() => {
     if (!turno || !claveSugerencia) return;
+    const [, , d] = claveSugerencia.split("|");
     let cancelado = false;
-    sugerirProximaFranja({ materiaId: turno.materia.id, profesorId: Number(profesorId), desde: hoy })
+    sugerirProximaFranja({ materiaId: turno.materia.id, profesorId: Number(profesorId), desde: d || hoy })
       .then((valor) => {
         if (!cancelado) setSugerencia({ clave: claveSugerencia, valor });
       })
@@ -184,7 +186,20 @@ export function EditarTurnoModal({
 
   const profesorElegido = listaProfesores.find((p) => String(p.id) === profesorId) ?? null;
   const franjasLibres = franjasMostrables.filter((f) => f.disponible).length;
-  const sugerenciaActual = sugerencia?.clave === claveSugerencia ? sugerencia.valor : null;
+  const primeraFranjaLibre = franjasMostrables.find((f) => f.disponible);
+  const sugerenciaDesdeBack = sugerencia?.clave === claveSugerencia ? sugerencia.valor : null;
+  const sugerenciaActual: SugerenciaFranja | null =
+    fecha && primeraFranjaLibre
+      ? {
+          fecha,
+          horaInicio: primeraFranjaLibre.horaInicio,
+          horaFin: primeraFranjaLibre.horaFin,
+          capacidad: primeraFranjaLibre.capacidad,
+          cuposDisponibles: primeraFranjaLibre.cuposDisponibles,
+          disponible: true,
+          motivo: null,
+        }
+      : sugerenciaDesdeBack;
   const hintFranjas =
     claveFranjas === null
       ? "Elegí el profesor y la fecha para ver los horarios."

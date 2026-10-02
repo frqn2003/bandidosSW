@@ -136,14 +136,34 @@ function ReservaContent() {
     materiaId && profesorId && fechaValida
       ? `${materiaId}|${profesorId}|${fecha}|${alumno?.id ?? ""}|${recargaFranjas}`
       : null;
+  const desdeSugerencia = fechaValida ? fecha : hoy;
   const claveSugerencia =
-    materiaId && profesorId ? `${materiaId}|${profesorId}|${alumno?.id ?? ""}|${recargaFranjas}` : null;
+    materiaId && profesorId
+      ? `${materiaId}|${profesorId}|${alumno?.id ?? ""}|${desdeSugerencia}|${recargaFranjas}`
+      : null;
 
   const cargandoMaterias = materias?.clave !== claveMaterias;
   const cargandoProfesores = claveProfesores !== null && profesores?.clave !== claveProfesores;
   const cargandoFranjas = claveFranjas !== null && franjas?.clave !== claveFranjas;
   const franjasActuales = !cargandoFranjas && franjas ? franjas.lista : [];
-  const sugerenciaActual = sugerencia?.clave === claveSugerencia ? sugerencia.valor : null;
+
+  const primeraFranjaLibre = franjasActuales.find((f) => f.disponible);
+  const sugerenciaDesdeBack = sugerencia?.clave === claveSugerencia ? sugerencia.valor : null;
+
+  // Si en la fecha elegida ya hay franjas disponibles, la más próxima es la primera disponible de ese día.
+  // Si en esa fecha no hay disponibilidad (o aún no se eligió fecha), se usa la sugerencia del back a partir de esa fecha.
+  const sugerenciaActual: SugerenciaFranja | null =
+    fechaValida && primeraFranjaLibre
+      ? {
+          fecha,
+          horaInicio: primeraFranjaLibre.horaInicio,
+          horaFin: primeraFranjaLibre.horaFin,
+          capacidad: primeraFranjaLibre.capacidad,
+          cuposDisponibles: primeraFranjaLibre.cuposDisponibles,
+          disponible: true,
+          motivo: null,
+        }
+      : sugerenciaDesdeBack;
 
   // Carga de profesor precargado desde calendario (para mostrarlo antes de elegir materia)
   useEffect(() => {
@@ -235,9 +255,14 @@ function ReservaContent() {
   // BACKEND: GET /api/turnos/proxima-franja?profesorId=&materiaId=&alumnoId=&desde= (PENDIENTE CONTRATO)
   useEffect(() => {
     if (!claveSugerencia) return;
-    const [m, p, a] = claveSugerencia.split("|");
+    const [m, p, a, d] = claveSugerencia.split("|");
     let cancelado = false;
-    sugerirProximaFranja({ materiaId: Number(m), profesorId: Number(p), alumnoId: a ? Number(a) : undefined, desde: hoy })
+    sugerirProximaFranja({
+      materiaId: Number(m),
+      profesorId: Number(p),
+      alumnoId: a ? Number(a) : undefined,
+      desde: d || hoy,
+    })
       .then((valor) => {
         if (!cancelado) setSugerencia({ clave: claveSugerencia, valor });
       })
@@ -521,11 +546,7 @@ function ReservaContent() {
   const mostrarSugerencia =
     sugerenciaActual !== null &&
     !horaValida &&
-    (fecha === "" ||
-      (claveFranjas !== null &&
-        franjas?.clave === claveFranjas &&
-        !franjas.error &&
-        !franjas.lista.some((f) => f.disponible)));
+    !cargandoFranjas;
 
   return (
     <div className="flex min-h-screen bg-surface">
