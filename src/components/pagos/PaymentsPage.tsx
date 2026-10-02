@@ -179,7 +179,7 @@ export function PaymentsPage() {
                     Gestión de Pagos
                   </h1>
                   <p className="text-sm text-slate-500">
-                    Registro de cobros de clases dictadas y emisión de comprobantes (HU-PAG-01)
+                    Registro de cobros de clases dictadas y emisión de comprobantes
                   </p>
                 </div>
               </div>
@@ -214,7 +214,7 @@ export function PaymentsPage() {
                   }`}
                 >
                   <Icon name="history" size={18} />
-                  Historial del alumno
+                  {selectedStudent ? "Historial del alumno" : "Historial de pagos"}
                   {paymentHistory.length > 0 && (
                     <span
                       className={`ml-1 rounded-full px-2 py-0.5 text-xs font-bold ${
