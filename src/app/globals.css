@@ -290,3 +290,92 @@ body {
     display: table-header-group;
   }
 }
+
+/* ── Animaciones custom (landing) ───────────────────────────────────────── */
+
+/* Haz de luz diagonal que viaja de la esquina inferior-izquierda a la superior-derecha */
+@keyframes shimmerDiagonalSweep {
+  0% {
+    transform: translate(-100%, 100%) rotate(-45deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  35% {
+    transform: translate(100%, -100%) rotate(-45deg);
+    opacity: 1;
+  }
+  40%, 100% {
+    transform: translate(100%, -100%) rotate(-45deg);
+    opacity: 0;
+  }
+}
+
+.animate-shimmer-diagonal {
+  position: absolute;
+  width: 250%;
+  height: 250%;
+  top: -75%;
+  left: -75%;
+  background: linear-gradient(
+    to right,
+    transparent 20%,
+    rgba(255, 255, 255, 0.6) 50%,
+    transparent 80%
+  );
+  animation: shimmerDiagonalSweep 5s infinite ease-in-out;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+}
+
+/* Pop de atención inicial al cargar la página */
+@keyframes cardPopIntro {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  40% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  75% {
+    transform: scale(0.99);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-card-intro {
+  animation: cardPopIntro 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ── Animaciones de Marquee (Marquee-03) ── */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-100% - var(--gap, 1rem)));
+  }
+}
+
+@keyframes marqueeVertical {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(calc(-100% - var(--gap, 1rem)));
+  }
+}
+
+.animate-marquee {
+  animation: marquee var(--duration, 40s) linear infinite;
+}
+
+.animate-marquee-vertical {
+  animation: marqueeVertical var(--duration, 40s) linear infinite;
+}
+
