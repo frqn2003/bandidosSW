@@ -26,6 +26,8 @@ Usar SIEMPRE estos antes de crear un equivalente propio del módulo.
 | `Switch` | Toggle de estado Activo/Inactivo | `role="switch"` + `aria-checked`, `checked`, `onChange`, `ariaLabel`; touch target ≥ 44px |
 | `Toast` | Notificaciones de éxito/error | `ToastProvider` + `useToast()` → `showToast("success"\|"error", msg)`. Éxito = verde (`status-success-strong`), error = rojo (`error`) |
 | `ConfirmarDialog` | Diálogo de confirmación sobre `Modal maxWidth="max-w-md"` | `open`, `title`, `description`, `confirmLabel`, `cancelLabel="Volver"`, `onClose`, `onConfirm`; `tone?: "danger" (default) \| "success" \| "neutral"` (mapea a Button variant destructive/primary/secondary + icono; `success`/`neutral` para acciones no destructivas). HU-PRO-01 agregó `children?` (contenido opcional extra bajo la descripción, ej: aviso de turnos futuros). HU-TUR-01 agregó `confirmando?` (deshabilita ambos botones y bloquea el cierre mientras se envía) y `confirmandoLabel?` (texto del botón durante el envío, ej. "Reservando…") |
+| `TiltImageCard` | Tarjeta con física 3D interactiva al puntero | `children`, `className?`, `maxRotateX?`, `maxRotateY?`. Interpolación exponencial rAF (tau ≈ 0.14s), perspectiva 500px, animación inicial de esquina al centro y exposición de variables CSS `--pointer-*`, `--rotate-*` |
+| `CircularCarousel` | Carrusel cilíndrico 3D con inercia e iluminación | `items`, `preset?`, `intro?`, `cardWidth?`, `aspectRatio?`, `speed?`, `captions?`, `gap?`, `tilt?`, `curve?`, `perspective?`, `momentum?`, `pauseOnHover?`, `parallax?`, `innerShade?`, `cornerRadius?`. Cilindro 3D con arrastre táctil y momentum físico |
 
 ## Por módulo (`src/components/<módulo>/`)
 

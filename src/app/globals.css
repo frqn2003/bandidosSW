@@ -379,3 +379,96 @@ body {
   animation: marqueeVertical var(--duration, 40s) linear infinite;
 }
 
+/* ── Animaciones Gamificadas de Métricas (Slam Estampa + Pelotitas Blancas con Gravedad) ── */
+@keyframes sparkRing {
+  0% {
+    transform: scale(0.2);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+.animate-spark-ring {
+  animation: sparkRing 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes whiteSparksGravity {
+  0% {
+    transform: translate(0, 0) scale(0.6);
+    opacity: 0;
+  }
+  20% {
+    transform: translate(calc(var(--tx, 20px) * 0.5), var(--ty-peak, -35px)) scale(1.15);
+    opacity: var(--init-op, 1);
+  }
+  45% {
+    transform: translate(var(--tx, 20px), calc(var(--ty-peak, -35px) * 0.4)) scale(1);
+    opacity: var(--init-op, 1);
+  }
+  80% {
+    opacity: calc(var(--init-op, 1) * 0.7);
+  }
+  100% {
+    transform: translate(calc(var(--tx, 20px) * 1.35), var(--ty-fall, 45px)) scale(0.2);
+    opacity: 0;
+  }
+}
+
+.animate-white-gravity-spark {
+  animation: whiteSparksGravity 0.75s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* Animación de Estampa Elástica de Impacto (Slam Pop) */
+@keyframes stampSlamPop {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  25% {
+    transform: scale(1.42);
+    filter: brightness(1.6) drop-shadow(0 0 16px rgba(255, 255, 255, 0.9));
+  }
+  50% {
+    transform: scale(0.92);
+  }
+  75% {
+    transform: scale(1.08);
+    filter: brightness(1.1);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+.animate-stamp-slam {
+  display: inline-block;
+  transform-origin: center;
+  animation: stampSlamPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ── Cinta Promocional Ticker Continuo ───────────────────────────────────── */
+@keyframes tickerTape {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-ticker {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+  animation: tickerTape 30s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ticker {
+    animation-duration: 90s;
+  }
+}

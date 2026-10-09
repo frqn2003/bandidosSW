@@ -18,6 +18,11 @@ const poppins = Poppins({
 export const metadata: Metadata = {
   title: "Nexo Académico",
   description: "Sistema de gestión académica — alumnos, docentes, turnos, asistencia y cobranzas",
+  icons: {
+    icon: "/LogoNegro.png",
+    shortcut: "/LogoNegro.png",
+    apple: "/LogoNegro.png",
+  },
 };
 
 export default function RootLayout({

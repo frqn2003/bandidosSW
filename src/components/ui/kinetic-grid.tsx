@@ -20,13 +20,15 @@ interface Ripple {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CELL_SIZE = 55; // Desktop-ish size. Will dictate cols/rows
-const INFLUENCE_RADIUS = 260;
-const MAX_WARP = 24;
+const CELL_SIZE = 55; // Grid cell size in px
+const INFLUENCE_RADIUS = 280;
+const INFLUENCE_RADIUS_SQ = INFLUENCE_RADIUS * INFLUENCE_RADIUS;
+const MAX_WARP = 26;
 const DOT_SPACING = 28;
-const LERP_SPEED = 0.08;
+const LERP_SPEED = 0.28; // Snappy, immediate follow with smooth tail
 
-const LINE_BASE = { r: 255, g: 255, b: 255, a: 0.13 };
+const BASE_LINE_STYLE = "rgba(255, 255, 255, 0.13)";
+const BASE_NODE_STYLE = "rgba(255, 255, 255, 0.22)";
 const NODE_BASE_RADIUS = 1.8;
 const NODE_ACTIVE_RADIUS = 3.2;
 
@@ -34,18 +36,6 @@ const NODE_ACTIVE_RADIUS = 3.2;
 
 function lerpN(a: number, b: number, t: number) {
   return a + (b - a) * t;
-}
-
-function lerpColor(
-  base: { r: number; g: number; b: number; a: number },
-  active: { r: number; g: number; b: number; a: number },
-  t: number,
-): string {
-  const r = Math.round(lerpN(base.r, active.r, t));
-  const g = Math.round(lerpN(base.g, active.g, t));
-  const b = Math.round(lerpN(base.b, active.b, t));
-  const a = lerpN(base.a, active.a, t);
-  return `rgba(${r},${g},${b},${a.toFixed(3)})`;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -60,6 +50,7 @@ export default function KineticGrid({
   globalColor?: "default" | "monochrome";
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const bgCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const mouseRef = useRef<Point>({ x: -9999, y: -9999 });
   const targetMouseRef = useRef<Point>({ x: -9999, y: -9999 });
@@ -67,8 +58,47 @@ export default function KineticGrid({
   const rafRef = useRef<number>(0);
   const sizeRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
 
-  // ── Warp ────────────────────────────────────────────────────────────────────
+  // ── Pre-render static background to offscreen canvas ──────────────────────
+  const updateBgCanvas = useCallback((w: number, h: number) => {
+    if (w === 0 || h === 0) return;
+    
+    let bgCanvas = bgCanvasRef.current;
+    if (!bgCanvas) {
+      bgCanvas = document.createElement("canvas");
+      bgCanvasRef.current = bgCanvas;
+    }
+    
+    bgCanvas.width = w;
+    bgCanvas.height = h;
+    const ctx = bgCanvas.getContext("2d");
+    if (!ctx) return;
 
+    const theme = {
+      default: { bg: "#161618", end: "#08080a" },
+      monochrome: { bg: "#000000", end: "#000000" },
+    }[globalColor ?? "default"];
+
+    // Radial gradient background
+    const radius = Math.max(w, h) * 0.75;
+    const bgGrd = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, radius);
+    bgGrd.addColorStop(0, theme.bg);
+    bgGrd.addColorStop(1, theme.end);
+    ctx.fillStyle = bgGrd;
+    ctx.fillRect(0, 0, w, h);
+
+    // Static background dot texture (baked once upon resize)
+    ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+    ctx.beginPath();
+    for (let x = DOT_SPACING / 2; x < w; x += DOT_SPACING) {
+      for (let y = DOT_SPACING / 2; y < h; y += DOT_SPACING) {
+        ctx.moveTo(x + 0.7, y);
+        ctx.arc(x, y, 0.7, 0, Math.PI * 2);
+      }
+    }
+    ctx.fill();
+  }, [globalColor]);
+
+  // ── Warp calculation ────────────────────────────────────────────────────────
   const getWarpedPoint = useCallback(
     (
       gx: number,
@@ -80,30 +110,22 @@ export default function KineticGrid({
       cols: number,
       rows: number,
     ): { pt: Point; proximity: number } => {
-      // Edge pin — smoothly locks boundary rows/cols in place
+      // Edge pin
       const edgeMargin = 1.5;
-      const colPin = Math.min(
-        col / edgeMargin,
-        (cols - 1 - col) / edgeMargin,
-        1,
-      );
-      const rowPin = Math.min(
-        row / edgeMargin,
-        (rows - 1 - row) / edgeMargin,
-        1,
-      );
+      const colPin = Math.min(col / edgeMargin, (cols - 1 - col) / edgeMargin, 1);
+      const rowPin = Math.min(row / edgeMargin, (rows - 1 - row) / edgeMargin, 1);
       const pinFactor = colPin * colPin * rowPin * rowPin;
 
       const dx = gx - mouse.x;
       const dy = gy - mouse.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      const distSq = dx * dx + dy * dy;
 
-      const proximity = Math.max(0, 1 - dist / INFLUENCE_RADIUS) * pinFactor;
+      let rx = 0;
+      let ry = 0;
 
       // Ripple displacement
-      let rx = 0,
-        ry = 0;
-      for (const r of ripples) {
+      for (let i = 0; i < ripples.length; i++) {
+        const r = ripples[i];
         const rdx = gx - r.x;
         const rdy = gy - r.y;
         const rdist = Math.sqrt(rdx * rdx + rdy * rdy);
@@ -119,8 +141,9 @@ export default function KineticGrid({
         }
       }
 
-      // Cursor warp with bell falloff
-      if (dist < INFLUENCE_RADIUS && dist > 0 && pinFactor > 0) {
+      if (distSq < INFLUENCE_RADIUS_SQ && distSq > 0 && pinFactor > 0) {
+        const dist = Math.sqrt(distSq);
+        const proximity = Math.max(0, 1 - dist / INFLUENCE_RADIUS) * pinFactor;
         const t = dist / INFLUENCE_RADIUS;
         const eased = t < 0.01 ? 0 : (1 - t) * (1 - t) * Math.min(1, dist / 60);
         const warpAmt = eased * MAX_WARP * pinFactor;
@@ -134,13 +157,12 @@ export default function KineticGrid({
         };
       }
 
-      return { pt: { x: gx + rx, y: gy + ry }, proximity };
+      return { pt: { x: gx + rx, y: gy + ry }, proximity: 0 };
     },
     [],
   );
 
   // ── Draw ────────────────────────────────────────────────────────────────────
-
   const draw = useCallback(
     (now: number) => {
       const canvas = canvasRef.current;
@@ -149,57 +171,42 @@ export default function KineticGrid({
       if (!ctx) return;
 
       const { w: W, h: H } = sizeRef.current;
+      if (W === 0 || H === 0) return;
+
       const mouse = mouseRef.current;
       const ripples = ripplesRef.current;
 
       const theme = {
         default: {
-          bg: "#161618",
-          lineActive: { r: 74, g: 158, b: 255, a: 0.9 },
-          nodeActive: { r: 74, g: 158, b: 255, a: 1.0 },
-          glow: "74,158,255",
-          ripple: "100,180,255",
+          lineActiveRgb: "60, 130, 255", // Azul eléctrico más claro y luminoso
+          nodeActiveRgb: "75, 145, 255", // Puntos con azul claro brillante
+          rippleRgb: "90, 160, 255",
         },
         monochrome: {
-          bg: "#000000",
-          lineActive: { r: 255, g: 255, b: 255, a: 0.9 },
-          nodeActive: { r: 255, g: 255, b: 255, a: 1.0 },
-          glow: "255,255,255",
-          ripple: "255,255,255",
+          lineActiveRgb: "255, 255, 255",
+          nodeActiveRgb: "255, 255, 255",
+          rippleRgb: "255, 255, 255",
         },
       }[globalColor ?? "default"];
 
-      ctx.clearRect(0, 0, W, H);
-
-      // Background with radial vignette for depth
-      const radius = Math.max(W, H) * 0.75;
-      const bgGrd = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, radius);
-      bgGrd.addColorStop(0, theme.bg);
-      bgGrd.addColorStop(1, "#08080a");
-      ctx.fillStyle = bgGrd;
-      ctx.fillRect(0, 0, W, H);
-
-      // Static background dot texture
-      ctx.fillStyle = "rgba(255,255,255,0.05)";
-      for (let x = DOT_SPACING / 2; x < W; x += DOT_SPACING) {
-        for (let y = DOT_SPACING / 2; y < H; y += DOT_SPACING) {
-          ctx.beginPath();
-          ctx.arc(x, y, 0.7, 0, Math.PI * 2);
-          ctx.fill();
-        }
+      // 1. Fast blit of pre-rendered background and static dots (1 call!)
+      if (bgCanvasRef.current) {
+        ctx.drawImage(bgCanvasRef.current, 0, 0);
+      } else {
+        ctx.fillStyle = "#161618";
+        ctx.fillRect(0, 0, W, H);
       }
 
-      // Update ripples
+      // 2. Update ripples
       for (let i = ripples.length - 1; i >= 0; i--) {
         const r = ripples[i];
         const age = (now - r.born) / 1000;
-        // FIX: Ensure radius is never negative
         r.radius = Math.max(0, age * 400);
         r.opacity = Math.max(0, 1 - age * 1.2);
         if (r.opacity <= 0) ripples.splice(i, 1);
       }
 
-      // ── Build warped grid ─────────────────────────────────────────────────
+      // 3. Build warped grid
       const cols = Math.max(2, Math.ceil(W / CELL_SIZE)) + 1;
       const rows = Math.max(2, Math.ceil(H / CELL_SIZE)) + 1;
       const cellW = W / (cols - 1);
@@ -227,93 +234,131 @@ export default function KineticGrid({
         }
       }
 
-      // ── Grid lines ────────────────────────────────────────────────────────
-      const drawSeg = (p1: Point, p2: Point, pr1: number, pr2: number) => {
-        const avg = (pr1 + pr2) / 2;
-        const t = avg * avg * (3 - 2 * avg); // smoothstep
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-        ctx.strokeStyle = lerpColor(LINE_BASE, theme.lineActive, t);
-        ctx.lineWidth = lerpN(0.8, 1.5, t);
-        ctx.stroke();
-      };
-
+      // 4. Batch drawing of grid lines
+      // Pasada 1: Líneas base estándar en un solo Path acumulado
+      ctx.beginPath();
+      ctx.strokeStyle = BASE_LINE_STYLE;
+      ctx.lineWidth = 0.8;
       ctx.lineCap = "butt";
 
-      for (let row = 0; row < rows; row++)
-        for (let col = 0; col < cols - 1; col++)
-          drawSeg(
-            pts[row][col],
-            pts[row][col + 1],
-            prox[row][col],
-            prox[row][col + 1],
-          );
-
-      for (let col = 0; col < cols; col++)
-        for (let row = 0; row < rows - 1; row++)
-          drawSeg(
-            pts[row][col],
-            pts[row + 1][col],
-            prox[row][col],
-            prox[row + 1][col],
-          );
-
-      // ── Intersection nodes ────────────────────────────────────────────────
       for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-          const p = pts[row][col];
-          const pr = prox[row][col];
-          const t = pr * pr * (3 - 2 * pr); // smoothstep
-          const r = lerpN(NODE_BASE_RADIUS, NODE_ACTIVE_RADIUS, t);
-
-          // Outer glow ring for active nodes
-          if (t > 0.3) {
-            const glowR = r + lerpN(0, 6, (t - 0.3) / 0.7);
-            const grd = ctx.createRadialGradient(
-              p.x,
-              p.y,
-              r * 0.5,
-              p.x,
-              p.y,
-              glowR,
-            );
-            grd.addColorStop(0, `rgba(${theme.glow},${(t * 0.3).toFixed(3)})`);
-            grd.addColorStop(1, `rgba(${theme.glow},0)`);
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, glowR, 0, Math.PI * 2);
-            ctx.fillStyle = grd;
-            ctx.fill();
+        for (let col = 0; col < cols - 1; col++) {
+          const pr = (prox[row][col] + prox[row][col + 1]) * 0.5;
+          if (pr <= 0.05) {
+            const p1 = pts[row][col];
+            const p2 = pts[row][col + 1];
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
           }
-
-          // Node fill
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-          ctx.fillStyle = lerpColor(
-            { r: 255, g: 255, b: 255, a: 0.2 },
-            theme.nodeActive,
-            t,
-          );
-          ctx.fill();
         }
       }
 
-      // ── Ripple rings ──────────────────────────────────────────────────────
-      for (const r of ripples) {
-        // FIX: Ensure radius is positive before drawing arc
-        const safeRadius = Math.max(0, r.radius);
-        ctx.beginPath();
-        ctx.arc(r.x, r.y, safeRadius, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(${theme.ripple},${(r.opacity * 0.28).toFixed(3)})`;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+      for (let col = 0; col < cols; col++) {
+        for (let row = 0; row < rows - 1; row++) {
+          const pr = (prox[row][col] + prox[row + 1][col]) * 0.5;
+          if (pr <= 0.05) {
+            const p1 = pts[row][col];
+            const p2 = pts[row + 1][col];
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+          }
+        }
+      }
+      ctx.stroke();
+
+      // Pasada 2: Segmentos activos iluminados cerca del mouse
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols - 1; col++) {
+          const pr = (prox[row][col] + prox[row][col + 1]) * 0.5;
+          if (pr > 0.05) {
+            const t = pr * pr * (3 - 2 * pr); // smoothstep
+            const p1 = pts[row][col];
+            const p2 = pts[row][col + 1];
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = `rgba(${theme.lineActiveRgb}, ${(0.13 + t * 0.77).toFixed(2)})`;
+            ctx.lineWidth = 0.8 + t * 0.7;
+            ctx.stroke();
+          }
+        }
+      }
+
+      for (let col = 0; col < cols; col++) {
+        for (let row = 0; row < rows - 1; row++) {
+          const pr = (prox[row][col] + prox[row + 1][col]) * 0.5;
+          if (pr > 0.05) {
+            const t = pr * pr * (3 - 2 * pr); // smoothstep
+            const p1 = pts[row][col];
+            const p2 = pts[row + 1][col];
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = `rgba(${theme.lineActiveRgb}, ${(0.13 + t * 0.77).toFixed(2)})`;
+            ctx.lineWidth = 0.8 + t * 0.7;
+            ctx.stroke();
+          }
+        }
+      }
+
+      // 5. Intersection nodes (puntos de intersección)
+      // Pasada 1: Nodos base en un solo path
+      ctx.beginPath();
+      ctx.fillStyle = BASE_NODE_STYLE;
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          if (prox[row][col] <= 0.05) {
+            const p = pts[row][col];
+            ctx.moveTo(p.x + NODE_BASE_RADIUS, p.y);
+            ctx.arc(p.x, p.y, NODE_BASE_RADIUS, 0, Math.PI * 2);
+          }
+        }
+      }
+      ctx.fill();
+
+      // Pasada 2: Nodos activos iluminados
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const pr = prox[row][col];
+          if (pr > 0.05) {
+            const p = pts[row][col];
+            const t = pr * pr * (3 - 2 * pr);
+            const r = lerpN(NODE_BASE_RADIUS, NODE_ACTIVE_RADIUS, t);
+
+            // Resplandor exterior suave para nodos muy activos
+            if (t > 0.3) {
+              const glowR = r + (t - 0.3) * 6;
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, glowR, 0, Math.PI * 2);
+              ctx.fillStyle = `rgba(${theme.nodeActiveRgb}, ${(t * 0.25).toFixed(2)})`;
+              ctx.fill();
+            }
+
+            // Nodo principal
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${theme.nodeActiveRgb}, ${(0.22 + t * 0.78).toFixed(2)})`;
+            ctx.fill();
+          }
+        }
+      }
+
+      // 6. Ondas de clic (Ripples)
+      for (let i = 0; i < ripples.length; i++) {
+        const r = ripples[i];
+        if (r.radius > 0) {
+          ctx.beginPath();
+          ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(${theme.rippleRgb}, ${(r.opacity * 0.28).toFixed(2)})`;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
       }
     },
     [getWarpedPoint, globalColor],
   );
 
   // ── Animation loop ──────────────────────────────────────────────────────────
-
   const animateRef = useRef<(now: number) => void>(() => {});
 
   const drawLoop = useCallback(
@@ -334,8 +379,7 @@ export default function KineticGrid({
     animateRef.current = drawLoop;
   }, [drawLoop]);
 
-  // ── Setup ───────────────────────────────────────────────────────────────────
-
+  // ── Setup & Listeners ───────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -346,6 +390,8 @@ export default function KineticGrid({
       canvas.width = w;
       canvas.height = h;
       sizeRef.current = { w, h };
+      updateBgCanvas(w, h);
+
       if (mouseRef.current.x === -9999) {
         mouseRef.current = { x: -9999, y: -9999 };
         targetMouseRef.current = { x: -9999, y: -9999 };
@@ -369,8 +415,8 @@ export default function KineticGrid({
       });
     };
 
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("click", onClick);
+    window.addEventListener("mousemove", onMouseMove, { passive: true });
+    window.addEventListener("click", onClick, { passive: true });
     rafRef.current = requestAnimationFrame((n) => animateRef.current(n));
 
     return () => {
@@ -381,11 +427,9 @@ export default function KineticGrid({
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, []);
-
+  }, [updateBgCanvas]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
-
   return (
     <div
       className={cn(
