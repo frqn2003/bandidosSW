@@ -16,10 +16,12 @@ import { z } from "zod";
 //   GET    rutaMateria(id)     → detalle
 //   PUT    rutaMateria(id)     → editar
 //   POST   rutaInactivar(id)   → baja lógica (estado = 'inactivo')
+//   POST   rutaActivar(id)     → reactivación (estado = 'activo')
 
 export const RUTA = "/api/materias";
 export const rutaMateria = (id: number) => `${RUTA}/${id}`;
 export const rutaInactivar = (id: number) => `${RUTA}/${id}/inactivar`;
+export const rutaActivar = (id: number) => `${RUTA}/${id}/activar`;
 
 
 // ─── 2a. Request: filtros del listado ────────────────────────────────────
@@ -102,5 +104,6 @@ export type ErrorMateria =
   | "NOMBRE_DUPLICADO"           // 409, uq_materia_nombre_activa
   | "MATERIA_CON_TURNOS_FUTUROS" // 409, al inactivar
   | "MATERIA_ASIGNADA"           // 409, al inactivar: hay profesores que la dictan
+  | "MATERIA_INACTIVA"           // 409, al editar una materia inactiva
   | "NO_ENCONTRADO"              // 404
   | "DATOS_INVALIDOS";           // 422

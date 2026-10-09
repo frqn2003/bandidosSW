@@ -23,29 +23,33 @@
 
 export type EstadoActivoInactivo = "activo" | "inactivo";
 
-export type EstadoDocumento = "vigente" | "anulado" | "pagado";
+export type EstadoTurno = "Reservado" | "Cancelado";
 
 export type ModoAbm = "INSERCION" | "EDICION" | "LECTURA";
 
-export type TipoEventoSesion = "login" | "logout" | "login_fallido" | "bloqueado";
+export type NivelMateria = "Primario" | "Secundario" | "Universitario";
 
-export type TipoMovimientoStock = "ingreso" | "egreso";
-
-export type TipoObservacionRecepcion = "faltante" | "danado" | "error";
+export type TipoEventoSesion = "login" | "logout" | "login_fallido" | "bloqueado" | "acceso_denegado";
 
 export type TipoOperacionAuditoria = "INSERT" | "UPDATE" | "DELETE";
-
-export type TipoPago = "pago_proveedor";
-
-export type TipoRecepcion = "parcial" | "total";
 
 
 // ── Tablas ──────────────────────────────────────────────────────────────────
 
 export interface DbTables {
+  academia: {
+    id: number;  // auto (identity)
+    nombre: string;
+    direccion: string;
+    telefono: string | null;
+    estado: EstadoActivoInactivo;  // auto (default)
+    created_at: Date;  // auto (default)
+    updated_at: Date;  // auto (default)
+    logo_url: string | null;
+  };
   agenda: {
-    id: number;  // auto (default)
-    sucursal_id: number;
+    id: number;  // auto (identity)
+    academia_id: number;
     nombre: string;  // auto (default)
     estado: EstadoActivoInactivo;  // auto (default)
     created_at: Date;  // auto (default)
@@ -53,7 +57,7 @@ export interface DbTables {
   agenda_profesional: {
     id: number;  // auto (identity)
     agenda_semanal_id: number;
-    usuario_id: number;
+    profesor_id: number;
     hora_inicio: string;
     hora_fin: string;
     estado: EstadoActivoInactivo;  // auto (default)
@@ -66,23 +70,32 @@ export interface DbTables {
     hora_fin: string;
     estado: EstadoActivoInactivo;  // auto (default)
   };
-  articulo: {
-    id: number;  // auto (default)
-    categoria_id: number;
-    unidad_medida_id: number;
-    codigo: string;
+  alumno: {
+    id: number;  // auto (identity)
+    legajo: string | null;
     nombre: string;
-    descripcion: string | null;
+    apellido: string;
+    dni: string;
+    fecha_nacimiento: Date;
+    telefono: string;
+    email: string | null;
+    nivel_educativo: NivelMateria;
+    responsable_nombre: string | null;
+    responsable_dni: string | null;
+    responsable_telefono: string | null;
     estado: EstadoActivoInactivo;  // auto (default)
-    fabricante_id: number;
-    imagen_url: string | null;
     created_at: Date;  // auto (default)
     updated_at: Date;  // auto (default)
-    contenido_neto: string;  // auto (default)
-    presentacion_id: number;
+    institucion_origen: string | null;
+    observaciones_generales: string | null;
+  };
+  alumno_materia_interes: {
+    id: number;  // auto (identity)
+    alumno_id: number;
+    materia_id: number;
   };
   auditoria: {
-    id: string;  // auto (default)
+    id: string;  // auto (identity)
     tabla: string;
     operacion: TipoOperacionAuditoria;
     registro_id: number;
@@ -92,346 +105,152 @@ export interface DbTables {
     valores_nuevos: unknown | null;
   };
   auditoria_sesion: {
-    id: number;  // auto (identity)
+    id: string;  // auto (identity)
     usuario_id: number | null;
     evento: TipoEventoSesion;
     fecha_hora: Date;  // auto (default)
     ip_origen: string | null;
     detalle: unknown | null;
   };
-  caja: {
-    id: number;  // auto (default)
-    sucursal_id: number;
-    nombre: string;  // auto (default)
-    saldo_actual: string;  // auto (default)
-    estado: EstadoActivoInactivo;  // auto (default)
-    created_at: Date;  // auto (default)
-  };
-  categoria: {
-    id: number;  // auto (default)
-    nombre: string;
-    prefijo: string;  // auto (default)
-  };
-  cliente: {
-    id: number;  // auto (identity)
-    nombre: string;
-    apellido: string;
-    documento: string;
-    direccion: string | null;
-    telefono: string;
-    email: string;
-    fecha_nacimiento: Date | null;
-    estado: EstadoActivoInactivo;  // auto (default)
-    created_at: Date;  // auto (default)
-    updated_at: Date;  // auto (default)
-  };
-  comprobante_proveedor: {
-    id: number;  // auto (default)
-    proveedor_id: number;
-    tipo_comprobante_id: number;
-    fecha_emision: Date;
-    fecha_vencimiento: Date;
-    orden_compra_id: number;
-    comprobante_corregido_id: number | null;
-    anula_comprobante_id: number | null;
-    monto_total: string;
-    estado: EstadoDocumento;  // auto (default)
-    usuario_id: number;
-    fecha_registro: Date;  // auto (default)
-    letra: string;
-    punto_venta: string;
-    numero_comprobante: string;
-  };
-  comprobante_proveedor_detalle: {
-    id: number;  // auto (default)
-    comprobante_id: number;
-    articulo_id: number;
-    cantidad: string;
-    precio_facturado: string;
-    subtotal: string | null;
-  };
-  cotizacion: {
-    id: number;  // auto (default)
-    solicitud_id: number;
-    proveedor_id: number;
-    forma_pago_id: number;
-    fecha_recepcion: Date;  // auto (default)
-  };
-  cotizacion_detalle: {
-    id: number;  // auto (default)
-    cotizacion_id: number;
-    articulo_id: number;
-    precio: string;
-  };
-  deposito: {
-    id: number;  // auto (default)
-    sucursal_id: number;
-    nombre: string;
-    ubicacion: string | null;
-  };
-  estado_orden_compra: {
-    id: number;  // auto (default)
-    nombre: string;
-    es_final: boolean;  // auto (default)
-  };
-  estado_turno: {
-    id: number;  // auto (identity)
-    nombre: string;
-    es_final: boolean;  // auto (default)
-  };
-  fabricante: {
-    id: number;  // auto (default)
-    nombre: string;
-    pais: string | null;
-    estado: EstadoActivoInactivo;  // auto (default)
-  };
-  ficha_stock: {
-    id: number;  // auto (default)
-    articulo_id: number;
-    deposito_id: number;
-    stock_actual: string;  // auto (default)
-    stock_minimo: string;  // auto (default)
-    stock_critico: string | null;
-  };
   forma_pago: {
-    id: number;  // auto (default)
-    nombre: string;
-  };
-  lote_vencimiento: {
-    id: number;  // auto (default)
-    ficha_stock_id: number;
-    numero_lote: string;
-    fecha_vencimiento: Date | null;
-    cantidad: string;  // auto (default)
-    created_at: Date;  // auto (default)
-  };
-  mascota: {
     id: number;  // auto (identity)
-    cliente_id: number;
     nombre: string;
-    especie: string;
-    raza: string | null;
-    sexo: string;
-    peso: string | null;
-    fecha_nacimiento: Date | null;
-    senas_particulares: string | null;
+    requiere_nro_operacion: boolean;  // auto (default)
     estado: EstadoActivoInactivo;  // auto (default)
     created_at: Date;  // auto (default)
     updated_at: Date;  // auto (default)
   };
-  movimiento_stock_cab: {
-    id: number;  // auto (default)
-    numero: string;
-    deposito_id: number;
-    tipo: TipoMovimientoStock;
-    origen_id: number;
-    origen_entidad_id: number | null;
-    fecha_hora: Date;  // auto (default)
-    usuario_id: number;
-    motivo: string | null;
-    movimiento_vinculado_id: number | null;
-  };
-  movimiento_stock_det: {
-    id: number;  // auto (default)
-    movimiento_id: number;
-    ficha_stock_id: number;
-    cantidad: string;
-  };
-  notificacion_compra: {
-    id: number;  // auto (default)
-    orden_compra_detalle_id: number;
-    usuario_responsable_id: number;
-    cantidad_solicitada: string;
-    cantidad_recibida: string;
-    diferencia: string | null;
-    mensaje: string;
-    fecha_hora: Date;  // auto (default)
-    leida: boolean;  // auto (default)
-  };
-  orden_compra: {
-    id: number;  // auto (default)
-    proveedor_id: number;
-    cod_ord: string;
-    cotizacion_id: number | null;
-    usuario_id: number;
-    estado_id: number;  // auto (default)
-    fecha: Date;  // auto (default)
-    fecha_entrega: Date | null;
-    notas: string | null;
-    subtotal: string | null;
-    descuento: string | null;
-    gastos_envio: string | null;
-    total: string;
-    deposito_id: number | null;
-    forma_pago_id: number;
-  };
-  orden_compra_detalle: {
-    id: number;  // auto (default)
-    orden_compra_id: number;
-    articulo_id: number;
-    cantidad: string;
-    precio_acordado: string;
-    subtotal: string;
-  };
-  origen_movimiento: {
-    id: number;  // auto (default)
+  materia: {
+    id: number;  // auto (identity)
     nombre: string;
+    nivel: NivelMateria;
+    descripcion: string | null;
+    duracion_clase_minutos: number;
+    valor_clase: string;
+    estado: EstadoActivoInactivo;  // auto (default)
+    created_at: Date;  // auto (default)
+    updated_at: Date;  // auto (default)
+  };
+  motivo_baja: {
+    id: number;  // auto (identity)
+    nombre: string;
+    requiere_detalle: boolean;  // auto (default)
+    estado: EstadoActivoInactivo;  // auto (default)
+    created_at: Date;  // auto (default)
+    updated_at: Date;  // auto (default)
+  };
+  motivo_cancelacion: {
+    id: number;  // auto (identity)
+    nombre: string;
+    requiere_detalle: boolean;  // auto (default)
+    estado: EstadoActivoInactivo;  // auto (default)
+    created_at: Date;  // auto (default)
+    updated_at: Date;  // auto (default)
   };
   pago: {
-    id: number;  // auto (default)
-    tipo: TipoPago;
-    proveedor_id: number;
-    monto: string;
-    fecha: Date;  // auto (default)
-    forma_pago_id: number;
-    numero_comprobante: string;
-    anula_pago_id: number | null;
-    estado: EstadoDocumento;  // auto (default)
-    usuario_id: number;
-    fecha_registro: Date;  // auto (default)
-  };
-  pago_imputacion: {
-    id: number;  // auto (default)
-    pago_id: number;
-    comprobante_proveedor_id: number;
-    monto_imputado: string;
-  };
-  practica: {
     id: number;  // auto (identity)
-    nombre: string;
-    duracion_estimada_minutos: number | null;
-    estado: EstadoActivoInactivo;  // auto (default)
-  };
-  presentacion: {
-    id: number;  // auto (default)
-    nombre: string;
-  };
-  proveedor: {
-    id: number;  // auto (default)
-    razon_social: string;
-    cuit: string;
-    direccion: string | null;
-    telefono: string | null;
-    email: string | null;
-    contacto: string | null;
-    plazo_entrega_dias: number | null;
-    estado: EstadoActivoInactivo;  // auto (default)
-    calificacion: string | null;
-  };
-  proveedor_forma_pago: {
-    proveedor_id: number;
-    forma_pago_id: number;
-  };
-  rol: {
-    id: number;  // auto (default)
-    nombre: string;
-  };
-  solicitud_cotizacion: {
-    id: number;  // auto (default)
+    comprobante: string | null;
+    alumno_id: number;
+    monto: string;
+    fecha_pago: Date;  // auto (default)
+    observaciones: string | null;
     usuario_id: number;
-    fecha: Date;  // auto (default)
-    estado: string;  // auto (default)
-    notas: string | null;
+    created_at: Date;  // auto (default)
   };
-  solicitud_detalle: {
-    id: number;  // auto (default)
-    solicitud_id: number;
-    articulo_id: number;
-    cantidad_estimada: string;
-    nota: string | null;
+  pago_forma_pago: {
+    id: number;  // auto (identity)
+    pago_id: number;
+    forma_pago_id: number;
+    nro_operacion: string | null;
   };
-  sucursal: {
-    id: number;  // auto (default)
-    nombre: string;
-    direccion: string;
-    telefono: string | null;
-    horario_atencion: string | null;
-    razon_social: string;
-    cuit: string;
-    ingresos_brutos: string | null;
+  pago_turno: {
+    id: number;  // auto (identity)
+    pago_id: number;
+    turno_id: number;
+    importe: string;
+  };
+  parametro: {
+    id: number;  // auto (identity)
+    clave: string;
+    valor: number;
+    unidad: string | null;
+    descripcion: string | null;
+    created_at: Date;  // auto (default)
+    updated_at: Date;  // auto (default)
+  };
+  precio_clase: {
+    id: number;  // auto (identity)
+    profesor_materia_id: number;
+    precio: string;
+  };
+  profesor: {
+    id: number;  // auto (identity)
+    usuario_id: number;
+    titulo_especialidad: string | null;
+    telefono: string;
     estado: EstadoActivoInactivo;  // auto (default)
     created_at: Date;  // auto (default)
     updated_at: Date;  // auto (default)
-    condicion_iva: string | null;
   };
-  tipo_comprobante: {
-    id: number;  // auto (default)
+  profesor_materia: {
+    id: number;  // auto (identity)
+    profesor_id: number;
+    materia_id: number;
+    capacidad_maxima: number;  // auto (default)
+  };
+  rol: {
+    id: number;  // auto (identity)
     nombre: string;
-    afecta_saldo: number;  // auto (default)
-    prefijo: string;  // auto (default)
   };
   turno: {
     id: number;  // auto (identity)
-    cliente_id: number;
-    mascota_id: number;
-    sucursal_id: number;
-    agenda_profesional_id: number;
-    practica_id: number;
-    estado_id: number;  // auto (default)
+    codigo: string | null;
+    alumno_id: number;
+    profesor_id: number;
+    materia_id: number;
     fecha: Date;
     hora_inicio: string;
     hora_fin: string;
-    notas: string | null;
+    valor_clase_congelado: string;
+    estado: EstadoTurno;  // auto (default)
+    observaciones: string | null;
     usuario_id: number;
-    fecha_creacion: Date;  // auto (default)
-  };
-  unidad_medida: {
-    id: number;  // auto (default)
-    nombre: string;
+    created_at: Date;  // auto (default)
+    cantidad_modificaciones: number;  // auto (default)
+    motivo_cancelacion_id: number | null;
+    detalle_cancelacion: string | null;
+    fecha_cancelacion: Date | null;
+    cancelacion_tardia: boolean;  // auto (default)
+    pagado: boolean;  // auto (default)
   };
   usuario: {
-    id: number;  // auto (default)
+    id: number;  // auto (identity)
     rol_id: number;
+    academia_id: number | null;
     nombre: string;
     apellido: string;
     dni: string;
     email: string;
     estado: EstadoActivoInactivo;  // auto (default)
-    fecha_creacion: Date;  // auto (default)
+    auth_id: string;
     intentos_fallidos: number;  // auto (default)
     bloqueado_hasta: Date | null;
-    sucursal_id: number | null;
-    auth_id: string | null;
+    fecha_creacion: Date;  // auto (default)
+    "cambiar_contraseña": boolean | null;  // auto (default)
+    telefono: string | null;
+    motivo_baja_id: number | null;
+    detalle_motivo_baja: string | null;
+    fecha_baja: Date | null;
+    debe_cambiar_password: boolean;  // auto (default)
   };
 }
 
 // ── Vistas ──────────────────────────────────────────────────────────────────
 
 export interface DbViews {
-  v_movimiento_stock: {
-    id: number | null;
-    numero: string | null;
-    ficha_stock_id: number | null;
-    deposito_id: number | null;
-    origen_id: number | null;
-    origen_entidad_id: number | null;
-    tipo: TipoMovimientoStock | null;
-    cantidad: string | null;
-    fecha_hora: Date | null;
-    usuario_id: number | null;
-    motivo: string | null;
-    movimiento_vinculado_id: number | null;
-    movimiento_id: number | null;
-  };
-  vista_cuenta_corriente_proveedor: {
-    comprobante_id: number | null;
-    proveedor_id: number | null;
-    letra: string | null;
-    punto_venta: string | null;
-    numero_comprobante: string | null;
-    numero_completo: string | null;
-    tipo_comprobante: string | null;
-    fecha_emision: Date | null;
-    fecha_vencimiento: Date | null;
-    monto_signado: string | null;
-    monto_pagado: string | null;
-    saldo_pendiente: string | null;
-    estado_vencimiento: string | null;
-    dias_para_vencer: number | null;
-  };
   vw_huecos_disponibles: {
     agenda_profesional_id: number | null;
-    usuario_id: number | null;
+    profesor_id: number | null;
     fecha: Date | null;
     hueco_inicio: string | null;
     hueco_fin: string | null;

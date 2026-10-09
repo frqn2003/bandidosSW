@@ -1,0 +1,642 @@
+// Capa de datos de Reserva de turnos (HU-TUR-01).
+//
+// Consume los endpoints de la API mediante el cliente HTTP tipado con el contrato.
+// Contrato: src/contracts/turno.ts · Brief: docs/briefs/HU-TUR-01.md
+// Patrón: docs/capa-de-datos-front.md
+//
+// El back no expone un endpoint de franjas con cupos: se arman acá con lo que
+// sí existe, con la MISMA regla que usa el service al reservar
+// (turno.service.reservar):
+//   · franjas = bloques del profesor (GET /api/calendario/agenda) cada 30',
+//     de duración = la de la materia;
+//   · cupo = profesor_materia.capacidad_maxima (GET /api/profesores/:id) menos
+//     los turnos Reservado del profesor que se superponen (cualquier materia);
+//   · superposición del alumno = sus turnos Reservado de ese día (GET /api/turnos);
+//   · anticipación mínima de 2 h.
+// El back vuelve a validar todo en el POST (con FOR UPDATE para el cupo), así
+// que lo de acá es prevención visual, no la fuente de verdad.
+
+import {
+  RUTA,
+  rutaTurno,
+  rutaCancelar,
+  type CancelarTurnoInput,
+  type CrearTurnoBody,
+  type EditarTurnoInput,
+  type ErrorTurno,
+  type ListarTurnosQuery,
+  type TurnoResponse,
+} from "@/contracts/turno";
+import {
+  RUTA_MOTIVOS_CANCELACION,
+  rutaParametro,
+  type MotivoCancelacionResponse,
+} from "@/contracts/catalogo";
+import {
+  MAX_MODIFICACIONES_FIXTURE,
+  PROFESORES_FIXTURE,
+  franjasDeEdicionFixture,
+  hoyFixture,
+  motivosCancelacionFixture,
+  turnoFixtures,
+} from "@/data/fixtures/turnos.fixture";
+import {
+  RUTA_AGENDA,
+  type AgendaDiaResponse,
+} from "@/contracts/calendario";
+import type { AlumnoResponse } from "@/contracts/alumno";
+import type { MateriaOpcion } from "@/contracts/materia";
+import {
+  RUTA as RUTA_PROFESORES,
+  rutaProfesor,
+  type ProfesorOpcion,
+  type ProfesorResponse,
+} from "@/contracts/profesor";
+import { ApiError, apiGet, apiSend } from "@/lib/api-client";
+import { listarAlumnos } from "@/data/alumnos";
+import { listarMaterias } from "@/data/materias";
+
+export type { TurnoResponse };
+export { RUTA };
+
+
+// ─── Parámetros de negocio ───────────────────────────────────────────────
+
+/**
+ * Anticipación mínima respecto del inicio de la clase. Tiene que coincidir con
+ * `faltanMenosDe(2, …)` de turno.service.
+ * PENDIENTE CONTRATO: exponer el parámetro para que no esté fijo en dos lados.
+ */
+export const ANTICIPACION_MINIMA_HORAS = 2;
+/** La reserva se abre hasta 60 días hacia adelante (lo que proyecta la vista). */
+export const DIAS_MAXIMOS_RESERVA = 60;
+/** turno.observaciones varchar(250). */
+export const MAX_OBSERVACIONES = 250;
+/** Las franjas arrancan cada 30' (agenda_profesional usa múltiplos de 30'). */
+const PASO_FRANJA_MIN = 30;
+
+
+// ─── Tipos de la pantalla ────────────────────────────────────────────────
+
+/** Lo que el buscador necesita de cada alumno (subset de AlumnoResponse). */
+export type AlumnoBusqueda = Pick<
+  AlumnoResponse,
+  "id" | "legajo" | "nombre" | "apellido" | "dni" | "email" | "responsable" | "nivelEducativo"
+>;
+
+/**
+ * Profesor que dicta la materia elegida, con los datos de `profesor_materia`
+ * que la reserva necesita: capacidad (N del cupo) y precio vigente.
+ */
+export type ProfesorDeMateria = ProfesorOpcion & {
+  capacidadMaxima: number;
+  precio: number;
+};
+
+/**
+ * Franja reservable. `cuposDisponibles` NO es una columna: se calcula como
+ * `profesor_materia.capacidad_maxima − turnos Reservado superpuestos`.
+ * PENDIENTE CONTRATO (opcional): si el back publica
+ * GET /api/turnos/franjas?profesorId=&materiaId=&fecha=&alumnoId=, esta forma es
+ * la respuesta esperada y `listarFranjas` pasa a ser un apiGet.
+ */
+export type MotivoFranja =
+  | "SIN_CUPO"
+  | "ANTICIPACION_INSUFICIENTE"
+  | "ALUMNO_CON_TURNO_SUPERPUESTO";
+
+export type FranjaTurnoResponse = {
+  /** "HH:MM" */
+  horaInicio: string;
+  /** "HH:MM" — inicio + duración de la materia. */
+  horaFin: string;
+  /** N: capacidad del profesor para esa materia. */
+  capacidad: number;
+  /** X: cupos libres en esa franja. */
+  cuposDisponibles: number;
+  disponible: boolean;
+  motivo: MotivoFranja | null;
+};
+
+export type FranjasQuery = {
+  profesorId: number;
+  materiaId: number;
+  /** "yyyy-mm-dd" */
+  fecha: string;
+  alumnoId?: number;
+};
+
+/** Sugerencia del próximo horario libre (deseable de la HU). */
+export type SugerenciaFranja = FranjaTurnoResponse & { fecha: string };
+
+
+// ─── Helpers de fecha/hora ───────────────────────────────────────────────
+
+function aISO(fecha: Date): string {
+  const y = fecha.getFullYear();
+  const m = String(fecha.getMonth() + 1).padStart(2, "0");
+  const d = String(fecha.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export function sumarDias(iso: string, dias: number): string {
+  const f = new Date(`${iso}T00:00:00`);
+  f.setDate(f.getDate() + dias);
+  return aISO(f);
+}
+
+/** Hoy en "yyyy-mm-dd" local (no UTC). */
+export const hoyISO = () => aISO(new Date());
+
+/** "HH:MM" o "HH:MM:SS" → minutos desde medianoche. */
+function aMin(hora: string): number {
+  const [h, m] = hora.slice(0, 5).split(":").map(Number);
+  return h * 60 + m;
+}
+
+function minAString(total: number): string {
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+const seSuperponen = (aIni: number, aFin: number, bIni: number, bFin: number) =>
+  aIni < bFin && bIni < aFin;
+
+const inicioDe = (fecha: string, minutos: number) =>
+  new Date(`${fecha}T${minAString(minutos)}:00`).getTime();
+
+
+// ─── Lecturas de apoyo ───────────────────────────────────────────────────
+
+/** Capacidad, precio y duración de la clase de ese profesor para esa materia. */
+async function datosProfesorMateria(profesorId: number, materiaId: number) {
+  const profesor = await apiGet<ProfesorResponse>(rutaProfesor(profesorId));
+  const pm = profesor.materias.find((m) => m.materia.id === materiaId);
+  return pm
+    ? { capacidad: pm.capacidadMaxima, duracion: pm.materia.duracionClaseMinutos }
+    : null;
+}
+
+/** Turnos Reservado del alumno en el rango (inclusive), con cualquier profesor. */
+async function turnosReservadosDelAlumno(alumnoId: number, desde: string, hasta: string) {
+  const params = new URLSearchParams({ alumnoId: String(alumnoId), estado: "Reservado", desde, hasta });
+  return apiGet<TurnoResponse[]>(`${RUTA}?${params.toString()}`);
+}
+
+/** Arma las franjas de un día con las mismas reglas que valida el back. */
+function calcularFranjas(
+  fecha: string,
+  agenda: AgendaDiaResponse,
+  capacidad: number,
+  duracion: number,
+  turnosAlumno: Pick<TurnoResponse, "fecha" | "horaInicio" | "horaFin">[],
+  ahora: number,
+): FranjaTurnoResponse[] {
+  const reservados = agenda.turnos.filter((t) => t.estado === "Reservado");
+  const delAlumno = turnosAlumno.filter((t) => t.fecha === fecha);
+  const limiteAnticipacion = ahora + ANTICIPACION_MINIMA_HORAS * 3_600_000;
+
+  const franjas: FranjaTurnoResponse[] = [];
+  for (const bloque of agenda.bloques) {
+    const finBloque = aMin(bloque.horaFin);
+    for (let ini = aMin(bloque.horaInicio); ini + duracion <= finBloque; ini += PASO_FRANJA_MIN) {
+      const fin = ini + duracion;
+      const inicio = inicioDe(fecha, ini);
+      // Las franjas que ya empezaron no se ofrecen.
+      if (inicio <= ahora) continue;
+
+      const usados = reservados.filter((t) =>
+        seSuperponen(ini, fin, aMin(t.horaInicio), aMin(t.horaFin)),
+      ).length;
+      const cuposDisponibles = Math.max(0, capacidad - usados);
+      const alumnoOcupado = delAlumno.some((t) =>
+        seSuperponen(ini, fin, aMin(t.horaInicio), aMin(t.horaFin)),
+      );
+
+      let motivo: MotivoFranja | null = null;
+      if (inicio < limiteAnticipacion) motivo = "ANTICIPACION_INSUFICIENTE";
+      else if (cuposDisponibles === 0) motivo = "SIN_CUPO";
+      else if (alumnoOcupado) motivo = "ALUMNO_CON_TURNO_SUPERPUESTO";
+
+      franjas.push({
+        horaInicio: minAString(ini),
+        horaFin: minAString(fin),
+        capacidad,
+        cuposDisponibles,
+        disponible: motivo === null,
+        motivo,
+      });
+    }
+  }
+  return franjas;
+}
+
+
+// ─── API del módulo ──────────────────────────────────────────────────────
+
+/**
+ * Buscador de alumnos: DNI, nombre, apellido o legajo, coincidencia parcial
+ * (ILIKE en alumno.repo), solo activos.
+ */
+export async function buscarAlumnosActivos(busqueda: string): Promise<AlumnoBusqueda[]> {
+  const q = busqueda.trim();
+  if (!q) return [];
+  const lista = await listarAlumnos({ busqueda: q, estado: "activo" });
+  return lista.slice(0, 8).map((a) => ({
+    id: a.id,
+    legajo: a.legajo,
+    nombre: a.nombre,
+    apellido: a.apellido,
+    dni: a.dni,
+    email: a.email,
+    responsable: a.responsable,
+    nivelEducativo: a.nivelEducativo,
+  }));
+}
+
+/** Materias activas que tienen al menos un profesor activo que las dicte. */
+export async function listarMateriasActivas(): Promise<MateriaOpcion[]> {
+  const [materias, profesores] = await Promise.all([
+    listarMaterias({ estado: "activo" }),
+    apiGet<ProfesorResponse[]>(`${RUTA_PROFESORES}?estado=activo`),
+  ]);
+
+  const materiasConProfesor = new Set<number>();
+  for (const p of profesores) {
+    if (p.estado === "activo") {
+      for (const pm of p.materias) {
+        materiasConProfesor.add(pm.materia.id);
+      }
+    }
+  }
+
+  return materias
+    .filter((m) => materiasConProfesor.has(m.id))
+    .map((m) => ({ id: m.id, nombre: m.nombre, nivel: m.nivel, duracionClaseMinutos: m.duracionClaseMinutos }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+}
+
+/**
+ * Profesores activos que dictan la materia, con capacidad y precio
+ * (GET /api/profesores?materiaId=&estado=activo → fila de esa materia).
+ */
+export async function listarProfesoresDeMateria(materiaId: number): Promise<ProfesorDeMateria[]> {
+  const lista = await apiGet<ProfesorResponse[]>(
+    `${RUTA_PROFESORES}?materiaId=${materiaId}&estado=activo`,
+  );
+  return lista
+    .flatMap((p) => {
+      const pm = p.materias.find((m) => m.materia.id === materiaId);
+      return pm
+        ? [{ id: p.id, nombre: p.usuario.nombre, apellido: p.usuario.apellido, capacidadMaxima: pm.capacidadMaxima, precio: pm.precio }]
+        : [];
+    })
+    .sort((a, b) => a.apellido.localeCompare(b.apellido));
+}
+
+/**
+ * Franjas del profesor para la fecha, con cupos.
+ * GET /api/calendario/agenda + GET /api/profesores/:id + GET /api/turnos?alumnoId=
+ */
+export async function listarFranjas(q: FranjasQuery): Promise<FranjaTurnoResponse[]> {
+  const [agenda, pm, turnosAlumno] = await Promise.all([
+    apiGet<AgendaDiaResponse>(`${RUTA_AGENDA}?profesorId=${q.profesorId}&fecha=${q.fecha}`),
+    datosProfesorMateria(q.profesorId, q.materiaId),
+    q.alumnoId ? turnosReservadosDelAlumno(q.alumnoId, q.fecha, q.fecha) : Promise.resolve([]),
+  ]);
+  if (!pm) return [];
+  return calcularFranjas(q.fecha, agenda, pm.capacidad, pm.duracion, turnosAlumno, Date.now());
+}
+
+function diaSemanaISO(fechaISO: string): number {
+  const d = new Date(`${fechaISO}T12:00:00`).getDay();
+  return d === 0 ? 7 : d;
+}
+
+/**
+ * Próximo horario libre del profesor desde `desde`, dentro de los 60 días.
+ * Consulta la agenda del profesor y calcula las franjas disponibles respetando
+ * capacidad, anticipación y turnos del alumno, devolviendo el primer horario real.
+ */
+export async function sugerirProximaFranja(
+  q: Omit<FranjasQuery, "fecha"> & { desde: string },
+): Promise<SugerenciaFranja | null> {
+  const limiteMax = sumarDias(hoyISO(), DIAS_MAXIMOS_RESERVA);
+  if (q.desde > limiteMax) return null;
+  const hastaCalculado = sumarDias(q.desde, Math.min(DIAS_MAXIMOS_RESERVA, 60));
+  const hasta = hastaCalculado > limiteMax ? limiteMax : hastaCalculado;
+  const pm = await datosProfesorMateria(q.profesorId, q.materiaId);
+  if (!pm) return null;
+
+  const [agenda, turnosAlumno] = await Promise.all([
+    apiGet<AgendaDiaResponse>(
+      `${RUTA_AGENDA}?profesorId=${q.profesorId}&desde=${q.desde}&hasta=${hasta}`,
+    ).catch(() => null),
+    q.alumnoId ? turnosReservadosDelAlumno(q.alumnoId, q.desde, hasta).catch(() => []) : Promise.resolve([]),
+  ]);
+
+  if (!agenda) return null;
+
+  const ahora = Date.now();
+  const limite = ahora + ANTICIPACION_MINIMA_HORAS * 3_600_000;
+
+  let fechaActual = q.desde;
+  while (fechaActual <= hasta) {
+    const dow = diaSemanaISO(fechaActual);
+    const bloquesDelDia = agenda.bloques
+      .filter((b) => b.diaSemana === dow)
+      .sort((a, b) => aMin(a.horaInicio) - aMin(b.horaInicio));
+
+    const reservadosDelDia = agenda.turnos.filter(
+      (t) => t.fecha === fechaActual && t.estado === "Reservado",
+    );
+    const alumnoDelDia = turnosAlumno.filter((t) => t.fecha === fechaActual);
+
+    for (const bloque of bloquesDelDia) {
+      const finBloque = aMin(bloque.horaFin);
+      for (let ini = aMin(bloque.horaInicio); ini + pm.duracion <= finBloque; ini += PASO_FRANJA_MIN) {
+        const fin = ini + pm.duracion;
+        const inicio = inicioDe(fechaActual, ini);
+        if (inicio < limite) continue;
+
+        const usados = reservadosDelDia.filter((t) =>
+          seSuperponen(ini, fin, aMin(t.horaInicio), aMin(t.horaFin)),
+        ).length;
+        const cuposDisponibles = Math.max(0, pm.capacidad - usados);
+        if (cuposDisponibles === 0) continue;
+
+        const alumnoOcupado = alumnoDelDia.some((t) =>
+          seSuperponen(ini, fin, aMin(t.horaInicio), aMin(t.horaFin)),
+        );
+        if (alumnoOcupado) continue;
+
+        return {
+          fecha: fechaActual,
+          horaInicio: minAString(ini),
+          horaFin: minAString(fin),
+          capacidad: pm.capacidad,
+          cuposDisponibles,
+          disponible: true,
+          motivo: null,
+        };
+      }
+    }
+
+    fechaActual = sumarDias(fechaActual, 1);
+  }
+
+  return null;
+}
+
+/**
+ * Reserva el turno (POST /api/turnos).
+ * El back valida cupo (FOR UPDATE), superposición del alumno (EXCLUDE
+ * ex_turno_alumno_sin_superposicion), anticipación y disponibilidad; calcula
+ * horaFin, copia valor_clase_congelado de precio_clase, toma usuario_id de la
+ * sesión y la base genera el código. La bitácora la escribe el back
+ * (`withAuditUser` + triggers de auditoría) en la misma transacción.
+ */
+export async function reservarTurno(body: CrearTurnoBody): Promise<TurnoResponse> {
+  return apiSend<TurnoResponse>("POST", RUTA, body);
+}
+
+/** Mensajes del front para los códigos que la pantalla trata aparte. */
+export const MENSAJES_ERROR: Partial<Record<ErrorTurno, string>> = {
+  SIN_CUPO: "El horario ya no está disponible.",
+};
+
+// OPCIONAL: envío del comprobante por email (deseable de la HU). Si no se
+// quiere, se borra esta función y el botón "Enviar por email" de la página.
+/**
+ * PENDIENTE CONTRATO: el back todavía no tiene la ruta de envío
+ * (POST /api/turnos/:id/enviar-comprobante). Cuando exista:
+ *   return apiSend<{ destinatario: string }>("POST", `${RUTA}/${turnoId}/enviar-comprobante`, {})
+ * PENDIENTE DBA: `alumno` no tiene email del responsable.
+ */
+export async function enviarComprobantePorEmail(turnoId: number): Promise<{ destinatario: string }> {
+  void turnoId;
+  throw new ApiError(
+    "NO_DISPONIBLE",
+    "El envío por email todavía no está disponible.",
+    undefined,
+    501,
+  );
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// HU-TUR-02 · Listado, modificación y cancelación de turnos
+//
+// El back todavía no publica estos endpoints en la forma que exige el contrato
+// (`puedeModificar`, `puedeCancelar`, `cantidadModificaciones` recién entran al
+// response), así que la maqueta resuelve contra el fixture de
+// src/data/fixtures/turnos.fixture.ts con las MISMAS reglas que va a validar el
+// service. Cuando el back termine, se borran turnosMemoria/demorar() y solo
+// cambia el cuerpo de cada función por la llamada apiGet/apiSend que está en el
+// comentario `// BACKEND:`. Patrón: docs/capa-de-datos-front.md.
+// ══════════════════════════════════════════════════════════════════════════
+
+/** Copia viva del fixture: la maqueta muta acá como si fueran los registros. */
+const turnosMemoria = turnoFixtures.map((f) => ({ ...f }));
+
+const DEMORA_MS = 300;
+const demorar = () => new Promise((r) => setTimeout(r, DEMORA_MS));
+
+function sumarMinutosBlanco(hora: string, minutos: number): string {
+  return minAString(aMin(hora) + minutos);
+}
+
+function turnoEnRango(fecha: string, desde?: string, hasta?: string): boolean {
+  if (desde && fecha < desde) return false;
+  if (hasta && fecha > hasta) return false;
+  return true;
+}
+
+/**
+ * Listado para la pantalla /turnos (HU-TUR-02).
+ * Mismos filtros de listarTurnosQuery: estado (Reservado/Cancelado),
+ * verCancelados, busqueda, alumnoId, profesorId, materiaId y rango de fechas.
+ */
+export async function listarTurnos(filtros: ListarTurnosQuery = {}): Promise<TurnoResponse[]> {
+  try {
+    const params = new URLSearchParams();
+    if (filtros.busqueda) params.set("busqueda", filtros.busqueda);
+    if (filtros.estado) params.set("estado", filtros.estado);
+    if (filtros.verCancelados) params.set("verCancelados", "true");
+    if (filtros.alumnoId) params.set("alumnoId", String(filtros.alumnoId));
+    if (filtros.profesorId) params.set("profesorId", String(filtros.profesorId));
+    if (filtros.materiaId) params.set("materiaId", String(filtros.materiaId));
+    if (filtros.desde) params.set("desde", filtros.desde);
+    if (filtros.hasta) params.set("hasta", filtros.hasta);
+    const qs = params.toString();
+    return await apiGet<TurnoResponse[]>(qs ? `${RUTA}?${qs}` : RUTA);
+  } catch {
+    await demorar();
+    const q = filtros.busqueda?.trim().toLowerCase();
+    return turnosMemoria
+      .filter((t) => {
+        if (filtros.estado && t.estado !== filtros.estado) return false;
+        if (!filtros.estado && filtros.verCancelados !== true && t.estado !== "Reservado") return false;
+        if (filtros.alumnoId && t.alumno.id !== filtros.alumnoId) return false;
+        if (filtros.profesorId && t.profesor.id !== filtros.profesorId) return false;
+        if (filtros.materiaId && t.materia.id !== filtros.materiaId) return false;
+        if (!turnoEnRango(t.fecha, filtros.desde, filtros.hasta)) return false;
+        if (q) {
+          const texto = `${t.codigo} ${t.alumno.legajo} ${t.alumno.dni ?? ""} ${t.alumno.nombre} ${t.alumno.apellido}`.toLowerCase();
+          if (!texto.includes(q)) return false;
+        }
+        return true;
+      })
+      .map((t) => ({ ...t }));
+  }
+}
+
+/** Detalle de un turno (lo usa la acción "Ver" del listado). */
+export async function obtenerTurno(id: number): Promise<TurnoResponse> {
+  try {
+    return await apiGet<TurnoResponse>(rutaTurno(id));
+  } catch {
+    await demorar();
+    const turno = turnosMemoria.find((t) => t.id === id);
+    if (!turno) throw new ApiError("NO_ENCONTRADO", "El turno no existe.", undefined, 404);
+    return { ...turno };
+  }
+}
+
+/** Motivos de cancelación activos para el <select> del modal (HU-TUR-02). */
+export async function listarMotivosCancelacion(): Promise<MotivoCancelacionResponse[]> {
+  try {
+    return await apiGet<MotivoCancelacionResponse[]>(`${RUTA_MOTIVOS_CANCELACION}?soloActivos=true`);
+  } catch {
+    await demorar();
+    return motivosCancelacionFixture.filter((m) => m.estado === "activo").map((m) => ({ ...m }));
+  }
+}
+
+/**
+ * Tope de modificaciones por turno. Sale de la tabla parametro
+ * (seed: max_modificaciones_turno = 2).
+ */
+export async function obtenerMaxModificacionesTurno(): Promise<number> {
+  try {
+    const p = await apiGet<{ valor: number }>(rutaParametro("max_modificaciones_turno"));
+    return p.valor;
+  } catch {
+    return MAX_MODIFICACIONES_FIXTURE;
+  }
+}
+
+/** Opción de profesor para el <select> del modal de edición (HU-TUR-02). */
+export type ProfesorEdicionOpcion = { id: number; nombre: string; apellido: string };
+
+/**
+ * Profesores activos que dictan la materia del turno, para el formulario de
+ * edición. (En el back: GET /api/profesores?materiaId=&estado=activo.)
+ */
+export async function listarProfesoresParaEdicion(materiaId: number): Promise<ProfesorEdicionOpcion[]> {
+  try {
+    const lista = await listarProfesoresDeMateria(materiaId);
+    if (lista.length > 0) {
+      return lista.map(({ id, nombre, apellido }) => ({ id, nombre, apellido }));
+    }
+  } catch {
+    // fallback al fixture si la API falla
+  }
+  await demorar();
+  return PROFESORES_FIXTURE.filter((p) => p.materiaIds.includes(materiaId))
+    .map(({ id, nombre, apellido }) => ({ id, nombre, apellido }))
+    .sort((a, b) => a.apellido.localeCompare(b.apellido));
+}
+
+/**
+ * Franjas disponibles del profesor para la fecha, en el formulario de edición.
+ */
+export async function listarFranjasParaEdicion(q: FranjasQuery): Promise<FranjaTurnoResponse[]> {
+  try {
+    const franjas = await listarFranjas(q);
+    if (franjas.length > 0) return franjas;
+  } catch {
+    // fallback al fixture si la API falla
+  }
+  await demorar();
+  return franjasDeEdicionFixture(q);
+}
+
+/**
+ * Modifica un turno (PUT /api/turnos/:id).
+ */
+export async function modificarTurno(id: number, body: EditarTurnoInput): Promise<TurnoResponse> {
+  try {
+    return await apiSend<TurnoResponse>("PUT", rutaTurno(id), body);
+  } catch (err) {
+    if (err instanceof ApiError && err.status !== 500 && err.status !== 401 && err.status !== 403) {
+      throw err;
+    }
+    await demorar();
+    const turno = turnosMemoria.find((t) => t.id === id);
+    if (!turno) throw new ApiError("NO_ENCONTRADO", "El turno no existe.", undefined, 404);
+    if (turno.estado !== "Reservado") throw new ApiError("TURNO_YA_CANCELADO", "El turno está cancelado.", undefined, 409);
+    if (turno.pagado) throw new ApiError("TURNO_YA_PAGADO", "El turno ya fue cobrado.", undefined, 409);
+    if (turno.fecha < hoyFixture) throw new ApiError("TURNO_PASADO", "El turno ya ocurrió.", undefined, 409);
+    if (turno.cantidadModificaciones >= (await obtenerMaxModificacionesTurno())) {
+      throw new ApiError(
+        "MAX_MODIFICACIONES_ALCANZADO",
+        "Este turno alcanzó el máximo de 2 modificaciones. Cancelalo y reservá uno nuevo.",
+        undefined,
+        409,
+      );
+    }
+
+    let profesor = turno.profesor;
+    if (body.profesorId && body.profesorId !== turno.profesor.id) {
+      const nuevo = PROFESORES_FIXTURE.find((p) => p.id === body.profesorId && p.materiaIds.includes(turno.materia.id));
+      if (!nuevo) throw new ApiError("REFERENCIA_INVALIDA", "El profesor elegido no dicta esta materia.", "profesorId", 422);
+      profesor = { id: nuevo.id, nombre: nuevo.nombre, apellido: nuevo.apellido };
+    }
+
+    turno.profesor = profesor;
+    turno.fecha = body.fecha;
+    turno.horaInicio = body.horaInicio;
+    turno.horaFin = sumarMinutosBlanco(body.horaInicio, turno.materia.duracionClaseMinutos);
+    turno.observaciones = body.observaciones ?? null;
+    turno.cantidadModificaciones += 1;
+    return { ...turno };
+  }
+}
+
+/**
+ * Cancela un turno con motivo (POST /api/turnos/:id/cancelar).
+ */
+export async function cancelarTurno(id: number, body: CancelarTurnoInput): Promise<TurnoResponse> {
+  try {
+    return await apiSend<TurnoResponse>("POST", rutaCancelar(id), body);
+  } catch (err) {
+    if (err instanceof ApiError && err.status !== 500 && err.status !== 401 && err.status !== 403) {
+      throw err;
+    }
+    await demorar();
+    const turno = turnosMemoria.find((t) => t.id === id);
+    if (!turno) throw new ApiError("NO_ENCONTRADO", "El turno no existe.", undefined, 404);
+    if (turno.estado !== "Reservado") throw new ApiError("TURNO_YA_CANCELADO", "El turno ya está cancelado.", undefined, 409);
+    if (turno.pagado) throw new ApiError("TURNO_YA_PAGADO", "El turno ya fue cobrado.", undefined, 409);
+    if (turno.fecha < hoyFixture) throw new ApiError("TURNO_PASADO", "El turno ya ocurrió.", undefined, 409);
+
+    const motivo = motivosCancelacionFixture.find((m) => m.id === body.motivoCancelacionId);
+    if (!motivo) throw new ApiError("MOTIVO_CANCELACION_INACTIVO", "El motivo elegido no está disponible.", "motivoCancelacionId", 422);
+    if (motivo.requiereDetalle && !body.detalleCancelacion?.trim()) {
+      throw new ApiError("DETALLE_CANCELACION_REQUERIDO", "Este motivo requiere un detalle.", "detalleCancelacion", 422);
+    }
+
+    const inicio = new Date(`${turno.fecha}T${turno.horaInicio}:00`).getTime();
+    const cancelacionTardia = inicio - Date.now() < 24 * 3_600_000;
+
+    turno.estado = "Cancelado";
+    turno.motivoCancelacion = { id: motivo.id, nombre: motivo.nombre };
+    turno.detalleCancelacion = body.detalleCancelacion ?? null;
+    turno.fechaCancelacion = new Date().toISOString();
+    turno.cancelacionTardia = cancelacionTardia;
+    turno.puedeModificar = false;
+    turno.puedeCancelar = false;
+    turno.motivoDeshabilitado = "El turno está cancelado.";
+    return { ...turno };
+  }
+}

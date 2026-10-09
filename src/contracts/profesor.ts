@@ -29,10 +29,13 @@ import { z } from "zod";
 //   GET    rutaProfesor(id)     → detalle (con materias y precios)
 //   PUT    rutaProfesor(id)     → editar ficha + materias (reemplaza la lista)
 //   POST   rutaInactivar(id)    → baja lógica (estado = 'inactivo')
+//   GET    rutaCandidatos       → usuarios que todavía pueden recibir una ficha
+//   POST   rutaCandidatos       → alta rápida de un usuario Profesor (solo Gerente)
 
 export const RUTA = "/api/profesores";
 export const rutaProfesor = (id: number) => `${RUTA}/${id}`;
 export const rutaInactivar = (id: number) => `${RUTA}/${id}/inactivar`;
+export const rutaCandidatos = `${RUTA}/candidatos`;
 
 
 // ─── 2a. Request: filtros del listado ────────────────────────────────────
@@ -42,7 +45,11 @@ export const listarProfesoresQuery = z
     busqueda: z.string().trim().optional(),          // nombre, apellido o dni del usuario
     materiaId: z.coerce.number().int().positive().optional(),
     academiaId: z.coerce.number().int().positive().optional(),
+    diaSemana: z.coerce.number().int().min(1).max(6).optional(), // 1 = lunes ... 6 = sábado
     estado: z.enum(["activo", "inactivo"]).optional(),
+    /** Filtra por el usuario vinculado. Permite que el rol Profesor resuelva
+     *  su propio profesor.id desde la sesión: GET /api/profesores?usuarioId=X */
+    usuarioId: z.coerce.number().int().positive().optional(),
   })
   .strict();
 
@@ -86,6 +93,27 @@ export const crearProfesorBody = camposProfesor.extend({
 export const editarProfesorBody = camposProfesor;
 
 
+// ─── 2c. Request: alta rápida de usuario candidato ───────────────────────
+// Destraba el alta de profesores mientras no exista el módulo /usuarios. El
+// back crea la cuenta en Supabase Auth (API de administración) y la fila de
+// `usuario` con rol Profesor; la contraseña temporal la genera el back y se
+// devuelve UNA sola vez. Rol y academia NO viajan: los fija el back.
+
+export const crearCandidatoBody = z
+  .object({
+    nombre: z.string().trim().min(1, "Ingresá el nombre.").max(80, "Máximo 80 caracteres."),
+    apellido: z.string().trim().min(1, "Ingresá el apellido.").max(80, "Máximo 80 caracteres."),
+    dni: z.string().trim().regex(/^\d{7,8}$/, "El DNI debe tener 7 u 8 dígitos, sin puntos."),
+    email: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .max(120, "Máximo 120 caracteres.")
+      .email("Ingresá un email válido."),
+  })
+  .strict();
+
+
 // ─── 3. Tipos derivados ──────────────────────────────────────────────────
 
 export type CrearProfesorBody = z.input<typeof crearProfesorBody>;
@@ -94,6 +122,8 @@ export type EditarProfesorBody = z.input<typeof editarProfesorBody>;
 export type EditarProfesorInput = z.output<typeof editarProfesorBody>;
 export type ListarProfesoresQuery = z.output<typeof listarProfesoresQuery>;
 export type MateriaDictadaBody = z.input<typeof materiaDictada>;
+export type CrearCandidatoBody = z.input<typeof crearCandidatoBody>;
+export type CrearCandidatoInput = z.output<typeof crearCandidatoBody>;
 
 
 // ─── 4. Response ─────────────────────────────────────────────────────────
@@ -134,6 +164,31 @@ export type ProfesorResponse = {
   fechaActualizacion: string;
 };
 
+/**
+ * Usuario con rol "Profesor", activo, con academia y SIN ficha todavía.
+ * Alimenta el combo "Usuario asociado" del alta: son los únicos ids que
+ * `crearProfesorBody.usuarioId` acepta sin devolver error.
+ */
+export type CandidatoProfesorResponse = {
+  /** usuario.id — es el que viaja como `usuarioId` en el alta. */
+  id: number;
+  nombre: string;
+  apellido: string;
+  dni: string;
+  email: string;
+  academia: { id: number; nombre: string } | null;
+};
+
+/**
+ * Respuesta del alta rápida. `passwordTemporal` se muestra una sola vez: no
+ * se guarda en ningún lado del sistema (vive solo en Supabase Auth, hasheada).
+ * En el primer ingreso el usuario la tiene que cambiar (`cambiar_contraseña`).
+ */
+export type CandidatoCreadoResponse = {
+  usuario: CandidatoProfesorResponse;
+  passwordTemporal: string;
+};
+
 /** Lo que devuelve el combo de profesores (turnos, calendario, disponibilidad). */
 export type ProfesorOpcion = {
   id: number;
@@ -157,4 +212,10 @@ export type ErrorProfesor =
   | "PROFESOR_CON_TURNOS_FUTUROS"// 409, al inactivar
   | "REFERENCIA_INVALIDA"        // 422, usuarioId o materiaId inexistente
   | "NO_ENCONTRADO"              // 404
-  | "DATOS_INVALIDOS";           // 422
+  | "DATOS_INVALIDOS"            // 422
+  // Alta rápida de candidato (POST rutaCandidatos):
+  | "ACCESO_DENEGADO"            // 403, solo el Gerente crea usuarios
+  | "DNI_DUPLICADO"              // 409, ya hay un usuario activo con ese DNI
+  | "EMAIL_DUPLICADO"            // 409, ya hay un usuario activo con ese email
+  | "EMAIL_YA_REGISTRADO_EN_AUTH"// 409, el email existe en Supabase Auth pero no en `usuario`
+  | "AUTH_NO_DISPONIBLE";        // 503, Supabase Auth no respondió o falta la service role key

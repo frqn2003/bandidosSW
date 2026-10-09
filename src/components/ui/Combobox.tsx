@@ -1,7 +1,7 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Icon } from "@/components/ui/Icon";
 
 export interface ComboboxOption {
   value: string;
@@ -152,9 +152,9 @@ export function Combobox({
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label htmlFor={id} className="text-sm font-bold text-text-primary">
+        <label htmlFor={id} className="text-sm font-bold text-on-surface">
           {label}
-          {requiredMark && <span className="text-destructive"> *</span>}
+          {requiredMark && <span className="text-error"> *</span>}
         </label>
       )}
       <div className="relative" ref={rootRef}>
@@ -187,9 +187,9 @@ export function Combobox({
           }}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="h-11 min-h-11 w-full cursor-text rounded-sm border bg-surface px-4 pr-11 text-base text-text-primary transition-colors duration-fast ease-out placeholder:text-text-secondary focus:border-brand-900 focus:outline-none focus:ring-2 focus:ring-brand-900/20 disabled:cursor-not-allowed disabled:bg-cream-100 disabled:opacity-70"
+          className="h-11 min-h-11 w-full cursor-text rounded-sm border border-outline-variant bg-surface-container-low px-4 pr-11 text-base text-on-surface transition-colors duration-fast ease-out placeholder:text-on-surface-variant focus:border-secondary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-secondary/20 disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:opacity-70"
           style={{
-            borderColor: error ? "var(--color-destructive)" : undefined,
+            borderColor: error ? "var(--color-error)" : undefined,
           }}
         />
         <button
@@ -204,11 +204,12 @@ export function Combobox({
             }
           }}
           aria-hidden={true}
-          className="pointer-events-none absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-pill text-text-secondary"
+          className="pointer-events-none absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-on-surface-variant"
         >
-          <ChevronDown
-            className={`h-4 w-4 transition-transform duration-fast ease-out ${open ? "rotate-180" : ""}`}
-            aria-hidden={true}
+          <Icon
+            name="expand_more"
+            size={16}
+            className={`transition-transform duration-fast ease-out ${open ? "rotate-180" : ""}`}
           />
         </button>
         {open && (
@@ -216,12 +217,12 @@ export function Combobox({
             id={listboxId}
             role="listbox"
             aria-label={label ?? id}
-            className="absolute left-0 right-0 top-[calc(100%+4px)] z-20 overflow-hidden rounded-md border border-border bg-surface shadow-card"
+            className="absolute left-0 right-0 top-[calc(100%+4px)] z-20 overflow-hidden rounded-md border border-outline-variant bg-surface-container-lowest shadow-card"
           >
             {filtered.length === 0 ? (
               <p
                 role="status"
-                className="px-4 py-3 text-sm font-medium text-text-secondary"
+                className="px-4 py-3 text-sm font-medium text-on-surface-variant"
               >
                 {noResultsText}
               </p>
@@ -233,7 +234,7 @@ export function Combobox({
                       ? "bg-status-danger/10 text-status-danger-strong border-l-4 border-status-danger"
                       : option.tone === "warning"
                         ? "bg-status-warning/10 text-status-warning-strong border-l-4 border-status-warning"
-                        : "bg-surface text-text-primary border-l-4 border-transparent";
+                        : "bg-surface-container-lowest text-on-surface border-l-4 border-transparent";
 
                   return (
                     <li
@@ -245,7 +246,7 @@ export function Combobox({
                       onClick={() => seleccionar(option)}
                       className={`flex min-h-11 cursor-pointer items-center border-l-4 px-4 py-2 text-sm font-semibold transition-colors duration-fast ease-out hover:brightness-95 focus-visible:outline-none ${
                         toneClass
-                      } ${index === activeIndex ? "ring-1 ring-brand-900/15" : ""}`}
+                      } ${index === activeIndex ? "ring-1 ring-secondary/15" : ""}`}
                     >
                       {option.label}
                     </li>
@@ -260,12 +261,12 @@ export function Combobox({
         <p
           id={errorId}
           role="alert"
-          className="text-sm font-semibold text-destructive"
+          className="text-sm font-semibold text-error"
         >
           {error}
         </p>
       ) : hint ? (
-        <p id={hintId} className="text-xs font-medium text-text-secondary">
+        <p id={hintId} className="text-xs font-medium text-on-surface-variant">
           {hint}
         </p>
       ) : null}

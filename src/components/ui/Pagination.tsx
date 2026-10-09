@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Icon } from "@/components/ui/Icon";
 
 interface PaginationProps {
   page: number;
@@ -13,9 +13,11 @@ interface PaginationProps {
   onPageSizeChange: (size: number) => void;
   disabled?: boolean;
   itemLabel?: string;
+  /** Tamaños de página ofrecidos. Default [10, 25, 50] — cambiado porque la HU-ALU-01 pide 20. */
+  pageSizes?: number[];
 }
 
-const PAGE_SIZES = [10, 25, 50];
+const PAGE_SIZES_DEFAULT = [10, 25, 50];
 
 export function Pagination({
   page,
@@ -28,6 +30,7 @@ export function Pagination({
   onPageSizeChange,
   disabled = false,
   itemLabel = "artículos",
+  pageSizes = PAGE_SIZES_DEFAULT,
 }: PaginationProps) {
   const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
   const visiblePages = pages.filter((p) => {
@@ -44,11 +47,11 @@ export function Pagination({
 
   return (
     <div className="flex flex-col items-center justify-between gap-4 px-2 py-3 sm:flex-row">
-      <p className="text-sm font-medium text-text-secondary">
+      <p className="text-sm font-medium text-on-surface-variant">
         Mostrando {pageStart}-{pageEnd} de {totalItems} {itemLabel}
       </p>
       <div className="flex flex-wrap items-center gap-4">
-        <label className="flex items-center gap-2 text-sm font-medium text-text-secondary">
+        <label className="flex items-center gap-2 text-sm font-medium text-on-surface-variant">
           Filas por página
           <select
             value={pageSize}
@@ -57,9 +60,9 @@ export function Pagination({
               onPageChange(1);
             }}
             disabled={disabled}
-            className="h-11 cursor-pointer rounded-pill border border-border bg-surface px-3 text-sm font-semibold text-text-primary focus:border-brand-900 focus:outline-none focus:ring-2 focus:ring-brand-900/20 disabled:cursor-not-allowed disabled:opacity-45"
+            className="h-11 cursor-pointer rounded-full border border-outline-variant bg-surface-container-low px-3 text-sm font-semibold text-on-surface focus:border-secondary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-secondary/20 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            {PAGE_SIZES.map((size) => (
+            {pageSizes.map((size) => (
               <option key={size} value={size}>
                 {size}
               </option>
@@ -72,15 +75,15 @@ export function Pagination({
             onClick={() => onPageChange(Math.max(1, page - 1))}
             disabled={page === 1 || disabled}
             aria-label="Página anterior"
-            className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-pill border border-border bg-surface text-brand-900 transition-colors duration-fast ease-out hover:bg-brand-900/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-900 disabled:cursor-not-allowed disabled:opacity-45"
+            className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-outline-variant bg-surface-container-low text-primary transition-colors duration-fast ease-out hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary disabled:cursor-not-allowed disabled:opacity-45"
           >
-            <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+            <Icon name="chevron_left" size={20} />
           </button>
           {withGaps.map((p, i) =>
             p === "…" ? (
               <span
                 key={`gap-${i}`}
-                className="px-1 text-sm font-semibold text-text-secondary"
+                className="px-1 text-sm font-semibold text-on-surface-variant"
                 aria-hidden="true"
               >
                 …
@@ -93,10 +96,10 @@ export function Pagination({
                 disabled={disabled}
                 aria-current={p === page ? "page" : undefined}
                 aria-label={`Página ${p}`}
-                className={`flex h-11 min-w-11 cursor-pointer items-center justify-center rounded-pill px-2 text-sm font-bold transition-colors duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-900 disabled:cursor-not-allowed disabled:opacity-45 ${
+                className={`flex h-11 min-w-11 cursor-pointer items-center justify-center rounded-full px-2 text-sm font-bold transition-colors duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary disabled:cursor-not-allowed disabled:opacity-45 ${
                   p === page
-                    ? "bg-brand-900 text-cream-50"
-                    : "border border-border bg-surface text-brand-900 hover:bg-brand-900/5"
+                    ? "bg-primary text-on-primary"
+                    : "border border-outline-variant bg-surface-container-low text-primary hover:bg-primary/5"
                 }`}
               >
                 {p}
@@ -108,9 +111,9 @@ export function Pagination({
             onClick={() => onPageChange(Math.min(totalPages, page + 1))}
             disabled={page === totalPages || disabled}
             aria-label="Página siguiente"
-            className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-pill border border-border bg-surface text-brand-900 transition-colors duration-fast ease-out hover:bg-brand-900/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-900 disabled:cursor-not-allowed disabled:opacity-45"
+            className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-outline-variant bg-surface-container-low text-primary transition-colors duration-fast ease-out hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary disabled:cursor-not-allowed disabled:opacity-45"
           >
-            <ChevronRight className="h-5 w-5" aria-hidden="true" />
+            <Icon name="chevron_right" size={20} />
           </button>
         </nav>
       </div>
