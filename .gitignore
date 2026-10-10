@@ -45,6 +45,7 @@ next-env.d.ts
 
 # herramientas del agente
 .atl/
+.antigravity/
 
 # artefactos locales del agente
 __pycache__/

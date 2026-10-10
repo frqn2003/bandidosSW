@@ -450,13 +450,13 @@ body {
   animation: stampSlamPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
-/* ── Cinta Promocional Ticker Continuo ───────────────────────────────────── */
+/* ── Cinta Promocional Ticker Continuo (Acelerado en GPU) ─────────────────── */
 @keyframes tickerTape {
   0% {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
   100% {
-    transform: translateX(-50%);
+    transform: translate3d(-50%, 0, 0);
   }
 }
 

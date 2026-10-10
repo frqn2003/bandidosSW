@@ -14,16 +14,28 @@ export default function LiveOrb({
 }: LiveOrbProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mouseRef = useRef({ x: 0, y: 0 });
+  const centerPosRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
+    const updateCenter = () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
+      centerPosRef.current = {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      };
+    };
 
-      // Cálculo angular directo y normalización de distancia hacia el mouse
+    updateCenter();
+    window.addEventListener("resize", updateCenter, { passive: true });
+    window.addEventListener("scroll", updateCenter, { passive: true });
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const centerX = centerPosRef.current.x;
+      const centerY = centerPosRef.current.y;
+
+      // Cálculo angular directo sin forzar reflow en el DOM
       const rawDx = e.clientX - centerX;
       const rawDy = e.clientY - centerY;
       const dist = Math.sqrt(rawDx * rawDx + rawDy * rawDy);
@@ -44,8 +56,12 @@ export default function LiveOrb({
       };
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
+    return () => {
+      window.removeEventListener("resize", updateCenter);
+      window.removeEventListener("scroll", updateCenter);
+      window.removeEventListener("mousemove", handleMouseMove);
+    };
   }, []);
 
   useEffect(() => {

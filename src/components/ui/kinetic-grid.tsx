@@ -44,10 +44,14 @@ export default function KineticGrid({
   children,
   className,
   globalColor = "default",
+  lineColorRgb,
+  nodeColorRgb,
 }: {
   children?: ReactNode;
   className?: string;
   globalColor?: "default" | "monochrome";
+  lineColorRgb?: string;
+  nodeColorRgb?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -61,13 +65,13 @@ export default function KineticGrid({
   // ── Pre-render static background to offscreen canvas ──────────────────────
   const updateBgCanvas = useCallback((w: number, h: number) => {
     if (w === 0 || h === 0) return;
-    
+
     let bgCanvas = bgCanvasRef.current;
     if (!bgCanvas) {
       bgCanvas = document.createElement("canvas");
       bgCanvasRef.current = bgCanvas;
     }
-    
+
     bgCanvas.width = w;
     bgCanvas.height = h;
     const ctx = bgCanvas.getContext("2d");
@@ -178,9 +182,9 @@ export default function KineticGrid({
 
       const theme = {
         default: {
-          lineActiveRgb: "60, 130, 255", // Azul eléctrico más claro y luminoso
-          nodeActiveRgb: "75, 145, 255", // Puntos con azul claro brillante
-          rippleRgb: "90, 160, 255",
+          lineActiveRgb: lineColorRgb ?? "60, 130, 255", // Personalizable o azul eléctrico luminoso
+          nodeActiveRgb: nodeColorRgb ?? "75, 145, 255", // Personalizable o puntos celeste brillante
+          rippleRgb: nodeColorRgb ?? "90, 160, 255",
         },
         monochrome: {
           lineActiveRgb: "255, 255, 255",
@@ -355,14 +359,33 @@ export default function KineticGrid({
         }
       }
     },
-    [getWarpedPoint, globalColor],
+    [getWarpedPoint, globalColor, lineColorRgb, nodeColorRgb],
   );
 
   // ── Animation loop ──────────────────────────────────────────────────────────
-  const animateRef = useRef<(now: number) => void>(() => {});
+  const animateRef = useRef<(now: number) => void>(() => { });
+  const isSleepingRef = useRef<boolean>(false);
+
+  const wakeUp = useCallback(() => {
+    if (isSleepingRef.current) {
+      isSleepingRef.current = false;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame((n) => animateRef.current(n));
+    }
+  }, []);
 
   const drawLoop = useCallback(
     (now: number) => {
+      // Si la pestaña no está visible o el Hero quedó muy abajo en scroll, dormir
+      if (typeof document !== "undefined" && document.hidden) {
+        isSleepingRef.current = true;
+        return;
+      }
+      if (typeof window !== "undefined" && window.scrollY > window.innerHeight * 1.3) {
+        isSleepingRef.current = true;
+        return;
+      }
+
       const m = mouseRef.current;
       const t = targetMouseRef.current;
 
@@ -370,6 +393,17 @@ export default function KineticGrid({
       m.y = lerpN(m.y, t.y, LERP_SPEED);
 
       draw(now);
+
+      const dx = m.x - t.x;
+      const dy = m.y - t.y;
+      const distSq = dx * dx + dy * dy;
+
+      // Si el puntero se estabilizó y no hay ondas expansivas activas, dormir para 0% CPU
+      if (distSq < 0.04 && ripplesRef.current.length === 0 && m.x !== -9999) {
+        isSleepingRef.current = true;
+        return;
+      }
+
       rafRef.current = requestAnimationFrame((n) => animateRef.current(n));
     },
     [draw],
@@ -396,13 +430,15 @@ export default function KineticGrid({
         mouseRef.current = { x: -9999, y: -9999 };
         targetMouseRef.current = { x: -9999, y: -9999 };
       }
+      wakeUp();
     };
 
     setSize();
-    window.addEventListener("resize", setSize);
+    window.addEventListener("resize", setSize, { passive: true });
 
     const onMouseMove = (e: MouseEvent) => {
       targetMouseRef.current = { x: e.clientX, y: e.clientY };
+      wakeUp();
     };
 
     const onClick = (e: MouseEvent) => {
@@ -413,21 +449,39 @@ export default function KineticGrid({
         opacity: 1,
         born: performance.now(),
       });
+      wakeUp();
+    };
+
+    const onScroll = () => {
+      if (window.scrollY < window.innerHeight * 1.2) {
+        wakeUp();
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (!document.hidden) {
+        wakeUp();
+      }
     };
 
     window.addEventListener("mousemove", onMouseMove, { passive: true });
     window.addEventListener("click", onClick, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
+    document.addEventListener("visibilitychange", onVisibilityChange, { passive: true });
+
     rafRef.current = requestAnimationFrame((n) => animateRef.current(n));
 
     return () => {
       window.removeEventListener("resize", setSize);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("click", onClick);
+      window.removeEventListener("scroll", onScroll);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [updateBgCanvas]);
+  }, [updateBgCanvas, wakeUp]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (

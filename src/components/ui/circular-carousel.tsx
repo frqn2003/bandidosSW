@@ -76,11 +76,12 @@ export default function CircularCarousel({
   className = ''
 }: CircularCarouselProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const cylinderRef = useRef<HTMLDivElement>(null);
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
-  const [rotationAngle, setRotationAngle] = useState(0);
   const [isIntroComplete, setIsIntroComplete] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isVisibleRef = useRef(false);
 
   // Estados mutables para el ciclo continuo de animación rAF
   const animState = useRef({
@@ -93,18 +94,9 @@ export default function CircularCarousel({
     rafId: 0
   });
 
-  // Para cerrar el cilindro de forma circular armónica, duplicamos los items si hay pocos
+  // Cada materia aparece de forma única sin duplicaciones artificiales
   const displayItems = useMemo(() => {
     if (!items || items.length === 0) return [];
-    if (items.length < 8) {
-      // Duplicamos para tener un anillo de al menos 8-9 tarjetas con fondo visible
-      const repeated: CarouselItem[] = [];
-      const times = Math.ceil(8 / items.length);
-      for (let i = 0; i < times; i++) {
-        repeated.push(...items);
-      }
-      return repeated;
-    }
     return items;
   }, [items]);
 
@@ -115,7 +107,7 @@ export default function CircularCarousel({
   // Radio del cilindro calculado por circunferencia
   const radius = useMemo(() => {
     const perimeter = count * (cardWidth + gap);
-    return Math.max(380, Math.round((perimeter / (2 * Math.PI)) * curve));
+    return Math.max(260, Math.round((perimeter / (2 * Math.PI)) * curve));
   }, [count, cardWidth, gap, curve]);
 
   // Velocidad base de rotación automática (grados por segundo)
@@ -125,40 +117,82 @@ export default function CircularCarousel({
     return speed * 0.28 * dirMult;
   }, [speed, autoplay, direction]);
 
-  // Bucle de animación continuo a 60fps
+  // Bucle de animación continuo a 60-120 FPS sin re-renders de React
   useEffect(() => {
-    animState.current.lastTime = performance.now();
+    const state = animState.current;
+    state.lastTime = performance.now();
 
     const loop = (time: number) => {
-      const state = animState.current;
+      if (!isVisibleRef.current) return;
+
       const dt = Math.min((time - state.lastTime) / 1000, 0.1);
       state.lastTime = time;
 
       if (!state.isDragging) {
         if (pauseOnHover && isHovered) {
-          // Si el mouse toca una tarjeta, se frena suave y rápidamente
           state.velocity = state.velocity * 0.82;
         } else {
-          // Si el mouse no está sobre ninguna tarjeta, gira continuamente
           const friction = Math.pow(Math.max(0.1, Math.min(0.98, momentum)), dt * 60);
           state.velocity = state.velocity * friction + baseAngularSpeed * (1 - friction);
         }
         state.angle = (state.angle + state.velocity * dt) % 360;
       }
 
-      setRotationAngle(state.angle);
+      // Actualización directa del DOM con aceleración por hardware (CERO re-renders)
+      if (cylinderRef.current) {
+        cylinderRef.current.style.transform = `rotateX(${tilt}deg) rotateY(${state.angle.toFixed(2)}deg)`;
+      }
+
       state.rafId = requestAnimationFrame(loop);
     };
 
-    const currentAnimState = animState.current;
-    currentAnimState.rafId = requestAnimationFrame(loop);
-
-    return () => {
-      if (currentAnimState.rafId) {
-        cancelAnimationFrame(currentAnimState.rafId);
+    let hasHadInitialSpin = false;
+    const startLoop = () => {
+      if (!state.rafId) {
+        if (!hasHadInitialSpin) {
+          hasHadInitialSpin = true;
+          // Impulso inicial de giro cinematográfico al emerger en pantalla
+          state.velocity = baseAngularSpeed * 2.8;
+        }
+        state.lastTime = performance.now();
+        state.rafId = requestAnimationFrame(loop);
       }
     };
-  }, [baseAngularSpeed, momentum, pauseOnHover, isHovered]);
+
+    const stopLoop = () => {
+      if (state.rafId) {
+        cancelAnimationFrame(state.rafId);
+        state.rafId = 0;
+      }
+    };
+
+    // IntersectionObserver para pausar el bucle cuando no está visible en pantalla
+    const el = containerRef.current;
+    if (el) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const visible = entries[0].isIntersecting;
+          isVisibleRef.current = visible;
+          if (visible) {
+            startLoop();
+          } else {
+            stopLoop();
+          }
+        },
+        { threshold: 0.05 }
+      );
+      observer.observe(el);
+
+      return () => {
+        stopLoop();
+        observer.disconnect();
+      };
+    }
+
+    return () => {
+      stopLoop();
+    };
+  }, [baseAngularSpeed, momentum, pauseOnHover, isHovered, tilt]);
 
   // Animación de entrada ("rise")
   useEffect(() => {
@@ -206,6 +240,10 @@ export default function CircularCarousel({
     const deltaAngle = (deltaX / radius) * (180 / Math.PI);
     state.angle = (state.angle + deltaAngle) % 360;
     state.velocity = deltaAngle * 35; // Impulso inicial para el release
+
+    if (cylinderRef.current) {
+      cylinderRef.current.style.transform = `rotateX(${tilt}deg) rotateY(${state.angle.toFixed(2)}deg)`;
+    }
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -247,20 +285,17 @@ export default function CircularCarousel({
       }}
       suppressHydrationWarning
     >
-      {/* Contenedor cilíndrico en el espacio 3D */}
+      {/* Contenedor cilíndrico en el espacio 3D manipulado directamente en DOM */}
       <div
+        ref={cylinderRef}
         className="relative w-0 h-0 [transform-style:preserve-3d] will-change-transform"
         style={{
-          transform: `rotateX(${tilt}deg)`
+          transform: `rotateX(${tilt}deg) rotateY(0deg)`
         }}
       >
         {displayItems.map((item, index) => {
-          // Ángulo absoluto del centro de esta tarjeta
-          const itemAngle = (rotationAngle + index * stepAngle) % 360;
-          const cardRad = (itemAngle * Math.PI) / 180;
-          const cardSin = Math.sin(cardRad);
-          // Parallax sincronizado a nivel de tarjeta completa para evitar desfasaje de rebanadas
-          const cardParallaxOffset = cardSin * parallax * -20;
+          // Ángulo relativo base fijo de esta tarjeta sobre la circunferencia del cilindro
+          const itemAngle = (index * stepAngle) % 360;
 
           // Slices para curvatura 3D cilíndrica (bent cards)
           const slicesCount = bend ? 7 : 1;
@@ -287,12 +322,6 @@ export default function CircularCarousel({
                 const sliceAngle = (itemAngle + sliceAngleOffset) % 360;
                 
                 const sliceRad = (sliceAngle * Math.PI) / 180;
-                const sliceCos = Math.cos(sliceRad);
-
-                // Opacidad de sombra de profundidad suave (máximo 45% para que la foto siempre se distinga)
-                const shadeOpacity = depthFade
-                  ? Math.max(0, Math.min(0.45, (-sliceCos + 0.2) * 0.4))
-                  : 0;
 
                 // Border radius en los extremos exterior izquierdo (k=0) y derecho (k=N-1)
                 const isLeft = k === 0;
@@ -318,37 +347,29 @@ export default function CircularCarousel({
                   >
                     {/* Cara Frontal (visible al girar hacia el frente) */}
                     <div
-                      className="absolute inset-0 overflow-hidden shadow-2xl bg-slate-900 [backface-visibility:hidden]"
+                      className="absolute inset-0 overflow-hidden shadow-xl bg-white [backface-visibility:hidden]"
                       style={{
                         borderRadius: sliceBorderRadius,
-                        borderLeft: isLeft ? '1px solid rgba(255, 255, 255, 0.2)' : 'none',
-                        borderRight: isRight ? '1px solid rgba(255, 255, 255, 0.2)' : 'none',
-                        borderTop: '1px solid rgba(255, 255, 255, 0.2)',
-                        borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+                        borderLeft: isLeft ? '1px solid rgba(0, 0, 0, 0.08)' : 'none',
+                        borderRight: isRight ? '1px solid rgba(0, 0, 0, 0.08)' : 'none',
+                        borderTop: '1px solid rgba(0, 0, 0, 0.08)',
+                        borderBottom: '1px solid rgba(0, 0, 0, 0.08)'
                       }}
                     >
-                      {/* Imagen offset para componer la tarjeta completa sin distorsión de escala */}
+                      {/* Imagen offset para componer la tarjeta completa sin distorsión de escala ni capas oscuras */}
                       <img
                         src={item.src}
                         alt={item.alt || item.title || 'Materia'}
-                        className="h-full object-cover transition-transform duration-100 ease-out will-change-transform pointer-events-none"
+                        className="h-full object-cover transition-transform duration-100 ease-out will-change-transform pointer-events-none brightness-100"
                         style={{
                           width: `${cardWidth}px`,
                           maxWidth: 'none',
-                          transform: `translateX(-${k * sliceWidth}px) translateX(${cardParallaxOffset}px)`
+                          transform: `translateX(-${k * sliceWidth}px)`
                         }}
                         suppressHydrationWarning
                         onError={(e) => {
                           const target = e.currentTarget;
                           target.src = '/Imagen-Institucional.png';
-                        }}
-                      />
-
-                      {/* Sombra de profundidad */}
-                      <div
-                        className="absolute inset-0 bg-black pointer-events-none transition-opacity duration-75"
-                        style={{
-                          opacity: shadeOpacity
                         }}
                       />
 
@@ -379,22 +400,22 @@ export default function CircularCarousel({
 
                     {/* Cara Trasera (visible cuando la tarjeta orbita al fondo del cilindro) */}
                     <div
-                      className="absolute inset-0 overflow-hidden shadow-2xl bg-slate-900 [backface-visibility:hidden]"
+                      className="absolute inset-0 overflow-hidden shadow-xl bg-white [backface-visibility:hidden]"
                       style={{
                         transform: 'rotateY(180deg)',
                         borderRadius: bend
                           ? `${isRight ? cornerRadius : 0}px ${isLeft ? cornerRadius : 0}px ${isLeft ? cornerRadius : 0}px ${isRight ? cornerRadius : 0}px`
                           : `${cornerRadius}px`,
-                        borderLeft: isRight ? '1px solid rgba(255, 255, 255, 0.15)' : 'none',
-                        borderRight: isLeft ? '1px solid rgba(255, 255, 255, 0.15)' : 'none',
-                        borderTop: '1px solid rgba(255, 255, 255, 0.15)',
-                        borderBottom: '1px solid rgba(255, 255, 255, 0.15)'
+                        borderLeft: isRight ? '1px solid rgba(0, 0, 0, 0.08)' : 'none',
+                        borderRight: isLeft ? '1px solid rgba(0, 0, 0, 0.08)' : 'none',
+                        borderTop: '1px solid rgba(0, 0, 0, 0.08)',
+                        borderBottom: '1px solid rgba(0, 0, 0, 0.08)'
                       }}
                     >
                       <img
                         src={item.src}
                         alt={item.alt || item.title || 'Materia'}
-                        className="h-full object-cover transition-transform duration-100 ease-out will-change-transform pointer-events-none"
+                        className="h-full object-cover transition-transform duration-100 ease-out will-change-transform pointer-events-none brightness-100"
                         style={{
                           width: `${cardWidth}px`,
                           maxWidth: 'none',
@@ -404,13 +425,6 @@ export default function CircularCarousel({
                         onError={(e) => {
                           const target = e.currentTarget;
                           target.src = '/Imagen-Institucional.png';
-                        }}
-                      />
-                      {/* Sombra suave de profundidad en el fondo */}
-                      <div
-                        className="absolute inset-0 bg-black pointer-events-none transition-opacity duration-75"
-                        style={{
-                          opacity: 0.38
                         }}
                       />
                     </div>

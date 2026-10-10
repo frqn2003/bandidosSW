@@ -119,7 +119,7 @@ export default function RadialSocialMenu({ className }: RadialSocialMenuProps) {
   // Mensaje al inicio de la landing: exactamente 4 segundos después de iniciar la página
   useEffect(() => {
     let startTimer: NodeJS.Timeout | null = null;
-    
+
     // Solo inicia el temporizador de 4 segundos si estamos en el inicio
     if (typeof window !== "undefined" && window.scrollY < 200) {
       startTimer = setTimeout(() => {
