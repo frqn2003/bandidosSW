@@ -91,7 +91,8 @@ export function ComprobanteTurno({
             <span className="font-display text-2xl font-bold tracking-wide text-primary">
               {turno.codigo}
             </span>
-            <TurnoCalendarioBadge estado={turno.estado} />
+            {/* El comprobante es del alta: 'Asistió'/'Ausente' (HU-ASI-01) no aplican acá. */}
+            <TurnoCalendarioBadge estado={turno.estado === "Cancelado" ? "Cancelado" : "Reservado"} />
           </div>
         </div>
       </header>

@@ -40,7 +40,7 @@ const paginado = {
 export const listarAuditoriaQuery = z
   .object({
     tabla: z
-      .enum(["materia", "profesor", "profesor_materia", "agenda_profesional", "alumno", "turno"])
+      .enum(["materia", "profesor", "profesor_materia", "agenda_profesional", "alumno", "turno", "asistencia", "bloqueo_fecha", "pago", "cierre_caja", "nota_alumno"])
       .optional(),
     operacion: z.enum(["INSERT", "UPDATE", "DELETE"]).optional(),
     registroId: z.coerce.number().int().positive().optional(),
@@ -89,7 +89,12 @@ export type TablaAuditada =
   | "profesor_materia"
   | "agenda_profesional"
   | "alumno"
-  | "turno";
+  | "turno"
+  | "asistencia"
+  | "bloqueo_fecha"
+  | "pago"
+  | "cierre_caja"
+  | "nota_alumno";
 
 export type OperacionAuditoria = "INSERT" | "UPDATE" | "DELETE";
 
