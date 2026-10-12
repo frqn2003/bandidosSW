@@ -69,9 +69,8 @@ export const MODULOS: Modulo[] = [
   },
   { id: "alumnos", label: "Alumnos", href: "/alumnos", icon: "group", construido: true },
   { id: "profesores", label: "Cuerpo Docente", href: "/profesores", icon: "groups", construido: true },
-  // Solo para el rol Profesor: su propia ficha en modo LECTURA. Todavía no
-  // existe como pantalla, así que no navega a ningún lado (chip "Próx.").
-  { id: "mi-ficha", label: "Mi ficha", href: "#", icon: "badge", construido: false },
+  // Solo para el rol Profesor: su propia ficha en modo LECTURA y edición de disponibilidad.
+  { id: "mi-ficha", label: "Mi ficha", href: "/mi-ficha", icon: "badge", construido: true },
   { id: "materias", label: "Materias", href: "/materias", icon: "menu_book", construido: true },
   { id: "cobranzas", label: "Cobranzas", href: "/pagos", icon: "receipt_long", construido: true },
   { id: "usuarios", label: "Usuarios", href: "/usuarios", icon: "manage_accounts", construido: true },
@@ -93,7 +92,7 @@ export const PERMISOS_POR_ROL: Record<NombreRol, ModuloId[]> = {
     (id) => id !== "mi-ficha" && id !== "reservar-turno" && id !== "mis-turnos",
   ),
   "Mesa de Entrada": ["turnos", "calendario", "alumnos", "cobranzas"],
-  Profesor: ["calendario", "mi-ficha"],
+  Profesor: ["calendario", "dashboard", "mi-ficha"],
   Alumno: ["reservar-turno", "mis-turnos"],
 };
 

@@ -88,15 +88,17 @@ export function CalendarToolbar({
         </div>
 
         {/* Botón "+ Reservar turno" */}
-        <Button
-          type="button"
-          variant="primary"
-          onClick={onReservarTurno}
-          className="gap-2 shadow-xs"
-        >
-          <Icon name="add" size={18} />
-          Reservar turno
-        </Button>
+        {onReservarTurno && (
+          <Button
+            type="button"
+            variant="primary"
+            onClick={onReservarTurno}
+            className="gap-2 shadow-xs"
+          >
+            <Icon name="add" size={18} />
+            Reservar turno
+          </Button>
+        )}
       </div>
 
       {/* ─── Fila Inferior: Controles de Vista, Navegación y Filtros ─── */}

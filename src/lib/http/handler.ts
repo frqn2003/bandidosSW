@@ -37,6 +37,17 @@ export function withRoute<P = Record<string, never>>(
       const session = await requireSession();
       return await fn({ req, session, params: ctx.params });
     } catch (e) {
+      if (e instanceof z.ZodError) {
+        const primero = e.issues[0];
+        const campo = primero?.path.join(".") || undefined;
+        return errorResponse(
+          new ValidationError(
+            "DATOS_INVALIDOS",
+            primero?.message || "Los datos enviados no son válidos.",
+            campo,
+          ),
+        );
+      }
       return errorResponse(traducirErrorPostgres(e) ?? e);
     }
   };
@@ -60,6 +71,17 @@ export function withPublicRoute<P = Record<string, never>>(
     try {
       return await fn({ req, params: ctx.params });
     } catch (e) {
+      if (e instanceof z.ZodError) {
+        const primero = e.issues[0];
+        const campo = primero?.path.join(".") || undefined;
+        return errorResponse(
+          new ValidationError(
+            "DATOS_INVALIDOS",
+            primero?.message || "Los datos enviados no son válidos.",
+            campo,
+          ),
+        );
+      }
       return errorResponse(traducirErrorPostgres(e) ?? e);
     }
   };

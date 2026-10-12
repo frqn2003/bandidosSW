@@ -336,7 +336,7 @@ export function DayView({
                             </div>
                           );
                         })()
-                      ) : esFranjaLibre ? (
+                      ) : esFranjaLibre && !esProfesor ? (
                         /* Franja Libre (Dashed border, clickable) */
                         <div
                           onClick={() =>
@@ -348,10 +348,10 @@ export function DayView({
                           <span>Libre</span>
                         </div>
                       ) : (
-                        /* Fuera de disponibilidad del profesor */
+                        /* Fuera de disponibilidad del profesor o modo lectura */
                         <div
                           className="h-full w-full rounded-md bg-slate-50/40 select-none flex items-center justify-center text-slate-300 text-[11px]"
-                          title={`Fuera del horario de atención de ${col.profesor.apellido}`}
+                          title={esProfesor ? "Sin clases programadas" : `Fuera del horario de atención de ${col.profesor.apellido}`}
                         >
                           <span className="sr-only">No disponible</span>
                         </div>

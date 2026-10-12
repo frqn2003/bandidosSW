@@ -368,7 +368,7 @@ export function WeekView({
 
                         {/* Celda vacía sin turnos ni clases en curso */}
                         {turnosEnFranja.length === 0 && turnosOcupandoSlot.length === 0 && (
-                          trabaja ? (
+                          trabaja && !esProfesor ? (
                             <div
                               onClick={() => onReservarFranja && onReservarFranja(dia.fecha, hora)}
                               className="h-full w-full rounded flex items-center justify-center text-transparent hover:text-blue-600 hover:border hover:border-dashed hover:border-blue-400 hover:bg-blue-50/50 cursor-pointer transition-all group"
@@ -381,7 +381,7 @@ export function WeekView({
                           ) : (
                             <div
                               className="h-full w-full rounded select-none flex items-center justify-center"
-                              title="Fuera del horario de atención del profesor"
+                              title={esProfesor ? "Sin clases programadas" : "Fuera del horario de atención del profesor"}
                             >
                               <span className="sr-only">No disponible</span>
                             </div>

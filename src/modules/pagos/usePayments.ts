@@ -70,10 +70,22 @@ export function usePayments() {
   // Carga inicial y recarga de datos desde la API
   const cargarDatos = useCallback(() => {
     return Promise.all([
-      listarAlumnos({ estado: "activo" }),
-      listarClasesPendientes(),
-      listarFormasPago(),
-      listarPagos(),
+      listarAlumnos({ estado: "activo" }).catch((e) => {
+        console.warn("[pagos] fallo al listar alumnos:", e);
+        return [];
+      }),
+      listarClasesPendientes().catch((e) => {
+        console.warn("[pagos] fallo al listar clases pendientes:", e);
+        return [];
+      }),
+      listarFormasPago().catch((e) => {
+        console.warn("[pagos] fallo al listar formas de pago:", e);
+        return [];
+      }),
+      listarPagos().catch((e) => {
+        console.warn("[pagos] fallo al listar pagos:", e);
+        return [];
+      }),
     ])
       .then(([alus, pendientes, fp, historial]) => {
         // Indexar clases pendientes por alumno
@@ -107,7 +119,7 @@ export function usePayments() {
         setPaymentHistory(historial);
       })
       .catch((err) => {
-        console.error("Error al cargar datos iniciales de pagos:", err);
+        console.warn("[pagos] error al procesar datos iniciales:", err);
       });
   }, []);
 
