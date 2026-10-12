@@ -204,6 +204,32 @@ export function AttendanceCorrectionModal({
             </div>
           )}
 
+          {/* Banner para Gerente dentro de las primeras 24hs */}
+          {!evaluacion.pasaronMasDe24hs && rolUsuario === "Gerente" && (
+            <div className="rounded-sm border border-secondary/40 bg-secondary/10 p-3 text-xs flex items-start gap-2.5 text-on-surface">
+              <Icon name="info" size={20} className="text-secondary shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">Dentro del plazo de 24 horas</p>
+                <p className="mt-0.5 text-on-surface-variant">
+                  El registro fue realizado hace menos de 24 horas. Durante este plazo la corrección corresponde al Profesor. El Gerente solo puede modificar registros una vez vencido el plazo de 24 horas, con motivo obligatorio.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Banner para Mesa de Entrada (solo lectura) */}
+          {rolUsuario === "Mesa de Entrada" && (
+            <div className="rounded-sm border border-outline-variant bg-surface-container-low p-3 text-xs flex items-start gap-2.5 text-on-surface">
+              <Icon name="visibility" size={20} className="text-secondary shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">Acceso en modo LECTURA</p>
+                <p className="mt-0.5 text-on-surface-variant">
+                  Mesa de Entrada cuenta con permisos de solo lectura para los registros de asistencia.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Datos del registro original */}
           <div className="rounded-md border border-outline-variant bg-surface-container-low p-3.5 text-xs text-on-surface">
             <div className="grid grid-cols-2 gap-2 pb-2 mb-2 border-b border-outline-variant/60">

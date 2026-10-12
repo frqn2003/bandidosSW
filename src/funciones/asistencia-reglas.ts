@@ -132,8 +132,8 @@ export type EvaluacionCorreccion = {
 
 /**
  * Evalúa si el usuario puede corregir una asistencia ya guardada:
- * - Menos de 24 horas: Profesor y Gerente pueden editar libremente.
- * - Más de 24 horas: Profesor pasa a modo LECTURA; solo Gerente puede editar y exige motivo obligatorio.
+ * - Menos de 24 horas: El Profesor puede corregir; Gerente y Mesa de Entrada quedan en modo LECTURA.
+ * - Más de 24 horas: Profesor y Mesa de Entrada quedan en modo LECTURA; solo Gerente puede modificar con motivo obligatorio.
  */
 export function evaluarPlazoCorreccion(
   asistencia: AsistenciaResponse | null,
@@ -155,8 +155,27 @@ export function evaluarPlazoCorreccion(
   const horasTranscurridas = Math.max(0, diffMs / (1000 * 60 * 60));
   const pasaronMasDe24hs = horasTranscurridas > HORAS_CORRECCION_ASISTENCIA;
   const esGerente = rolUsuario === "Gerente";
+  const esMesaEntrada = rolUsuario === "Mesa de Entrada";
 
   if (!pasaronMasDe24hs) {
+    if (esGerente) {
+      return {
+        puedeCorregir: false,
+        pasaronMasDe24hs: false,
+        horasTranscurridas,
+        requiereMotivo: false,
+        motivoDeshabilitado: "Dentro de las 24 horas solo el Profesor puede corregir el registro.",
+      };
+    }
+    if (esMesaEntrada) {
+      return {
+        puedeCorregir: false,
+        pasaronMasDe24hs: false,
+        horasTranscurridas,
+        requiereMotivo: false,
+        motivoDeshabilitado: "Mesa de Entrada no tiene permisos para modificar asistencias.",
+      };
+    }
     return {
       puedeCorregir: true,
       pasaronMasDe24hs: false,

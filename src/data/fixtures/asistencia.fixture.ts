@@ -37,12 +37,19 @@ export const GERENTE_DEMO = {
   apellido: "González",
 };
 
+export const PROFESORES_ASISTENCIA = [
+  { id: 3, nombre: "Roberto", apellido: "Peralta" },
+  { id: 4, nombre: "Martín", apellido: "Gómez" },
+  { id: 1, nombre: "Juan", apellido: "Pérez" },
+];
+
 export const CLASES_DEL_DIA_FIXTURE: (ClaseDelDiaResponse & { profesorId: number })[] = [
   // 1. Turno que empieza en 20 minutos (BLOQUEADO: fuera de ventana de 15 min)
   {
     turnoId: 101,
     codigo: "TUR-000101",
     profesorId: 3,
+    profesor: PROFESOR_DEMO,
     alumno: { id: 1, legajo: "ALU-000001", nombre: "Sofía", apellido: "Ramírez" },
     materia: { id: 1, nombre: "Matemática" },
     fecha: hoyIso,
@@ -60,6 +67,7 @@ export const CLASES_DEL_DIA_FIXTURE: (ClaseDelDiaResponse & { profesorId: number
     turnoId: 102,
     codigo: "TUR-000102",
     profesorId: 3,
+    profesor: PROFESOR_DEMO,
     alumno: { id: 2, legajo: "ALU-000002", nombre: "Lucas", apellido: "Benítez" },
     materia: { id: 2, nombre: "Física" },
     fecha: hoyIso,
@@ -77,6 +85,7 @@ export const CLASES_DEL_DIA_FIXTURE: (ClaseDelDiaResponse & { profesorId: number
     turnoId: 103,
     codigo: "TUR-000103",
     profesorId: 3,
+    profesor: PROFESOR_DEMO,
     alumno: { id: 3, legajo: "ALU-000003", nombre: "Valentina", apellido: "Herrera" },
     materia: { id: 1, nombre: "Matemática" },
     fecha: hoyIso,
@@ -105,6 +114,7 @@ export const CLASES_DEL_DIA_FIXTURE: (ClaseDelDiaResponse & { profesorId: number
     turnoId: 104,
     codigo: "TUR-000104",
     profesorId: 3,
+    profesor: PROFESOR_DEMO,
     alumno: { id: 1, legajo: "ALU-000001", nombre: "Sofía", apellido: "Ramírez" },
     materia: { id: 3, nombre: "Química" },
     fecha: ayerIso,
@@ -125,6 +135,53 @@ export const CLASES_DEL_DIA_FIXTURE: (ClaseDelDiaResponse & { profesorId: number
     },
     puedeRegistrar: false,
     puedeCorregir: false, // Profesor no puede; Gerente sí con motivo
+    motivoDeshabilitado: "Notificación: solo el Gerente puede modificar",
+  },
+
+  // 5. Turno de OTRO profesor (profesorId: 4, Martín Gómez): turno hoy
+  {
+    turnoId: 105,
+    codigo: "TUR-000105",
+    profesorId: 4,
+    profesor: { id: 4, nombre: "Martín", apellido: "Gómez" },
+    alumno: { id: 4, legajo: "ALU-000004", nombre: "Mateo", apellido: "Ríos" },
+    materia: { id: 1, nombre: "Matemática" },
+    fecha: hoyIso,
+    horaInicio: calcularHora(10),
+    horaFin: calcularHora(70),
+    estado: "Reservado",
+    asistencia: null,
+    puedeRegistrar: true,
+    puedeCorregir: false,
+    motivoDeshabilitado: null,
+  },
+
+  // 6. Turno registrado AYER de Martín Gómez (hace 28 horas: solo Gerente puede modificar)
+  {
+    turnoId: 106,
+    codigo: "TUR-000106",
+    profesorId: 4,
+    profesor: { id: 4, nombre: "Martín", apellido: "Gómez" },
+    alumno: { id: 2, legajo: "ALU-000002", nombre: "Lucas", apellido: "Benítez" },
+    materia: { id: 2, nombre: "Física" },
+    fecha: ayerIso,
+    horaInicio: "15:00",
+    horaFin: "16:00",
+    estado: "Asistió",
+    asistencia: {
+      id: 503,
+      turnoId: 106,
+      presente: true,
+      temaTrabajado: "Termodinámica y transferencia de calor",
+      observaciones: "Clase de consulta previa a parcial.",
+      registradoPor: { id: 4, nombre: "Martín", apellido: "Gómez" },
+      registradoAt: new Date(ahora.getTime() - 28 * 60 * 60 * 1000).toISOString(),
+      modificadoAt: null,
+      modificadoPor: null,
+      motivoCorreccion: null,
+    },
+    puedeRegistrar: false,
+    puedeCorregir: false,
     motivoDeshabilitado: "Notificación: solo el Gerente puede modificar",
   },
 ];
@@ -217,6 +274,40 @@ export const HISTORIAL_ALUMNOS_FIXTURE: (HistorialAsistenciaItem & { alumnoId: n
     profesor: PROFESOR_DEMO,
     estado: "Asistió",
     temaTrabajado: "Dinámica lineal y rozamiento",
+  },
+  // Alumno 3: Valentina Herrera (atendida por Roberto Peralta, profesorId 3)
+  {
+    alumnoId: 3,
+    turnoId: 103,
+    codigo: "TUR-000103",
+    fecha: hoyIso,
+    horaInicio: calcularHora(-120),
+    materia: { id: 1, nombre: "Matemática" },
+    profesor: PROFESOR_DEMO,
+    estado: "Asistió",
+    temaTrabajado: "Ecuaciones cuadráticas y factorización por método de Gauss",
+  },
+  {
+    alumnoId: 3,
+    turnoId: 87,
+    codigo: "TUR-000087",
+    fecha: "2026-10-06",
+    horaInicio: "16:00",
+    materia: { id: 1, nombre: "Matemática" },
+    profesor: PROFESOR_DEMO,
+    estado: "Asistió",
+    temaTrabajado: "Polinomios y regla de Ruffini",
+  },
+  {
+    alumnoId: 3,
+    turnoId: 82,
+    codigo: "TUR-000082",
+    fecha: "2026-09-29",
+    horaInicio: "16:00",
+    materia: { id: 1, nombre: "Matemática" },
+    profesor: PROFESOR_DEMO,
+    estado: "Asistió",
+    temaTrabajado: "Casos de factoreo: factor común y trinomio",
   },
   // Alumno 4: Solo atendido por Profesor 1 (Juan Pérez), no por Roberto Peralta (id 3)
   {

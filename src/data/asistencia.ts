@@ -38,6 +38,7 @@ import {
   HISTORIAL_ALUMNOS_FIXTURE,
   PROFESOR_DEMO,
   GERENTE_DEMO,
+  PROFESORES_ASISTENCIA,
 } from "@/data/fixtures/asistencia.fixture";
 
 export {
@@ -45,6 +46,7 @@ export {
   RUTA_CLASES_DEL_DIA,
   rutaAsistencia,
   rutaHistorialAlumno,
+  PROFESORES_ASISTENCIA,
   type ClaseDelDiaResponse,
   type AsistenciaResponse,
   type HistorialAsistenciaResponse,
@@ -79,7 +81,7 @@ export interface SesionContexto {
 }
 
 /**
- * Consulta las clases del día para el profesor logueado (o todas si es Gerente).
+ * Consulta las clases del día para el profesor logueado (o todas si es Gerente / Mesa de Entrada).
  * Ordenadas por hora de inicio ascendente.
  */
 export async function listarClasesDelDia(
@@ -95,12 +97,22 @@ export async function listarClasesDelDia(
 
   const ahora = tiempoSimulado ?? new Date();
   const rol = sesion?.rol ?? "Profesor";
-  const profesorId = sesion?.profesorId ?? (rol === "Profesor" ? PROFESOR_DEMO.id : undefined);
+  if (rol !== "Profesor" && rol !== "Gerente" && rol !== "Mesa de Entrada") {
+    // Solo roles autorizados pueden ver las clases
+    return [];
+  }
 
   let filtradas = memoriaClases.filter((c) => c.fecha === fecha);
 
-  if (rol === "Profesor" && profesorId) {
+  if (rol === "Profesor") {
+    const profesorId = sesion?.profesorId ?? PROFESOR_DEMO.id;
+    // El profesor solo ve sus propios turnos
     filtradas = filtradas.filter((c) => c.profesorId === profesorId);
+  } else {
+    // Gerente y Mesa de Entrada: ven todos o filtran por profesor si vino en la query
+    if (queryValida.profesorId) {
+      filtradas = filtradas.filter((c) => c.profesorId === queryValida.profesorId);
+    }
   }
 
   // Recalcular flags de ventana de registro y plazo de corrección en vivo
@@ -109,9 +121,15 @@ export async function listarClasesDelDia(
       const ventana = evaluarVentanaRegistro(clase.fecha, clase.horaInicio, clase.estado, ahora);
       const correccion = evaluarPlazoCorreccion(clase.asistencia, rol, ahora);
 
+      // Solo el profesor asignado al turno puede registrar asistencia
+      const esDocenteAsignado =
+        rol === "Profesor" && clase.profesorId === (sesion?.profesorId ?? PROFESOR_DEMO.id);
+      const puedeRegistrar = esDocenteAsignado && ventana.puedeRegistrar;
+
       return {
         turnoId: clase.turnoId,
         codigo: clase.codigo,
+        profesor: clase.profesor,
         alumno: { ...clase.alumno },
         materia: { ...clase.materia },
         fecha: clase.fecha,
@@ -119,11 +137,13 @@ export async function listarClasesDelDia(
         horaFin: clase.horaFin,
         estado: clase.estado,
         asistencia: clase.asistencia ? { ...clase.asistencia } : null,
-        puedeRegistrar: ventana.puedeRegistrar,
+        puedeRegistrar,
         puedeCorregir: correccion.puedeCorregir,
         motivoDeshabilitado: clase.asistencia
           ? correccion.motivoDeshabilitado
-          : ventana.motivoDeshabilitado,
+          : !esDocenteAsignado
+            ? "Solo el profesor asignado puede registrar la asistencia."
+            : ventana.motivoDeshabilitado,
       };
     })
     .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
@@ -150,6 +170,17 @@ export async function registrarAsistencia(
   }
 
   const clase = memoriaClases[claseIndex];
+
+  // Regla: El Profesor solo puede registrar asistencia de sus propios turnos
+  const profesorId = sesion?.profesorId ?? sesion?.usuarioId ?? PROFESOR_DEMO.id;
+  if (clase.profesorId !== profesorId) {
+    throw new ApiError(
+      "TURNO_NO_PROPIO",
+      "Solo podés registrar asistencia en turnos asignados a vos.",
+      "turnoId",
+      403,
+    );
+  }
 
   if (clase.estado !== "Reservado") {
     throw new ApiError(
@@ -246,16 +277,44 @@ export async function corregirAsistencia(
   }
 
   const clase = memoriaClases[claseIndex];
+
+  // Regla: El Profesor solo puede corregir asistencia de sus propios turnos
+  const rol = sesion?.rol ?? "Profesor";
+  if (rol === "Profesor") {
+    const profesorId = sesion?.profesorId ?? sesion?.usuarioId ?? PROFESOR_DEMO.id;
+    if (clase.profesorId !== profesorId) {
+      throw new ApiError(
+        "TURNO_NO_PROPIO",
+        "Solo podés corregir asistencia en turnos asignados a vos.",
+        "turnoId",
+        403,
+      );
+    }
+  } else if (rol === "Mesa de Entrada") {
+    throw new ApiError(
+      "SIN_PERMISOS",
+      "Mesa de Entrada no tiene permisos para modificar asistencias.",
+      undefined,
+      403,
+    );
+  } else if (rol !== "Gerente") {
+    throw new ApiError(
+      "SIN_PERMISOS",
+      "No tenés permisos para corregir asistencias.",
+      undefined,
+      403,
+    );
+  }
+
   const asistenciaActual = clase.asistencia!;
   const ahora = tiempoSimulado ?? new Date();
-  const rol = sesion?.rol ?? "Profesor";
 
   const correccion = evaluarPlazoCorreccion(asistenciaActual, rol, ahora);
 
   if (!correccion.puedeCorregir) {
     throw new ApiError(
-      "PLAZO_CORRECCION_VENCIDO",
-      "Han transcurrido más de 24 horas: solo el Gerente puede modificar la asistencia.",
+      "PLAZO_CORRECCION_INVALIDO",
+      correccion.motivoDeshabilitado || "No se puede corregir la asistencia.",
       undefined,
       409,
     );
@@ -321,13 +380,18 @@ export async function obtenerHistorialAlumno(
   // BACKEND: const sp = new URLSearchParams(...); return apiGet<HistorialAsistenciaResponse>(`${rutaHistorialAlumno(alumnoId)}?${sp}`);
 
   const rol = sesion?.rol ?? "Profesor";
-  const profesorId = sesion?.profesorId ?? (rol === "Profesor" ? PROFESOR_DEMO.id : undefined);
+  const profesorId =
+    sesion?.profesorId ?? sesion?.usuarioId ?? (rol === "Profesor" ? PROFESOR_DEMO.id : undefined);
 
-  // Validación de acceso para rol Profesor: solo alumnos que atiende
+  // Validación de acceso para rol Profesor: solo alumnos que atiende (en historial o en clases asignadas)
   if (rol === "Profesor" && profesorId) {
-    const atiendeAlAlumno = memoriaHistorial.some(
-      (h) => h.alumnoId === alumnoId && h.profesor.id === profesorId,
-    );
+    const atiendeAlAlumno =
+      memoriaHistorial.some(
+        (h) => h.alumnoId === alumnoId && h.profesor.id === profesorId,
+      ) ||
+      memoriaClases.some(
+        (c) => c.alumno.id === alumnoId && c.profesorId === profesorId,
+      );
     if (!atiendeAlAlumno) {
       throw new ApiError(
         "SIN_PERMISO",

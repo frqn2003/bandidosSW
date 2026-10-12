@@ -58,6 +58,7 @@ export function StudentAttendanceHistory({
     const sesionCtx = {
       usuarioId: sesion?.usuario.id,
       rol: sesion?.usuario.rol.nombre,
+      profesorId: sesion?.usuario.id,
     };
 
     obtenerHistorialAlumno(

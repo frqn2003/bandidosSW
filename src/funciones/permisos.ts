@@ -97,9 +97,12 @@ export const MODULOS: Modulo[] = [
  */
 export const PERMISOS_POR_ROL: Record<NombreRol, ModuloId[]> = {
   Gerente: MODULOS.map((m) => m.id).filter(
-    (id) => id !== "mi-ficha" && id !== "reservar-turno" && id !== "mis-turnos",
+    (id) =>
+      id !== "mi-ficha" &&
+      id !== "reservar-turno" &&
+      id !== "mis-turnos",
   ),
-  "Mesa de Entrada": ["turnos", "calendario", "alumnos", "cobranzas"],
+  "Mesa de Entrada": ["turnos", "calendario", "asistencia", "alumnos", "cobranzas"],
   Profesor: ["calendario", "asistencia", "dashboard", "mi-ficha"],
   Alumno: ["reservar-turno", "mis-turnos"],
 };
@@ -107,7 +110,12 @@ export const PERMISOS_POR_ROL: Record<NombreRol, ModuloId[]> = {
 /** Los módulos que le corresponden al rol, en el orden del menú. */
 export function modulosDe(rol: NombreRol): Modulo[] {
   const permitidos = PERMISOS_POR_ROL[rol] ?? [];
-  return MODULOS.filter((m) => permitidos.includes(m.id));
+  return MODULOS.filter((m) => permitidos.includes(m.id)).map((m) => {
+    if (m.id === "asistencia" && rol !== "Profesor") {
+      return { ...m, label: "Clases de los profesores" };
+    }
+    return m;
+  });
 }
 
 export function puedeVer(rol: NombreRol, modulo: ModuloId): boolean {

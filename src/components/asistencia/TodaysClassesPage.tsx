@@ -8,17 +8,20 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { useSesion } from "@/funciones/sesion";
+import { AccesoDenegado } from "@/components/auth/AccesoDenegado";
 import {
   listarClasesDelDia,
   registrarAsistencia,
   corregirAsistencia,
+  PROFESORES_ASISTENCIA,
   type ClaseDelDiaResponse,
 } from "@/data/asistencia";
 import {
@@ -35,22 +38,15 @@ export function TodaysClassesPage() {
   const { sesion } = useSesion();
   const { showToast } = useToast();
 
-  const [fechaBase] = useState(() => new Date());
+  const rolUsuario = sesion?.usuario.rol.nombre ?? "Profesor";
+  const esProfesor = rolUsuario === "Profesor";
+  const esGerente = rolUsuario === "Gerente";
+
   const [fechaSeleccionada, setFechaSeleccionada] = useState(() => fechaAISO(new Date()));
+  const [profesorFiltro, setProfesorFiltro] = useState<string>("todos");
   const [clases, setClases] = useState<ClaseDelDiaResponse[]>([]);
   const [cargando, setCargando] = useState(true);
   const [recargaVersion, setRecargaVersion] = useState(0);
-
-  // Rol activo (permite conmutar en desarrollo/testing para verificar regla Gerente vs Profesor)
-  const rolReal = sesion?.usuario.rol.nombre ?? "Profesor";
-  const [rolSimulado, setRolSimulado] = useState<string>(rolReal);
-
-  // Simulación de tiempo para pruebas de la ventana de 15 minutos y 24 horas
-  const [tiempoSimuladoOffsetMinutos, setTiempoSimuladoOffsetMinutos] = useState<number>(0);
-
-  const tiempoActualEfectivo = useMemo(() => {
-    return new Date(fechaBase.getTime() + tiempoSimuladoOffsetMinutos * 60 * 1000);
-  }, [fechaBase, tiempoSimuladoOffsetMinutos]);
 
   // Modales
   const [presentClase, setPresentClase] = useState<ClaseDelDiaResponse | null>(null);
@@ -61,17 +57,25 @@ export function TodaysClassesPage() {
     nombre: string;
   } | null>(null);
 
-  // Cargar clases del día
+  // Cargar clases del día según rol y filtro de profesor
   useEffect(() => {
     let cancelado = false;
+    const profesorIdQuery = esProfesor
+      ? sesion?.usuario.id
+      : profesorFiltro !== "todos"
+        ? Number(profesorFiltro)
+        : undefined;
+
     listarClasesDelDia(
-      { fecha: fechaSeleccionada },
+      {
+        fecha: fechaSeleccionada,
+        profesorId: profesorIdQuery,
+      },
       {
         usuarioId: sesion?.usuario.id,
-        rol: rolSimulado,
-        profesorId: sesion?.usuario.id,
+        rol: rolUsuario,
+        profesorId: esProfesor ? sesion?.usuario.id : undefined,
       },
-      tiempoActualEfectivo,
     )
       .then((data) => {
         if (cancelado) return;
@@ -88,7 +92,7 @@ export function TodaysClassesPage() {
     return () => {
       cancelado = true;
     };
-  }, [fechaSeleccionada, sesion, rolSimulado, tiempoActualEfectivo, showToast, recargaVersion]);
+  }, [fechaSeleccionada, profesorFiltro, sesion, showToast, recargaVersion, esProfesor, rolUsuario]);
 
   // Manejo de clicks en botones bloqueados fuera de la ventana de 15 minutos
   const handleIntentoBotonBloqueado = (clase: ClaseDelDiaResponse) => {
@@ -114,9 +118,9 @@ export function TodaysClassesPage() {
         },
         {
           usuarioId: sesion?.usuario.id,
-          rol: rolSimulado,
+          rol: "Profesor",
+          profesorId: sesion?.usuario.id,
         },
-        tiempoActualEfectivo,
       );
       showToast(
         "success",
@@ -144,9 +148,9 @@ export function TodaysClassesPage() {
         },
         {
           usuarioId: sesion?.usuario.id,
-          rol: rolSimulado,
+          rol: "Profesor",
+          profesorId: sesion?.usuario.id,
         },
-        tiempoActualEfectivo,
       );
       showToast(
         "success",
@@ -180,9 +184,9 @@ export function TodaysClassesPage() {
         },
         {
           usuarioId: sesion?.usuario.id,
-          rol: rolSimulado,
+          rol: rolUsuario,
+          profesorId: esProfesor ? sesion?.usuario.id : undefined,
         },
-        tiempoActualEfectivo,
       );
       showToast("success", "Registro de asistencia actualizado exitosamente.");
       setCorrectClase(null);
@@ -199,26 +203,49 @@ export function TodaysClassesPage() {
   const clasesRegistradas = clases.filter((c) => c.estado !== "Reservado").length;
   const clasesPendientes = clases.filter((c) => c.estado === "Reservado").length;
 
+  // Acceso al módulo: Profesor, Gerente y Mesa de Entrada
+  if (sesion && !["Profesor", "Gerente", "Mesa de Entrada"].includes(sesion.usuario.rol.nombre)) {
+    return <AccesoDenegado rol={sesion.usuario.rol.nombre} />;
+  }
+
   return (
     <div className="space-y-6">
       {/* Header de la vista */}
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <span className="flex h-11 w-11 items-center justify-center rounded-md bg-primary-container/30">
-            <Icon name="how_to_reg" size={24} className="text-primary" />
+            <Icon name={esProfesor ? "how_to_reg" : "groups"} size={24} className="text-primary" />
           </span>
           <div>
             <h1 className="font-display text-2xl font-bold text-on-surface">
-              Mis clases del día
+              {esProfesor ? "Mis clases del día" : "Clases de los profesores"}
             </h1>
             <p className="text-sm font-medium text-on-surface-variant">
-              Registro y control de asistencia para tus turnos programados.
+              {esProfesor
+                ? "Registro y control de asistencia para tus turnos programados."
+                : "Seguimiento y control de asistencia de las clases del centro académico."}
             </p>
           </div>
         </div>
 
-        {/* Selector de Fecha */}
-        <div className="flex items-center gap-2">
+        {/* Filtro por Profesor (Gerente y Mesa de Entrada) y Selector de Fecha */}
+        <div className="flex flex-wrap items-center gap-2">
+          {!esProfesor && (
+            <Select
+              id="filtro-profesor"
+              compact
+              value={profesorFiltro}
+              onChange={(e) => setProfesorFiltro(e.target.value)}
+              wrapperClassName="w-48"
+            >
+              <option value="todos">Todos los profesores</option>
+              {PROFESORES_ASISTENCIA.map((p) => (
+                <option key={p.id} value={String(p.id)}>
+                  {p.apellido}, {p.nombre}
+                </option>
+              ))}
+            </Select>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -282,67 +309,6 @@ export function TodaysClassesPage() {
         </div>
       </div>
 
-      {/* PANEL DE AUTO-TESTING Y SIMULACIÓN (Requisito 4 de HU-ASI-01) */}
-      <div className="rounded-md border border-secondary/30 bg-surface-container-lowest p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Icon name="science" size={20} className="text-secondary" />
-            <h3 className="font-display text-xs font-bold uppercase tracking-wider text-on-surface">
-              Auto-Testing de Reglas Críticas (15 min y 24 hs)
-            </h3>
-          </div>
-          <span className="text-[11px] text-on-surface-variant">
-            Hora de simulación: <strong>{tiempoActualEfectivo.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</strong> · Rol: <strong>{rolSimulado}</strong>
-          </span>
-        </div>
-
-        <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-outline-variant/60">
-          <Button
-            variant="outline"
-            size="sm"
-            type="button"
-            className="text-xs justify-start gap-1.5 h-8"
-            onClick={() => {
-              setTiempoSimuladoOffsetMinutos(0);
-              showToast("success", "Simulación reestablecida a hora actual en tiempo real.");
-            }}
-          >
-            <Icon name="schedule" size={16} className="text-secondary" />
-            Hora normal (En vivo)
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            type="button"
-            className="text-xs justify-start gap-1.5 h-8"
-            onClick={() => {
-              // Adelantar 15 minutos para habilitar el turno que empieza en 20 minutos
-              setTiempoSimuladoOffsetMinutos(15);
-              showToast("success", "Simulado: reloj adelantado 15 min (ventana habilitada).");
-            }}
-          >
-            <Icon name="fast_forward" size={16} className="text-status-success-strong" />
-            Simular +15 min (Habilitar turno)
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            type="button"
-            className="text-xs justify-start gap-1.5 h-8"
-            onClick={() => {
-              const nuevoRol = rolSimulado === "Gerente" ? "Profesor" : "Gerente";
-              setRolSimulado(nuevoRol);
-              showToast("success", `Rol de prueba cambiado a: ${nuevoRol}`);
-            }}
-          >
-            <Icon name="swap_horiz" size={16} className="text-secondary" />
-            Alternar rol ({rolSimulado === "Gerente" ? "Cambiar a Profesor" : "Cambiar a Gerente"})
-          </Button>
-        </div>
-      </div>
-
       {/* Tabla de Mis Clases del Día */}
       <div className="rounded-md border border-outline-variant bg-surface-container-lowest shadow-sm overflow-hidden">
         <div className="p-4 border-b border-outline-variant flex items-center justify-between">
@@ -360,22 +326,23 @@ export function TodaysClassesPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px] border-collapse text-left text-xs">
+          <table className="w-full border-collapse text-left text-xs">
             <thead>
               <tr className="border-b border-outline-variant bg-surface-container-low font-bold tracking-wider text-on-surface-variant uppercase text-[11px]">
-                <th className="px-3 py-2.5">Código</th>
-                <th className="px-3 py-2.5">Horario</th>
-                <th className="px-3 py-2.5">Alumno</th>
-                <th className="px-3 py-2.5">Materia</th>
-                <th className="px-3 py-2.5">Estado</th>
-                <th className="px-3 py-2.5">Registro</th>
-                <th className="px-3 py-2.5 text-right">Acciones</th>
+                <th className="px-2.5 py-2">Código</th>
+                <th className="px-2.5 py-2">Horario</th>
+                {!esProfesor && <th className="px-2.5 py-2">Profesor</th>}
+                <th className="px-2.5 py-2">Alumno</th>
+                <th className="px-2.5 py-2">Materia</th>
+                <th className="px-2.5 py-2">Estado</th>
+                <th className="px-2.5 py-2">Registro</th>
+                <th className="px-2.5 py-2 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/60 text-on-surface">
               {cargando ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-12 text-center text-on-surface-variant">
+                  <td colSpan={!esProfesor ? 8 : 7} className="px-3 py-12 text-center text-on-surface-variant">
                     <span className="inline-flex items-center gap-2">
                       <Icon name="progress_activity" size={20} className="animate-spin text-secondary" />
                       Cargando turnos del día...
@@ -394,22 +361,31 @@ export function TodaysClassesPage() {
                       className="hover:bg-surface-container-low/50 transition-colors"
                     >
                       {/* Código */}
-                      <td className="px-3 py-2.5 whitespace-nowrap font-mono font-semibold text-on-surface">
+                      <td className="px-2.5 py-2 whitespace-nowrap font-mono font-semibold text-on-surface">
                         {clase.codigo}
                       </td>
 
                       {/* Horario */}
-                      <td className="px-3 py-2.5 whitespace-nowrap tabular-nums">
+                      <td className="px-2.5 py-2 whitespace-nowrap tabular-nums">
                         <span className="font-bold text-on-surface">
                           {clase.horaInicio} - {clase.horaFin}
                         </span>
                       </td>
 
+                      {/* Profesor (para Gerente y Mesa de Entrada) */}
+                      {!esProfesor && (
+                        <td className="px-2.5 py-2 whitespace-nowrap">
+                          <span className="font-semibold text-on-surface">
+                            {clase.profesor ? `${clase.profesor.apellido}, ${clase.profesor.nombre}` : "—"}
+                          </span>
+                        </td>
+                      )}
+
                       {/* Alumno */}
-                      <td className="px-3 py-2.5 whitespace-nowrap">
-                        <div className="flex items-center gap-2.5">
+                      <td className="px-2.5 py-2 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
                           <span
-                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${tonoAvatarDe(
+                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${tonoAvatarDe(
                               clase.alumno.id,
                             )}`}
                           >
@@ -427,9 +403,9 @@ export function TodaysClassesPage() {
                                   nombre: `${clase.alumno.nombre} ${clase.alumno.apellido}`,
                                 })
                               }
-                              className="text-[11px] text-secondary hover:underline cursor-pointer flex items-center gap-1"
+                              className="text-[10.5px] text-secondary hover:underline cursor-pointer flex items-center gap-1"
                             >
-                              <Icon name="history" size={13} />
+                              <Icon name="history" size={12} />
                               Ver historial
                             </button>
                           </div>
@@ -437,12 +413,12 @@ export function TodaysClassesPage() {
                       </td>
 
                       {/* Materia */}
-                      <td className="px-3 py-2.5 whitespace-nowrap font-medium text-on-surface">
+                      <td className="px-2.5 py-2 whitespace-nowrap font-medium text-on-surface">
                         {clase.materia.nombre}
                       </td>
 
                       {/* Estado */}
-                      <td className="px-3 py-2.5 whitespace-nowrap">
+                      <td className="px-2.5 py-2 whitespace-nowrap">
                         <StatusBadge
                           variant={
                             clase.estado === "Asistió"
@@ -467,7 +443,7 @@ export function TodaysClassesPage() {
                       </td>
 
                       {/* Detalle del Registro */}
-                      <td className="px-3 py-2.5 text-xs max-w-xs">
+                      <td className="px-2.5 py-2 text-xs max-w-[180px]">
                         {clase.asistencia ? (
                           <div className="space-y-0.5 text-[11px]">
                             <span className="block text-on-surface-variant font-medium">
@@ -490,75 +466,81 @@ export function TodaysClassesPage() {
                       </td>
 
                       {/* Botones de Acción */}
-                      <td className="px-3 py-2.5 whitespace-nowrap text-right">
+                      <td className="px-2.5 py-2 whitespace-nowrap text-right">
                         {!tieneAsistencia ? (
-                          <div className="inline-flex items-center gap-1">
-                            {/* Botón Presente */}
-                            <div
-                              onClick={() => {
-                                if (!puedeRegistrar) handleIntentoBotonBloqueado(clase);
-                              }}
-                              className="inline-block"
-                            >
-                              <Button
-                                variant="outline"
-                                size="xs"
-                                type="button"
-                                disabled={!puedeRegistrar}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPresentClase(clase);
+                          esProfesor ? (
+                            <div className="inline-flex items-center gap-1">
+                              {/* Botón Presente */}
+                              <div
+                                onClick={() => {
+                                  if (!puedeRegistrar) handleIntentoBotonBloqueado(clase);
                                 }}
-                                className={`gap-1 border-status-success-strong text-status-success-strong hover:bg-status-success/15 ${
-                                  !puedeRegistrar
-                                    ? "opacity-50 cursor-not-allowed pointer-events-none"
-                                    : ""
-                                }`}
-                                title={
-                                  !puedeRegistrar
-                                    ? clase.motivoDeshabilitado ||
-                                      "Notificación: Botones Presente/ausente deshabilitados"
-                                    : "Marcar Presente"
-                                }
+                                className="inline-block"
                               >
-                                <Icon name="check_circle" size={14} />
-                                Presente
-                              </Button>
-                            </div>
+                                <Button
+                                  variant="outline"
+                                  size="xs"
+                                  type="button"
+                                  disabled={!puedeRegistrar}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPresentClase(clase);
+                                  }}
+                                  className={`gap-1 border-status-success-strong text-status-success-strong hover:bg-status-success/15 ${
+                                    !puedeRegistrar
+                                      ? "opacity-50 cursor-not-allowed pointer-events-none"
+                                      : ""
+                                  }`}
+                                  title={
+                                    !puedeRegistrar
+                                      ? clase.motivoDeshabilitado ||
+                                        "Notificación: Botones Presente/ausente deshabilitados"
+                                      : "Marcar Presente"
+                                  }
+                                >
+                                  <Icon name="check_circle" size={14} />
+                                  Presente
+                                </Button>
+                              </div>
 
-                            {/* Botón Ausente */}
-                            <div
-                              onClick={() => {
-                                if (!puedeRegistrar) handleIntentoBotonBloqueado(clase);
-                              }}
-                              className="inline-block"
-                            >
-                              <Button
-                                variant="outline"
-                                size="xs"
-                                type="button"
-                                disabled={!puedeRegistrar}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setAbsentClase(clase);
+                              {/* Botón Ausente */}
+                              <div
+                                onClick={() => {
+                                  if (!puedeRegistrar) handleIntentoBotonBloqueado(clase);
                                 }}
-                                className={`gap-1 border-status-warning-strong text-status-warning-strong hover:bg-status-warning/15 ${
-                                  !puedeRegistrar
-                                    ? "opacity-50 cursor-not-allowed pointer-events-none"
-                                    : ""
-                                }`}
-                                title={
-                                  !puedeRegistrar
-                                    ? clase.motivoDeshabilitado ||
-                                      "Notificación: Botones Presente/ausente deshabilitados"
-                                    : "Marcar Ausente"
-                                }
+                                className="inline-block"
                               >
-                                <Icon name="person_off" size={14} />
-                                Ausente
-                              </Button>
+                                <Button
+                                  variant="outline"
+                                  size="xs"
+                                  type="button"
+                                  disabled={!puedeRegistrar}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setAbsentClase(clase);
+                                  }}
+                                  className={`gap-1 border-status-warning-strong text-status-warning-strong hover:bg-status-warning/15 ${
+                                    !puedeRegistrar
+                                      ? "opacity-50 cursor-not-allowed pointer-events-none"
+                                      : ""
+                                  }`}
+                                  title={
+                                    !puedeRegistrar
+                                      ? clase.motivoDeshabilitado ||
+                                        "Notificación: Botones Presente/ausente deshabilitados"
+                                      : "Marcar Ausente"
+                                  }
+                                >
+                                  <Icon name="person_off" size={14} />
+                                  Ausente
+                                </Button>
+                              </div>
                             </div>
-                          </div>
+                          ) : (
+                            <span className="text-[11px] text-on-surface-variant italic">
+                              Pendiente
+                            </span>
+                          )
                         ) : (
                           /* Botón Corregir / Ver Registro */
                           <Button
@@ -566,14 +548,18 @@ export function TodaysClassesPage() {
                             size="xs"
                             type="button"
                             onClick={() => setCorrectClase(clase)}
-                            className="gap-1 text-secondary"
+                            className={`h-6.5 px-2 py-0 text-[11px] gap-1 shrink-0 ${
+                              puedeCorregir
+                                ? "text-secondary border-secondary/60 hover:bg-secondary/10"
+                                : "text-on-surface-variant border-outline-variant hover:bg-surface-container-high"
+                            }`}
                             title={
                               puedeCorregir
                                 ? "Corregir registro de asistencia"
                                 : "Ver registro (Modo lectura)"
                             }
                           >
-                            <Icon name={puedeCorregir ? "edit_calendar" : "visibility"} size={14} />
+                            <Icon name={puedeCorregir ? "edit_calendar" : "visibility"} size={13} />
                             {puedeCorregir ? "Corregir" : "Ver registro"}
                           </Button>
                         )}
@@ -583,7 +569,7 @@ export function TodaysClassesPage() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-on-surface-variant">
+                  <td colSpan={!esProfesor ? 8 : 7} className="px-4 py-12 text-center text-on-surface-variant">
                     <Icon name="event_busy" size={36} className="mx-auto text-on-surface-variant/40 mb-2" />
                     <p className="font-bold text-sm text-on-surface">
                       No hay clases programadas para esta fecha.
@@ -620,8 +606,7 @@ export function TodaysClassesPage() {
       <AttendanceCorrectionModal
         open={!!correctClase}
         clase={correctClase}
-        rolUsuario={rolSimulado}
-        tiempoSimulado={tiempoActualEfectivo}
+        rolUsuario={rolUsuario}
         onClose={() => setCorrectClase(null)}
         onConfirmCorrection={handleConfirmarCorreccion}
         onNotificarSoloGerente={() => {
