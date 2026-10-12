@@ -60,6 +60,7 @@ export function useDashboardMetrics() {
     hasta: ultimoDia,
     materiaId: "Todas",
     profesorId: "Todos",
+    nivel: "Todos",
   });
 
   const [errorApi, setErrorApi] = useState<string | null>(null);
@@ -142,12 +143,13 @@ export function useDashboardMetrics() {
     setCargando(true);
     setErrorApi(null);
     try {
-      // BACKEND: GET /api/indicadores?desde=...&hasta=...
+      // BACKEND: GET /api/indicadores?desde=...&hasta=...&nivel=...
       const resultado = await consultarIndicadores({
         desde: filtros.desde,
         hasta: filtros.hasta,
         materiaId: filtros.materiaId !== "Todas" ? filtros.materiaId : undefined,
         profesorId: filtros.profesorId !== "Todos" ? filtros.profesorId : undefined,
+        nivel: filtros.nivel !== "Todos" ? filtros.nivel : undefined,
       });
       setMetricas(resultado);
     } catch (err) {
@@ -208,7 +210,7 @@ export function useDashboardMetrics() {
   }, [ejecutarConsulta]);
 
   /**
-   * Restablece los filtros al mes en curso sin filtros de materia ni profesor.
+   * Restablece los filtros al mes en curso sin filtros de materia ni profesor ni nivel.
    */
   const limpiarFiltros = useCallback(() => {
     const { primerDia: p, ultimoDia: u } = getMesEnCursoAR();
@@ -217,12 +219,13 @@ export function useDashboardMetrics() {
       hasta: u,
       materiaId: "Todas",
       profesorId: "Todos",
+      nivel: "Todos",
     });
     setErrorApi(null);
   }, []);
 
   /**
-   * Tarjetas estructuradas con fórmulas matemáticas y tooltips explicativos.
+   * Tarjetas estructuradas con fórmulas matemáticas, tooltips y comparativa de períodos (HU-IND-03).
    */
   const kpiCards: KPICardData[] = useMemo(() => {
     const formateadorMoneda = new Intl.NumberFormat("es-AR", {
@@ -234,6 +237,132 @@ export function useDashboardMetrics() {
     const desde = metricas.periodo?.desde || filtros.desde;
     const hasta = metricas.periodo?.hasta || filtros.hasta;
 
+    if (metricas.tarjetas && metricas.tarjetas.length > 0) {
+      return metricas.tarjetas.map((t) => {
+        let valorFormateado = "—";
+        if (t.valor !== null && t.valor !== undefined) {
+          if (t.unidad === "porcentaje") {
+            valorFormateado = `${Number(t.valor).toFixed(1)}%`;
+          } else if (t.unidad === "pesos") {
+            valorFormateado = formateadorMoneda.format(Number(t.valor));
+          } else {
+            valorFormateado = Number(t.valor).toLocaleString("es-AR");
+          }
+        }
+
+        let valorAnteriorFormateado: string | null = null;
+        if (t.valorAnterior !== null && t.valorAnterior !== undefined) {
+          if (t.unidad === "porcentaje") {
+            valorAnteriorFormateado = `${Number(t.valorAnterior).toFixed(1)}%`;
+          } else if (t.unidad === "pesos") {
+            valorAnteriorFormateado = formateadorMoneda.format(Number(t.valorAnterior));
+          } else {
+            valorAnteriorFormateado = Number(t.valorAnterior).toLocaleString("es-AR");
+          }
+        }
+
+        let formula = "";
+        let explicacion = "";
+        let icono = "analytics";
+        let colorAcento: "primary" | "warning" | "success" | "info" | "danger" = "primary";
+        let esGlobal = false;
+        let href = "";
+        let label = "Ver detalle";
+
+        switch (t.clave) {
+          case "turnos_generados":
+            formula = "Total de turnos creados (incluye cancelados)";
+            explicacion =
+              "Suma la totalidad de clases programadas en el período seleccionado, independientemente de si se realizaron o cancelaron.";
+            icono = "calendar_month";
+            colorAcento = "primary";
+            href = `/turnos?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`;
+            label = "Ver turnos";
+            break;
+          case "porcentaje_cancelaciones":
+            formula = "(Turnos Cancelados / Turnos Generados) × 100";
+            explicacion =
+              "Proporción de turnos cancelados sobre el total generado en el período. Si no hay turnos, muestra '—'.";
+            icono = "event_busy";
+            colorAcento = "warning";
+            href = `/turnos?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&estado=Cancelado`;
+            label = "Ver cancelaciones";
+            break;
+          case "porcentaje_ocupacion":
+            formula = "(Horas de turnos no cancelados / Horas ofertadas en agendas) × 100";
+            explicacion =
+              "Aprovechamiento real de la capacidad horaria ofertada por los profesores. Si no hay disponibilidad, muestra '—'.";
+            icono = "trending_up";
+            colorAcento = "info";
+            href = "/calendario";
+            label = "Ver agenda";
+            break;
+          case "porcentaje_asistencia":
+            formula = "(Turnos Asistió / (Turnos Asistió + Turnos Ausente)) × 100";
+            explicacion =
+              "Proporción de asistencia real de alumnos a las clases dictadas. Si no hay asistencias registradas en el período, muestra '—'.";
+            icono = "how_to_reg";
+            colorAcento = "success";
+            href = "/calendario";
+            label = "Ver asistencias";
+            break;
+          case "alumnos_activos":
+            formula = "Total alumnos con estado 'activo' a la fecha de corte";
+            explicacion =
+              "Métrica global del centro académico a la fecha actual. No varía con los filtros de Materia o Profesor.";
+            icono = "school";
+            colorAcento = "success";
+            esGlobal = true;
+            href = "/alumnos";
+            label = "Ver alumnos";
+            break;
+          case "altas_alumnos":
+            formula = "Total alumnos dados de alta durante el período seleccionado";
+            explicacion =
+              "Nuevas inscripciones registradas en el centro. No varía con los filtros de Materia o Profesor.";
+            icono = "person_add";
+            colorAcento = "info";
+            esGlobal = true;
+            break;
+          case "ingresos_cobrados":
+            formula = "Suma de todos los pagos vigentes registrados en el período";
+            explicacion =
+              "Monto percibido efectivamente por el centro académico durante el rango seleccionado (excluye pagos anulados).";
+            icono = "payments";
+            colorAcento = "success";
+            href = "/pagos?tab=historial";
+            label = "Ver pagos";
+            break;
+          case "deuda_pendiente_total":
+            formula = "Suma del valor de clases dictadas no canceladas pendientes de pago";
+            explicacion =
+              "Monto adeudado al centro académico a la fecha de corte. Menor es mejor (una baja en la deuda es una mejora).";
+            icono = "account_balance_wallet";
+            colorAcento = "warning";
+            href = "/pagos";
+            label = "Ver deudores";
+            break;
+        }
+
+        return {
+          id: t.clave,
+          titulo: t.etiqueta,
+          valorFormateado,
+          formula,
+          explicacion,
+          icono,
+          colorAcento,
+          esGlobal,
+          variacionPorcentual: t.variacionPorcentual,
+          valorAnterior: valorAnteriorFormateado,
+          mejora: t.mejora,
+          menorEsMejor: t.menorEsMejor,
+          linkOrigen: href ? { href, label } : undefined,
+        };
+      });
+    }
+
+    // Fallback defensivo si tarjetas aún no está poblado
     return [
       {
         id: "turnosGenerados",
@@ -246,7 +375,7 @@ export function useDashboardMetrics() {
         icono: "calendar_month",
         colorAcento: "primary",
         linkOrigen: {
-          href: `/turnos?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&estado=`,
+          href: `/turnos?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`,
           label: "Ver turnos",
         },
       },
@@ -266,6 +395,7 @@ export function useDashboardMetrics() {
           "Proporción de turnos que no llegaron a dictarse por cancelación sobre el total generado en el período. Si no hay turnos, se muestra '—'.",
         icono: "event_busy",
         colorAcento: "warning",
+        menorEsMejor: true,
         linkOrigen: {
           href: `/turnos?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&estado=Cancelado`,
           label: "Ver cancelaciones",

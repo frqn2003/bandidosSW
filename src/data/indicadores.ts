@@ -6,8 +6,11 @@
 
 import {
   RUTA,
+  RUTA_MAPA_CALOR,
   type IndicadoresQuery,
   type IndicadoresResponse,
+  type MapaCalorQuery,
+  type MapaCalorResponse,
   type ErrorIndicadores,
 } from "@/contracts/indicadores";
 import { apiGet, ApiError } from "@/lib/api-client";
@@ -15,8 +18,14 @@ import { listarMaterias } from "@/data/materias";
 import { listarProfesores } from "@/data/profesores";
 import type { OpcionCatalogo } from "@/modules/indicadores/types";
 
-export { RUTA };
-export type { IndicadoresQuery, IndicadoresResponse, ErrorIndicadores };
+export { RUTA, RUTA_MAPA_CALOR };
+export type {
+  IndicadoresQuery,
+  IndicadoresResponse,
+  MapaCalorQuery,
+  MapaCalorResponse,
+  ErrorIndicadores,
+};
 
 /**
  * Consulta los indicadores analíticos de gestión para el período y filtros seleccionados.
@@ -25,7 +34,7 @@ export type { IndicadoresQuery, IndicadoresResponse, ErrorIndicadores };
 export async function consultarIndicadores(
   filtros: IndicadoresQuery
 ): Promise<IndicadoresResponse> {
-  const { desde, hasta, materiaId, profesorId } = filtros;
+  const { desde, hasta, materiaId, profesorId, nivel } = filtros;
 
   // Validación previa de contrato
   if (hasta < desde) {
@@ -54,10 +63,34 @@ export async function consultarIndicadores(
   if (hasta) params.set("hasta", hasta);
   if (materiaId) params.set("materiaId", String(materiaId));
   if (profesorId) params.set("profesorId", String(profesorId));
+  if (nivel) params.set("nivel", nivel);
 
   const qs = params.toString();
   const url = qs ? `${RUTA}?${qs}` : RUTA;
   return apiGet<IndicadoresResponse>(url);
+}
+
+/**
+ * HU-IND-03: Consulta las celdas del mapa de calor de demanda.
+ * Conectado al endpoint GET /api/indicadores/mapa-calor.
+ */
+export async function consultarMapaCalor(
+  filtros: MapaCalorQuery
+): Promise<MapaCalorResponse> {
+  const { desde, hasta, materiaId, profesorId, nivel, horaDesde, horaHasta } = filtros;
+
+  const params = new URLSearchParams();
+  if (desde) params.set("desde", desde);
+  if (hasta) params.set("hasta", hasta);
+  if (materiaId) params.set("materiaId", String(materiaId));
+  if (profesorId) params.set("profesorId", String(profesorId));
+  if (nivel) params.set("nivel", nivel);
+  if (horaDesde) params.set("horaDesde", horaDesde);
+  if (horaHasta) params.set("horaHasta", horaHasta);
+
+  const qs = params.toString();
+  const url = qs ? `${RUTA_MAPA_CALOR}?${qs}` : RUTA_MAPA_CALOR;
+  return apiGet<MapaCalorResponse>(url);
 }
 
 /**

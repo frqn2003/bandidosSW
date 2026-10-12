@@ -11,6 +11,12 @@ import type {
   TurnosPorSemanaItem,
   RankingMateriaDemandaItem,
   RankingMateriaIngresosItem,
+  IndicadorTarjetaResponse,
+  RankingProfesorItem,
+  ClaveTarjeta,
+  MapaCalorResponse,
+  MapaCalorCeldaResponse,
+  MapaCalorQuery,
   ErrorIndicadores,
 } from "@/contracts/indicadores";
 
@@ -20,83 +26,68 @@ export type {
   TurnosPorSemanaItem,
   RankingMateriaDemandaItem,
   RankingMateriaIngresosItem,
+  IndicadorTarjetaResponse,
+  RankingProfesorItem,
+  ClaveTarjeta,
+  MapaCalorResponse,
+  MapaCalorCeldaResponse,
+  MapaCalorQuery,
   ErrorIndicadores,
 };
 
+export type NivelFiltro = "Todos" | "Primario" | "Secundario" | "Universitario";
+
 /**
- * Estado de filtros del Dashboard en la UI.
+ * Estado de filtros globales del Dashboard de Dirección en la UI (HU-IND-03).
  */
 export interface DashboardFiltersState {
   desde: string; // "yyyy-mm-dd"
   hasta: string; // "yyyy-mm-dd"
   materiaId: number | "Todas";
   profesorId: number | "Todos";
+  nivel: NivelFiltro;
 }
 
 /**
- * Entidad simulada de Turno para el cálculo dinámico de métricas.
+ * Estado de filtros locales exclusivos del Mapa de Calor de Demanda.
  */
-export interface MockTurnoIndicador {
-  id: number;
-  fecha: string; // "yyyy-mm-dd"
-  horaInicio: string; // "hh:mm"
-  horaFin: string; // "hh:mm"
-  duracionHoras: number; // ej: 1, 1.5, 2
-  materiaId: number;
-  materiaNombre: string;
-  profesorId: number;
-  profesorNombre: string;
-  estado: "Reservado" | "Realizado" | "Cancelado";
-  valorClase: number; // Monto en pesos
-  pagado: boolean;
+export interface HeatmapFiltersState {
+  materiaId: number | "Todas";
+  profesorId: number | "Todos";
+  horaDesde: string; // "HH:MM" o ""
+  horaHasta: string; // "HH:MM" o ""
 }
 
 /**
- * Entidad simulada de Disponibilidad docente para el cálculo de % de ocupación.
- */
-export interface MockDisponibilidadProfesor {
-  id: number;
-  profesorId: number;
-  fecha: string; // "yyyy-mm-dd"
-  horasDisponibles: number; // Horas que el profesor ofreció en su agenda ese día
-}
-
-/**
- * Entidad simulada de Alumno para métricas globales (Alumnos activos y Altas).
- */
-export interface MockAlumnoIndicador {
-  id: number;
-  nombre: string;
-  apellido: string;
-  estado: "activo" | "inactivo";
-  fechaAlta: string; // "yyyy-mm-dd"
-}
-
-/**
- * Entidad simulada de Cobro/Pago para ingresos.
- */
-export interface MockPagoIndicador {
-  id: number;
-  turnoId: number;
-  fechaPago: string; // "yyyy-mm-dd"
-  monto: number;
-  materiaId: number;
-  profesorId: number;
-}
-
-/**
- * Información estructurada para cada tarjeta KPI del tablero.
+ * Información estructurada para cada tarjeta KPI del tablero con variación porcentual.
  */
 export interface KPICardData {
-  id: "turnosGenerados" | "porcentajeCancelaciones" | "porcentajeOcupacion" | "alumnosActivos" | "ingresosCobrados";
+  id:
+    | "turnos_generados"
+    | "porcentaje_cancelaciones"
+    | "porcentaje_ocupacion"
+    | "porcentaje_asistencia"
+    | "alumnos_activos"
+    | "altas_alumnos"
+    | "ingresos_cobrados"
+    | "deuda_pendiente_total"
+    | "turnosGenerados"
+    | "porcentajeCancelaciones"
+    | "porcentajeOcupacion"
+    | "alumnosActivos"
+    | "ingresosCobrados";
   titulo: string;
   valorFormateado: string;
   subtitulo?: string;
   formula: string;
   explicacion: string;
   icono: string;
-  colorAcento?: "primary" | "warning" | "success" | "info";
+  colorAcento?: "primary" | "warning" | "success" | "info" | "danger";
   esGlobal?: boolean; // Si es true, aclara que no es afectado por filtros de materia/profesor
+  variacionPorcentual?: number | null;
+  valorAnterior?: string | null;
+  mejora?: boolean | null;
+  menorEsMejor?: boolean;
   linkOrigen?: {
     href: string;
     label: string;
@@ -110,3 +101,55 @@ export interface OpcionCatalogo {
   id: number;
   nombre: string;
 }
+
+/**
+ * Entidad simulada de Turno para el cálculo dinámico de métricas (compatibilidad).
+ */
+export interface MockTurnoIndicador {
+  id: number;
+  fecha: string;
+  horaInicio: string;
+  horaFin: string;
+  duracionHoras: number;
+  materiaId: number;
+  materiaNombre: string;
+  profesorId: number;
+  profesorNombre: string;
+  estado: "Reservado" | "Realizado" | "Cancelado";
+  valorClase: number;
+  pagado: boolean;
+}
+
+/**
+ * Entidad simulada de Disponibilidad docente para el cálculo de % de ocupación.
+ */
+export interface MockDisponibilidadProfesor {
+  id: number;
+  profesorId: number;
+  fecha: string;
+  horasDisponibles: number;
+}
+
+/**
+ * Entidad simulada de Alumno para métricas globales.
+ */
+export interface MockAlumnoIndicador {
+  id: number;
+  nombre: string;
+  apellido: string;
+  estado: "activo" | "inactivo";
+  fechaAlta: string;
+}
+
+/**
+ * Entidad simulada de Cobro/Pago para ingresos.
+ */
+export interface MockPagoIndicador {
+  id: number;
+  turnoId: number;
+  fechaPago: string;
+  monto: number;
+  materiaId: number;
+  profesorId: number;
+}
+

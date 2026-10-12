@@ -22,21 +22,25 @@ import type {
   TurnosPorSemanaItem,
   RankingMateriaDemandaItem,
   RankingMateriaIngresosItem,
+  RankingProfesorItem,
 } from "@/modules/indicadores/types";
 
 interface DashboardChartsProps {
   turnosPorSemana: TurnosPorSemanaItem[];
   rankingDemanda: RankingMateriaDemandaItem[];
   rankingIngresos: RankingMateriaIngresosItem[];
+  rankingProfesores?: RankingProfesorItem[];
 }
 
 export function DashboardCharts({
   turnosPorSemana,
   rankingDemanda,
   rankingIngresos,
+  rankingProfesores = [],
 }: DashboardChartsProps) {
   const maxTurnos = Math.max(...rankingDemanda.map((d) => d.turnos), 1);
   const maxIngresos = Math.max(...rankingIngresos.map((i) => i.ingresos), 1);
+  const maxClasesProf = Math.max(...rankingProfesores.map((p) => p.clasesDictadas), 1);
 
   const formatoMoneda = new Intl.NumberFormat("es-AR", {
     style: "currency",
@@ -45,89 +49,88 @@ export function DashboardCharts({
   });
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-      {/* ── COLUMNA IZQUIERDA: GRÁFICO DE BARRAS RECHARTS (7 cols) ── */}
-      <div className="flex flex-col rounded-md border border-outline-variant bg-surface-container-lowest p-5 shadow-card lg:col-span-7">
-        <div className="flex items-center justify-between border-b border-outline-variant/60 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-primary/10 text-primary">
-              <Icon name="bar_chart" size={20} />
+    <div className="space-y-6">
+      {/* ── FILA SUPERIOR: GRÁFICO RECHARTS Y TOP DEMANDA ── */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {/* GRÁFICO DE BARRAS RECHARTS (7 cols) */}
+        <div className="flex flex-col rounded-md border border-outline-variant bg-surface-container-lowest p-5 shadow-card lg:col-span-7">
+          <div className="flex items-center justify-between border-b border-outline-variant/60 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-primary/10 text-primary">
+                <Icon name="bar_chart" size={20} />
+              </div>
+              <div>
+                <h3 className="font-display text-base font-bold text-on-surface">
+                  Turnos por semana
+                </h3>
+                <p className="text-xs text-on-surface-variant">
+                  Distribución cronológica de clases en el período
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-display text-base font-bold text-on-surface">
-                Turnos por semana
-              </h3>
-              <p className="text-xs text-on-surface-variant">
-                Distribución cronológica de clases en el período
-              </p>
-            </div>
+            <span className="rounded-full bg-surface-container-high px-2.5 py-0.5 text-xs font-bold text-on-surface-variant">
+              {turnosPorSemana.reduce((sum, item) => sum + item.cantidad, 0)} clases
+            </span>
           </div>
-          <span className="rounded-full bg-surface-container-high px-2.5 py-0.5 text-xs font-bold text-on-surface-variant">
-            {turnosPorSemana.reduce((sum, item) => sum + item.cantidad, 0)} clases
-          </span>
+
+          <div className="mt-4 h-72 w-full">
+            {turnosPorSemana.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={turnosPorSemana}
+                  margin={{ top: 16, right: 16, left: -16, bottom: 24 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis
+                    dataKey="etiquetaSemana"
+                    tick={{ fill: "#64748b", fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={{ stroke: "#cbd5e1" }}
+                    interval={0}
+                    angle={-20}
+                    textAnchor="end"
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fill: "#64748b", fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <Tooltip
+                    cursor={{ fill: "rgba(0, 35, 111, 0.05)" }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload as TurnosPorSemanaItem;
+                        return (
+                          <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-2.5 shadow-modal text-xs">
+                            <p className="font-bold text-on-surface">{data.etiquetaSemana}</p>
+                            <p className="mt-1 font-semibold text-primary">
+                              {data.cantidad} {data.cantidad === 1 ? "turno" : "turnos"}
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar
+                    dataKey="cantidad"
+                    fill="#00236f"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={48}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-xs text-on-surface-variant">
+                No hay turnos registrados en las semanas del período.
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Gráfico Recharts */}
-        <div className="mt-4 h-72 w-full">
-          {turnosPorSemana.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={turnosPorSemana}
-                margin={{ top: 16, right: 16, left: -16, bottom: 24 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis
-                  dataKey="etiquetaSemana"
-                  tick={{ fill: "#64748b", fontSize: 11 }}
-                  tickLine={false}
-                  axisLine={{ stroke: "#cbd5e1" }}
-                  interval={0}
-                  angle={-20}
-                  textAnchor="end"
-                />
-                <YAxis
-                  allowDecimals={false}
-                  tick={{ fill: "#64748b", fontSize: 11 }}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <Tooltip
-                  cursor={{ fill: "rgba(0, 35, 111, 0.05)" }}
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0].payload as TurnosPorSemanaItem;
-                      return (
-                        <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-2.5 shadow-modal text-xs">
-                          <p className="font-bold text-on-surface">{data.etiquetaSemana}</p>
-                          <p className="mt-1 font-semibold text-primary">
-                            {data.cantidad} {data.cantidad === 1 ? "turno" : "turnos"}
-                          </p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Bar
-                  dataKey="cantidad"
-                  fill="#00236f"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={48}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-full items-center justify-center text-xs text-on-surface-variant">
-              No hay turnos registrados en las semanas del período.
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── COLUMNA DERECHA: DOS RANKINGS TOP 5 (5 cols) ── */}
-      <div className="flex flex-col gap-6 lg:col-span-5">
-        {/* TOP 5 MATERIAS MÁS PEDIDAS */}
-        <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-5 shadow-card">
+        {/* TOP 5 MATERIAS MÁS PEDIDAS (5 cols) */}
+        <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-5 shadow-card lg:col-span-5">
           <div className="flex items-center justify-between border-b border-outline-variant/60 pb-3 mb-4">
             <div className="flex items-center gap-2">
               <Icon name="trending_up" size={18} className="text-secondary" />
@@ -163,7 +166,6 @@ export function DashboardCharts({
                       </div>
                     </div>
 
-                    {/* Barra horizontal simulada con Tailwind */}
                     <div className="h-2 w-full rounded-full bg-surface-container-high overflow-hidden">
                       <div
                         className="h-full rounded-full bg-primary transition-all duration-medium"
@@ -180,15 +182,82 @@ export function DashboardCharts({
             )}
           </div>
         </div>
+      </div>
 
-        {/* TOP 5 MATERIAS POR INGRESOS */}
-        <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-5 shadow-card">
+      {/* ── FILA INFERIOR: TOP PROFESORES (ASISTIÓ) Y TOP INGRESOS ── */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        {/* RANKING TOP 5 DE PROFESORES POR CLASES DICTADAS (6 cols) */}
+        <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-5 shadow-card lg:col-span-6">
           <div className="flex items-center justify-between border-b border-outline-variant/60 pb-3 mb-4">
             <div className="flex items-center gap-2">
-              <Icon name="payments" size={18} className="text-status-success-strong" />
-              <h3 className="font-display text-sm font-bold text-on-surface">
-                Top 5 materias por ingresos
-              </h3>
+              <Icon name="school" size={18} className="text-primary" />
+              <div>
+                <h3 className="font-display text-sm font-bold text-on-surface">
+                  Top 5 profesores por clases dictadas
+                </h3>
+                <p className="text-[11px] text-on-surface-variant">
+                  Clases impartidas en estado Asistió
+                </p>
+              </div>
+            </div>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
+              Clases / Horas
+            </span>
+          </div>
+
+          <div className="space-y-3.5">
+            {rankingProfesores.length > 0 ? (
+              rankingProfesores.map((item, index) => {
+                const porcentaje = Math.round((item.clasesDictadas / maxClasesProf) * 100);
+
+                return (
+                  <div key={item.profesorId} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[11px] font-bold text-blue-700 font-mono">
+                          {index + 1}
+                        </span>
+                        <span className="font-bold text-on-surface truncate">
+                          {item.profesor}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0 text-on-surface-variant font-medium">
+                        <span className="font-bold text-primary">{item.clasesDictadas}</span> clases
+                        <span>·</span>
+                        <span>{item.horasDictadas}h</span>
+                      </div>
+                    </div>
+
+                    <div className="h-2 w-full rounded-full bg-surface-container-high overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-secondary transition-all duration-medium"
+                        style={{ width: `${porcentaje}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="py-4 text-center text-xs text-on-surface-variant">
+                Sin clases dictadas registradas en el período.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* TOP 5 MATERIAS POR INGRESOS (6 cols) */}
+        <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-5 shadow-card lg:col-span-6">
+          <div className="flex items-center justify-between border-b border-outline-variant/60 pb-3 mb-4">
+            <div className="flex items-center gap-2">
+              <Icon name="payments" size={18} className="text-emerald-700" />
+              <div>
+                <h3 className="font-display text-sm font-bold text-on-surface">
+                  Top 5 materias por ingresos
+                </h3>
+                <p className="text-[11px] text-on-surface-variant">
+                  Facturación efectiva por cobro de clases
+                </p>
+              </div>
             </div>
             <span className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">
               Facturación
@@ -214,12 +283,11 @@ export function DashboardCharts({
                       <div className="flex items-center gap-1.5 shrink-0 font-semibold text-on-surface">
                         <span>{formatoMoneda.format(item.ingresos)}</span>
                         <span className="text-on-surface-variant font-normal text-[11px]">
-                          ({item.turnos})
+                          ({item.turnos} {item.turnos === 1 ? "turno" : "turnos"})
                         </span>
                       </div>
                     </div>
 
-                    {/* Barra horizontal simulada con Tailwind */}
                     <div className="h-2 w-full rounded-full bg-surface-container-high overflow-hidden">
                       <div
                         className="h-full rounded-full bg-emerald-600 transition-all duration-medium"
