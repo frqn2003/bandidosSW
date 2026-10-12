@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { StatusBadge, type StatusVariant } from "@/components/ui/StatusBadge";
 import { inicialesDe, tonoAvatarDe } from "@/funciones/formato";
 import type { StudentUI, StudentAuditLog } from "@/modules/alumnos/types";
+import { StudentAttendanceHistory } from "@/components/asistencia/StudentAttendanceHistory";
 
 interface StudentDetailViewProps {
   student: StudentUI;
@@ -303,8 +304,16 @@ export function StudentDetailView({
             </div>
           )}
 
-          {/* OTRAS PESTAÑAS (HISTORIAL) */}
-          {(activeTab === "turnos" || activeTab === "asistencias" || activeTab === "pagos") && (
+          {/* PESTAÑA: HISTORIAL DE ASISTENCIAS (HU-ASI-01) */}
+          {activeTab === "asistencias" && (
+            <StudentAttendanceHistory
+              alumnoId={student.id}
+              alumnoNombre={`${student.nombre} ${student.apellido}`}
+            />
+          )}
+
+          {/* OTRAS PESTAÑAS (TURNOS / PAGOS) */}
+          {(activeTab === "turnos" || activeTab === "pagos") && (
             <div className="rounded-md border border-dashed border-outline-variant p-8 text-center text-on-surface-variant">
               <Icon name="event_note" size={32} className="mx-auto text-on-surface-variant/50 mb-2" />
               <p className="text-sm font-bold text-on-surface capitalize">

@@ -19,6 +19,7 @@ interface RangoFechasProps {
   maxDias?: number;
   onChange: (rango: { desde: string; hasta: string }) => void;
   id?: string;
+  compact?: boolean;
 }
 
 const FECHA_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -41,6 +42,7 @@ export function RangoFechas({
   maxDias = 60,
   onChange,
   id = "range",
+  compact = false,
 }: RangoFechasProps) {
   const [desdeStr, setDesdeStr] = useState(desde);
   const [prevDesde, setPrevDesde] = useState(desde);
@@ -105,27 +107,33 @@ export function RangoFechas({
       ? Math.max(0, diferenciaDias(desdeStr, hastaStr))
       : 0;
 
+  const inputWidth = compact ? "w-[126px] sm:w-[130px]" : "w-44";
+  const separatorPadding = compact ? "pb-2 text-xs" : "pb-3 text-sm";
+  const gapClass = compact ? "gap-1.5 flex-nowrap" : "gap-2 flex-wrap";
+
   return (
     <>
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="w-44">
+      <div className={`flex items-end ${gapClass}`}>
+        <div className={inputWidth}>
           <Input
             id={`${id}-desde`}
             type="date"
             label="Desde"
+            compact={compact}
             value={desdeStr}
             onChange={(e) => alCambiarDesde(e.target.value)}
             onBlur={alBlurDesde}
           />
         </div>
-        <span aria-hidden="true" className="select-none pb-3 text-sm font-semibold leading-none text-on-surface-variant">
+        <span aria-hidden="true" className={`select-none font-semibold leading-none text-on-surface-variant ${separatorPadding}`}>
           al
         </span>
-        <div className="w-44">
+        <div className={inputWidth}>
           <Input
             id={`${id}-hasta`}
             type="date"
             label="Hasta"
+            compact={compact}
             value={hastaStr}
             onChange={(e) => alCambiarHasta(e.target.value)}
             onBlur={alBlurHasta}

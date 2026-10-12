@@ -24,6 +24,7 @@ export type ModuloId =
   | "sedes"
   | "turnos"
   | "calendario"
+  | "asistencia"
   | "alumnos"
   | "profesores"
   | "mi-ficha"
@@ -56,6 +57,13 @@ export const MODULOS: Modulo[] = [
     icon: "calendar_view_month",
     construido: true,
   },
+  {
+    id: "asistencia",
+    label: "Mis clases",
+    href: "/asistencia",
+    icon: "how_to_reg",
+    construido: true,
+  },
   // Después de Calendario a propósito: `inicioDe` toma el primer módulo
   // construido del rol, y la pantalla de entrada sigue siendo el calendario.
   // La entrada del módulo turnos es el listado (HU-TUR-02); la reserva
@@ -84,7 +92,7 @@ export const MODULOS: Modulo[] = [
  *
  * - Gerente: todos los módulos (incluyendo Indicadores de gestión de forma exclusiva).
  * - Mesa de Entrada: alumnos, turnos, calendarios y pagos (sin usuarios ni indicadores).
- * - Profesor: calendario y su ficha en modo LECTURA.
+ * - Profesor: calendario, mis clases (asistencia) y su ficha en modo LECTURA.
  * - Alumno (portal): solo reservar turno y mis turnos.
  */
 export const PERMISOS_POR_ROL: Record<NombreRol, ModuloId[]> = {
@@ -92,7 +100,7 @@ export const PERMISOS_POR_ROL: Record<NombreRol, ModuloId[]> = {
     (id) => id !== "mi-ficha" && id !== "reservar-turno" && id !== "mis-turnos",
   ),
   "Mesa de Entrada": ["turnos", "calendario", "alumnos", "cobranzas"],
-  Profesor: ["calendario", "dashboard", "mi-ficha"],
+  Profesor: ["calendario", "asistencia", "dashboard", "mi-ficha"],
   Alumno: ["reservar-turno", "mis-turnos"],
 };
 

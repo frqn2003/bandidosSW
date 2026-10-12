@@ -10,7 +10,7 @@ type Variant =
   | "outline-danger"
   | "ghost"
   | "destructive";
-type Size = "sm" | "md" | "lg" | "icon";
+type Size = "xs" | "sm" | "md" | "lg" | "icon";
 
 // Roles de color del documento de diseño (Nexo Académico):
 // - "Azul Conexión" (#2F6FED) → CTAs, activos, marca (tokens primary).
@@ -42,6 +42,7 @@ const variantClasses: Record<Variant, string> = {
 };
 
 const sizeClasses: Record<Size, string> = {
+  xs: "h-7 min-h-7 px-2 text-xs gap-1",
   sm: "h-9 min-h-9 px-3.5 text-sm gap-1.5",
   md: "h-11 min-h-11 px-5 text-sm gap-2",
   lg: "h-12 min-h-12 px-6 text-base gap-2",
