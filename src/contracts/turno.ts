@@ -120,8 +120,11 @@ export type ListarTurnosQuery = z.output<typeof listarTurnosQuery>;
 
 // ─── 4. Response ─────────────────────────────────────────────────────────
 
-export type EstadoTurno = "Reservado" | "Cancelado";
+/** 'Asistió' y 'Ausente' los fija el registro de asistencia (HU-ASI-01), nunca el alta de turno. */
+export type EstadoTurno = "Reservado" | "Cancelado" | "Asistió" | "Ausente";
 export type NivelMateria = "Primario" | "Secundario" | "Universitario";
+/** HU-POR-01: 'Portal del Alumno' si lo reservó el propio alumno. */
+export type OrigenTurno = "Centro" | "Portal del Alumno";
 
 export type TurnoResponse = {
   id: number;
@@ -154,6 +157,8 @@ export type TurnoResponse = {
   cancelacionTardia?: boolean;
   /** true si el turno ya fue cobrado en un pago. */
   pagado?: boolean;
+  /** HU-POR-01. Ausente = 'Centro'. */
+  origen?: OrigenTurno;
   /** Quién registró el turno (usuario que operaba en la sesión). */
   registradoPor: { id: number; nombre: string; apellido: string };
   /** ISO 8601. */
@@ -167,6 +172,7 @@ export type ErrorTurno =
   | "SIN_CUPO"                      // 409, cupo completo del profesor en esa franja
   | "ALUMNO_CON_TURNO_SUPERPUESTO"  // 409, el alumno ya tiene clase en ese horario
   | "FUERA_DE_DISPONIBILIDAD"       // 422, fuera de agenda del profesor
+  | "FECHA_BLOQUEADA"               // 422, la fecha cae en un bloqueo vigente (HU-CAL-03): no admite reservas ni modificaciones
   | "ANTICIPACION_INSUFICIENTE"     // 422, menos de 2 horas de anticipación
   | "PROFESOR_NO_DICTA_MATERIA"     // 422, profesor_materia inexistente o inactivo
   | "PRECIO_NO_DEFINIDO"            // 422, falta precio_clase

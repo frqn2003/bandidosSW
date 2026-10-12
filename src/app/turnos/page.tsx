@@ -256,7 +256,11 @@ function TurnosContent() {
 
   const conteo = useMemo<ConteoTurnos>(() => {
     const c: ConteoTurnos = { Reservado: 0, Finalizado: 0, Cancelado: 0 };
-    for (const t of turnos) c[estadoVisibleDe(t)] += 1;
+    for (const t of turnos) {
+      const e = estadoVisibleDe(t);
+      // 'Asistió'/'Ausente' (HU-ASI-01) son clases ya finalizadas: cuentan como Finalizado.
+      c[e === "Asistió" || e === "Ausente" ? "Finalizado" : e] += 1;
+    }
     return c;
   }, [turnos]);
 

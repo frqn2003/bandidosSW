@@ -67,19 +67,15 @@ export function usePayments() {
   // Comprobante emitido tras confirmar el pago (para mostrar en ReceiptView)
   const [lastReceipt, setLastReceipt] = useState<PaymentReceipt | null>(null);
 
-  // Carga inicial de datos desde la API
-  useEffect(() => {
-    let cancelado = false;
-
-    Promise.all([
+  // Carga inicial y recarga de datos desde la API
+  const cargarDatos = useCallback(() => {
+    return Promise.all([
       listarAlumnos({ estado: "activo" }),
       listarClasesPendientes(),
       listarFormasPago(),
       listarPagos(),
     ])
       .then(([alus, pendientes, fp, historial]) => {
-        if (cancelado) return;
-
         // Indexar clases pendientes por alumno
         const pendientesPorAlumno: Record<number, ClasePendientePagoResponse[]> = {};
         for (const c of pendientes) {
@@ -113,11 +109,11 @@ export function usePayments() {
       .catch((err) => {
         console.error("Error al cargar datos iniciales de pagos:", err);
       });
-
-    return () => {
-      cancelado = true;
-    };
   }, []);
+
+  useEffect(() => {
+    cargarDatos();
+  }, [cargarDatos]);
 
   // Alumno seleccionado actual
   const selectedStudent = useMemo(() => {
@@ -304,5 +300,6 @@ export function usePayments() {
     registerPayment,
     lastReceipt,
     clearLastReceipt,
+    recargarDatos: cargarDatos,
   };
 }

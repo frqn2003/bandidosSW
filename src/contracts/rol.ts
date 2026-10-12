@@ -33,7 +33,10 @@ export type ListarRolesQuery = z.output<typeof listarRolesQuery>;
 // decidir qué mostrar por rol (y para la regla "Profesor ⇒ academia obligatoria"
 // del alta de usuario), sin comparar contra un id hardcodeado.
 
-export type NombreRol = "Gerente" | "Profesor" | "Mesa de Entrada";
+// "Alumno" (HU-POR-01) es el rol del portal: existe en la base y en la sesión, pero
+// GET /api/roles NO lo lista. Las cuentas Alumno se crean solo con "Habilitar acceso al
+// portal" desde la ficha del alumno (alumno.ts), nunca desde el ABM de usuarios.
+export type NombreRol = "Gerente" | "Profesor" | "Mesa de Entrada" | "Alumno";
 
 export type RolResponse = {
   id: number;

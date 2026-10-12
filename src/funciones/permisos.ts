@@ -30,7 +30,9 @@ export type ModuloId =
   | "materias"
   | "cobranzas"
   | "usuarios"
-  | "reportes";
+  | "reportes"
+  | "reservar-turno"
+  | "mis-turnos";
 
 export type Modulo = {
   id: ModuloId;
@@ -73,6 +75,9 @@ export const MODULOS: Modulo[] = [
   { id: "materias", label: "Materias", href: "/materias", icon: "menu_book", construido: true },
   { id: "cobranzas", label: "Cobranzas", href: "/pagos", icon: "receipt_long", construido: true },
   { id: "usuarios", label: "Usuarios", href: "/usuarios", icon: "manage_accounts", construido: true },
+  // Solo para el rol Alumno (portal, HU-POR-01). Todavía no existen como pantalla.
+  { id: "reservar-turno", label: "Reservar turno", href: "#", icon: "event_available", construido: false },
+  { id: "mis-turnos", label: "Mis turnos", href: "#", icon: "event_note", construido: false },
 ];
 
 /**
@@ -81,11 +86,15 @@ export const MODULOS: Modulo[] = [
  * - Gerente: todos los módulos (incluyendo Indicadores de gestión de forma exclusiva).
  * - Mesa de Entrada: alumnos, turnos, calendarios y pagos (sin usuarios ni indicadores).
  * - Profesor: calendario y su ficha en modo LECTURA.
+ * - Alumno (portal): solo reservar turno y mis turnos.
  */
 export const PERMISOS_POR_ROL: Record<NombreRol, ModuloId[]> = {
-  Gerente: MODULOS.map((m) => m.id).filter((id) => id !== "mi-ficha"),
+  Gerente: MODULOS.map((m) => m.id).filter(
+    (id) => id !== "mi-ficha" && id !== "reservar-turno" && id !== "mis-turnos",
+  ),
   "Mesa de Entrada": ["turnos", "calendario", "alumnos", "cobranzas"],
   Profesor: ["calendario", "mi-ficha"],
+  Alumno: ["reservar-turno", "mis-turnos"],
 };
 
 /** Los módulos que le corresponden al rol, en el orden del menú. */

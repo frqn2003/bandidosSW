@@ -50,7 +50,7 @@ export interface StudentPaymentSummary {
 /**
  * Pestañas principales de navegación en Pagos.
  */
-export type PaymentsTab = "registrar" | "historial";
+export type PaymentsTab = "registrar" | "historial" | "caja" | "rendicion";
 
 /**
  * Estado del formulario de registro de pago en el front.

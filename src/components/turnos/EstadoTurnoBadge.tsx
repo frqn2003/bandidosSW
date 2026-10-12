@@ -16,6 +16,8 @@ const CONFIG: Record<EstadoTurnoVisible, { variant: StatusVariant; label: string
   Reservado: { variant: "info", label: "Reservado", icon: "event_available" },
   Finalizado: { variant: "neutral", label: "Finalizado", icon: "check_circle" },
   Cancelado: { variant: "danger", label: "Cancelado", icon: "block" },
+  Asistió: { variant: "success", label: "Asistió", icon: "task_alt" },
+  Ausente: { variant: "warning", label: "Ausente", icon: "person_off" },
 };
 
 interface EstadoTurnoBadgeProps {

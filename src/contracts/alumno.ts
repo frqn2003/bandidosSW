@@ -15,6 +15,11 @@
 //    - Si el alumno tiene deuda pendiente (clases pasadas no abonadas), `deudaPendiente` es true.
 //      Al inactivar, si no se envió `confirmarConDeuda: true`, se devuelve `ALUMNO_CON_DEUDA` para advertir.
 //  · Reactivación (HU-ALU-02): vuelve el estado a 'activo' revalidando DNI único.
+//  · Portal del Alumno (HU-POR-01): Mesa de Entrada o Gerente habilitan el acceso desde la ficha
+//    (`POST rutaHabilitarPortal`). Requiere ficha ACTIVA y Email cargado; el back crea la cuenta
+//    (rol Alumno, contraseña temporal enviada al email de la ficha, cambio obligatorio en el
+//    primer ingreso) y la vincula a la ficha: una sola cuenta activa por ficha. La contraseña
+//    nunca viaja en el response. Al inactivar la ficha, su cuenta se inactiva sola (trigger).
 //  · Listado (Precedencia de filtros):
 //    - Si se especifica `estado`, filtra por ese estado.
 //    - Si `verInactivos=true` (y sin `estado`), devuelve activos e inactivos.
@@ -38,12 +43,14 @@ export const hoyAR = () =>
 //   POST   rutaInactivar(id)        → baja lógica
 //   POST   rutaReactivar(id)        → reactivación lógica (estado = 'activo')
 //   GET    RUTA_POSIBLES_DUPLICADOS → advertencia antes de confirmar alta
+//   POST   rutaHabilitarPortal(id)  → habilitar acceso al portal del alumno (HU-POR-01)
 
 export const RUTA = "/api/alumnos";
 export const rutaAlumno = (id: number) => `${RUTA}/${id}`;
 export const rutaInactivar = (id: number) => `${RUTA}/${id}/inactivar`;
 export const rutaReactivar = (id: number) => `${RUTA}/${id}/reactivar`;
 export const RUTA_POSIBLES_DUPLICADOS = "/api/alumnos/posibles-duplicados";
+export const rutaHabilitarPortal = (id: number) => `${RUTA}/${id}/habilitar-portal`;
 
 
 // ─── 2a. Request: filtros del listado ────────────────────────────────────
@@ -182,6 +189,9 @@ export const inactivarAlumnoBody = z
 
 export const reactivarAlumnoBody = z.object({}).strict();
 
+/** Sin body: el email sale de la ficha y la contraseña temporal la genera el back. */
+export const habilitarPortalBody = z.object({}).strict();
+
 
 // ─── 3. Tipos derivados ──────────────────────────────────────────────────
 
@@ -237,6 +247,17 @@ export type AlumnoResponse = {
   fechaCreacion: string;
   /** ISO 8601. */
   fechaActualizacion: string;
+  /** HU-POR-01: true si la ficha ya tiene una cuenta activa en el portal (oculta "Habilitar acceso"). */
+  accesoPortal?: boolean;
+};
+
+/** Respuesta de "Habilitar acceso al portal". Nunca incluye la contraseña temporal. */
+export type HabilitarPortalResponse = {
+  alumnoId: number;
+  /** usuario.id de la cuenta creada. */
+  usuarioId: number;
+  /** Email al que se envió la contraseña temporal. */
+  email: string;
 };
 
 /** Lo que devuelve el combo de alumnos (alta de turno). */
@@ -254,5 +275,12 @@ export type ErrorAlumno =
   | "MATERIA_INTERES_INACTIVA"   // 422, al intentar agregar una nueva materia dada de baja
   | "ALUMNO_YA_INACTIVO"         // 409
   | "ALUMNO_YA_ACTIVO"           // 409
+  | "ALUMNO_INACTIVO"            // 422, no se habilita el portal a una ficha inactiva
+  | "ALUMNO_SIN_EMAIL"           // 422, el Email de la ficha es obligatorio para habilitar el portal
+  | "PORTAL_YA_HABILITADO"       // 409, la ficha ya tiene una cuenta activa (una sola por ficha)
+  | "EMAIL_DUPLICADO"            // 409, ya existe una cuenta con el email de la ficha
+  | "ACCESO_DENEGADO"            // 403, solo Mesa de Entrada o Gerente habilitan el acceso
+  | "ERROR_ENVIO_EMAIL"          // 500, falló el envío de la contraseña temporal
+  | "AUTH_NO_DISPONIBLE"         // 503, proveedor de autenticación caído
   | "NO_ENCONTRADO"              // 404
   | "DATOS_INVALIDOS";           // 422

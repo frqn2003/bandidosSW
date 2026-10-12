@@ -14,10 +14,11 @@
 import { hoyAR } from "@/contracts/alumno";
 import type { EstadoTurno } from "@/contracts/turno";
 
-export type EstadoTurnoVisible = "Reservado" | "Finalizado" | "Cancelado";
+// 'Asistió' / 'Ausente' los fija el registro de asistencia (HU-ASI-01) y se muestran tal cual.
+export type EstadoTurnoVisible = "Reservado" | "Finalizado" | "Cancelado" | "Asistió" | "Ausente";
 
 /** "Reservado" | "Finalizado" | "Cancelado" — el estado que se muestra. */
 export function estadoVisibleDe(turno: { estado: EstadoTurno; fecha: string }): EstadoTurnoVisible {
-  if (turno.estado === "Cancelado") return "Cancelado";
+  if (turno.estado !== "Reservado") return turno.estado;
   return turno.fecha < hoyAR() ? "Finalizado" : "Reservado";
 }

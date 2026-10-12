@@ -16,6 +16,7 @@ interface PaymentHistoryTabProps {
   onSelectReceipt: (receipt: PagoResponse) => void;
   onDownloadReceipt?: (receipt: PagoResponse) => void;
   selectedStudentName?: string;
+  onAnularPago?: (pago: PagoResponse) => void;
 }
 
 export function PaymentHistoryTab({
@@ -23,6 +24,7 @@ export function PaymentHistoryTab({
   onSelectReceipt,
   onDownloadReceipt,
   selectedStudentName,
+  onAnularPago,
 }: PaymentHistoryTabProps) {
   const formatMonto = (valor: number) =>
     new Intl.NumberFormat("es-AR", {
@@ -68,27 +70,43 @@ export function PaymentHistoryTab({
           <tbody className="divide-y divide-slate-100">
             {history.map((pago) => {
               const forma = pago.formasPago[0];
+              const esAnulado = pago.estado === "Anulado";
               return (
                 <tr
                   key={pago.id}
-                  className="hover:bg-slate-50/80 transition-colors"
+                  className={`transition-colors ${
+                    esAnulado ? "bg-red-50/25 opacity-80" : "hover:bg-slate-50/80"
+                  }`}
                 >
                   <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => onSelectReceipt(pago)}
-                      className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-blue-900 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded border border-blue-200 cursor-pointer transition-colors"
-                      title="Ver ticket detallado"
-                    >
-                      <Icon name="receipt_long" size={15} className="text-secondary" />
-                      {pago.comprobante}
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => onSelectReceipt(pago)}
+                        className={`inline-flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1 rounded border cursor-pointer transition-colors ${
+                          esAnulado
+                            ? "bg-red-50 text-red-700 border-red-200 line-through"
+                            : "bg-blue-50 text-blue-900 border-blue-200 hover:bg-blue-100"
+                        }`}
+                        title={esAnulado ? `Pago anulado: ${pago.motivoAnulacion || ""}` : "Ver ticket detallado"}
+                      >
+                        <Icon name="receipt_long" size={15} className={esAnulado ? "text-red-500" : "text-secondary"} />
+                        {pago.comprobante}
+                      </button>
+                      {esAnulado && (
+                        <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
+                          Anulado
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-3 py-3 font-medium text-slate-800">
-                    {formatearFecha(pago.fechaPago)}
+                    <span className={esAnulado ? "line-through text-slate-400" : ""}>
+                      {formatearFecha(pago.fechaPago)}
+                    </span>
                   </td>
                   <td className="px-3 py-3">
-                    <div className="font-semibold text-slate-900">
+                    <div className={`font-semibold ${esAnulado ? "text-slate-500 line-through" : "text-slate-900"}`}>
                       {pago.alumno.apellido}, {pago.alumno.nombre}
                     </div>
                     <div className="text-xs text-slate-400 font-mono">
@@ -96,7 +114,7 @@ export function PaymentHistoryTab({
                     </div>
                   </td>
                   <td className="px-3 py-3 text-xs text-slate-700">
-                    <span className="font-semibold text-slate-900">
+                    <span className={`font-semibold ${esAnulado ? "line-through text-slate-400" : "text-slate-900"}`}>
                       {pago.clases.length} {pago.clases.length === 1 ? "clase" : "clases"}
                     </span>
                     <span className="text-slate-400 block truncate max-w-xs">
@@ -104,7 +122,7 @@ export function PaymentHistoryTab({
                     </span>
                   </td>
                   <td className="px-3 py-3 text-xs">
-                    <span className="font-semibold text-slate-800">
+                    <span className={`font-semibold ${esAnulado ? "line-through text-slate-400" : "text-slate-800"}`}>
                       {forma?.nombre ?? "Efectivo"}
                     </span>
                     {forma?.nroOperacion && (
@@ -113,7 +131,7 @@ export function PaymentHistoryTab({
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-3 text-right font-bold text-slate-900">
+                  <td className={`px-3 py-3 text-right font-bold ${esAnulado ? "text-slate-400 line-through" : "text-slate-900"}`}>
                     {formatMonto(pago.monto)}
                   </td>
                   <td className="px-3 py-3 text-xs text-slate-600">
@@ -143,6 +161,17 @@ export function PaymentHistoryTab({
                       >
                         <Icon name="download" size={18} />
                       </button>
+                      {onAnularPago && !esAnulado && (
+                        <button
+                          type="button"
+                          onClick={() => onAnularPago(pago)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-red-600 shadow-2xs hover:border-red-300 hover:bg-red-50 transition-all cursor-pointer"
+                          title="Anular pago registrado"
+                          aria-label={`Anular comprobante ${pago.comprobante}`}
+                        >
+                          <Icon name="cancel" size={18} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
