@@ -122,6 +122,14 @@ export async function reactivarAlumno(id: number): Promise<AlumnoResponse> {
 }
 
 /**
+ * Habilitar acceso al portal para un alumno activo (HU-POR-01).
+ */
+export async function habilitarAccesoPortal(id: number) {
+  const { habilitarAccesoPortal: hap } = await import("@/data/portal");
+  return hap(id);
+}
+
+/**
  * Posibles duplicados: mismo nombre + apellido + fecha de nacimiento.
  *
  * Devuelve un array con las coincidencias encontradas o array vacío.

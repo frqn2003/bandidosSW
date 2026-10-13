@@ -15,6 +15,7 @@ import { StudentAttendanceHistory } from "@/components/asistencia/StudentAttenda
 import { StudentHistoryTab } from "@/components/alumnos/historial/StudentHistoryTab";
 import { StudentTurnosTab } from "@/components/alumnos/StudentTurnosTab";
 import { StudentPagosTab } from "@/components/alumnos/StudentPagosTab";
+import { EnablePortalAccess } from "@/components/alumnos/EnablePortalAccess";
 
 interface StudentDetailViewProps {
   student: StudentUI;
@@ -112,6 +113,7 @@ export function StudentDetailView({
           </div>
 
           <div className="flex items-center gap-2.5">
+            <EnablePortalAccess student={student} />
             {isInactive ? (
               <Button
                 variant="primary"

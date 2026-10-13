@@ -81,10 +81,9 @@ export const MODULOS: Modulo[] = [
   { id: "mi-ficha", label: "Mi ficha", href: "/mi-ficha", icon: "badge", construido: true },
   { id: "materias", label: "Materias", href: "/materias", icon: "menu_book", construido: true },
   { id: "cobranzas", label: "Cobranzas", href: "/pagos", icon: "receipt_long", construido: true },
-  { id: "usuarios", label: "Usuarios", href: "/usuarios", icon: "manage_accounts", construido: true },
-  // Solo para el rol Alumno (portal, HU-POR-01). Todavía no existen como pantalla.
-  { id: "reservar-turno", label: "Reservar turno", href: "#", icon: "event_available", construido: false },
-  { id: "mis-turnos", label: "Mis turnos", href: "#", icon: "event_note", construido: false },
+  // Solo para el rol Alumno (portal, HU-POR-01).
+  { id: "reservar-turno", label: "Reservar turno", href: "/portal/reservar", icon: "event_available", construido: true },
+  { id: "mis-turnos", label: "Mis turnos", href: "/portal/mis-turnos", icon: "event_note", construido: true },
 ];
 
 /**
