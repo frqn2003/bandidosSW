@@ -221,7 +221,7 @@ export function TodaysClassesPage() {
           </span>
           <div>
             <h1 className="font-display text-2xl font-bold text-on-surface">
-              {esProfesor ? "Mis clases del día" : "Clases de los profesores"}
+              {esProfesor ? "Mis clases del día" : "Asistencias a clases"}
             </h1>
             <p className="text-sm font-medium text-on-surface-variant">
               {esProfesor

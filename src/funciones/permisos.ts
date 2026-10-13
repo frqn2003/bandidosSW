@@ -21,7 +21,6 @@ import type { NombreRol } from "@/contracts/rol";
 
 export type ModuloId =
   | "dashboard"
-  | "sedes"
   | "turnos"
   | "calendario"
   | "asistencia"
@@ -49,7 +48,6 @@ export type Modulo = {
 /** El orden de este array es el orden del menú. */
 export const MODULOS: Modulo[] = [
   { id: "dashboard", label: "Indicadores", href: "/reportes", icon: "analytics", construido: true },
-  { id: "sedes", label: "Sedes", href: "#", icon: "location_city", construido: false },
   {
     id: "calendario",
     label: "Calendario",
@@ -110,8 +108,8 @@ export const PERMISOS_POR_ROL: Record<NombreRol, ModuloId[]> = {
 export function modulosDe(rol: NombreRol): Modulo[] {
   const permitidos = PERMISOS_POR_ROL[rol] ?? [];
   return MODULOS.filter((m) => permitidos.includes(m.id)).map((m) => {
-    if (m.id === "asistencia" && rol !== "Profesor") {
-      return { ...m, label: "Clases de los profesores" };
+    if (m.id === "asistencia" && (rol === "Gerente" || rol === "Mesa de Entrada")) {
+      return { ...m, label: "Asistencias a clases" };
     }
     return m;
   });

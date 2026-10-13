@@ -303,7 +303,7 @@ export function useDashboardMetrics() {
               "Proporción de asistencia real de alumnos a las clases dictadas. Si no hay asistencias registradas en el período, muestra '—'.";
             icono = "how_to_reg";
             colorAcento = "success";
-            href = "/calendario";
+            href = "/asistencia";
             label = "Ver asistencias";
             break;
           case "alumnos_activos":
