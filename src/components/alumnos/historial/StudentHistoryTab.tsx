@@ -12,12 +12,13 @@
 //  - Opción de impresión de historial.
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { HistorySummary } from "./HistorySummary";
 import { HistoryFilters } from "./HistoryFilters";
 import { TimelineList } from "./TimelineList";
 import { AddNoteModal } from "./AddNoteModal";
 import { Button } from "@/components/ui/Button";
+import { EncabezadoImpresion } from "@/components/layout/EncabezadoImpresion";
 import { useSesion } from "@/funciones/sesion";
 import { obtenerHistorialAlumno } from "@/data/historial";
 import type {
@@ -214,14 +215,39 @@ export function StudentHistoryTab({
     setVersionCarga((v) => v + 1);
   };
 
+  // Filtros formateados para el encabezado impreso (PDF limpio)
+  const filtrosParaImpresion: string[] = useMemo(() => {
+    const lista: string[] = [];
+    if (desde) lista.push(`Desde: ${desde}`);
+    if (hasta) lista.push(`Hasta: ${hasta}`);
+    if (tipoEvento !== "todos") lista.push(`Tipo: ${tipoEvento}`);
+    if (materiaId !== "todas") {
+      const mat = materiasDisponibles.find((m) => String(m.id) === materiaId);
+      lista.push(`Materia: ${mat?.nombre ?? materiaId}`);
+    }
+    if (profesorId !== "todos") {
+      const prof = profesoresDisponibles.find((p) => String(p.id) === profesorId);
+      lista.push(`Profesor: ${prof?.nombre ?? profesorId}`);
+    }
+    if (soloNotas) lista.push("Solo notas");
+    return lista;
+  }, [desde, hasta, tipoEvento, materiaId, profesorId, soloNotas, materiasDisponibles, profesoresDisponibles]);
+
   // Permisos para ver observaciones y notas sensibles
   const puedeVerObservacionesYNotas =
     rol === "Mesa de Entrada" || rol === "Gerente" || esProfesor;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print:space-y-4">
+      {/* Encabezado Institucional para Impresión (PDF) */}
+      <EncabezadoImpresion
+        titulo="Historial y Notas del Alumno"
+        subtitulo={`${student.nombre} ${student.apellido} · Legajo ${student.legajo} · Nivel: ${student.nivelEducativo}`}
+        filtrosAplicados={filtrosParaImpresion}
+      />
+
       {/* Barra Superior de la Pestaña */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/60 pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/60 pb-4 print:hidden">
         <div className="flex items-center gap-2">
           <History className="h-5 w-5 text-primary" />
           <h2 className="font-display text-lg font-bold text-on-surface">
@@ -283,7 +309,7 @@ export function StudentHistoryTab({
       {!alumnoActivo && (
         <div
           id="banner-modo-lectura-inactivo"
-          className="flex items-start gap-3 rounded-md border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900 shadow-xs"
+          className="flex items-start gap-3 rounded-md border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900 shadow-xs print:hidden"
         >
           <Info className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
           <div>
@@ -334,7 +360,7 @@ export function StudentHistoryTab({
           </section>
 
           {/* 2. Filtros Combinables */}
-          <section aria-label="Filtros del historial">
+          <section aria-label="Filtros del historial" className="print:hidden">
             <HistoryFilters
               desde={desde}
               hasta={hasta}

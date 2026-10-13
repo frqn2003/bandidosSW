@@ -120,7 +120,7 @@ export function TimelineItem({
   }
 
   return (
-    <div className="relative flex items-start gap-4 pb-6 group">
+    <div className="relative flex items-start gap-4 pb-6 group print:pb-3 print:break-inside-avoid">
       {/* Línea conectora vertical del timeline */}
       {!esUltimo && (
         <span
@@ -139,7 +139,7 @@ export function TimelineItem({
 
       {/* Tarjeta de Contenido */}
       <div
-        className={`flex-1 rounded-md border p-4 shadow-sm transition-all ${cardBorderClass} ${cardBgClass}`}
+        className={`flex-1 rounded-md border p-4 shadow-sm transition-all print:shadow-none print:p-3 ${cardBorderClass} ${cardBgClass}`}
       >
         {/* Cabecera del ítem */}
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant/60 pb-2.5">

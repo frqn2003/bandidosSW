@@ -68,9 +68,9 @@ export function HistorySummary({ resumen, cargando = false }: HistorySummaryProp
   const fechaUltimaClase = formatearFecha(resumen?.fechaUltimaClase);
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 print:grid-cols-5 print:gap-2">
       {/* 1. Clases Asistidas */}
-      <div className="rounded-md border border-outline-variant bg-white p-4 shadow-sm transition-all hover:border-emerald-300">
+      <div className="rounded-md border border-outline-variant bg-white p-4 shadow-sm transition-all hover:border-emerald-300 print:shadow-none print:p-2.5">
         <div className="flex items-center justify-between text-on-surface-variant">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
             Asistidas
@@ -88,7 +88,7 @@ export function HistorySummary({ resumen, cargando = false }: HistorySummaryProp
       </div>
 
       {/* 2. Ausencias */}
-      <div className="rounded-md border border-outline-variant bg-white p-4 shadow-sm transition-all hover:border-rose-300">
+      <div className="rounded-md border border-outline-variant bg-white p-4 shadow-sm transition-all hover:border-rose-300 print:shadow-none print:p-2.5">
         <div className="flex items-center justify-between text-on-surface-variant">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
             Ausencias
@@ -106,7 +106,7 @@ export function HistorySummary({ resumen, cargando = false }: HistorySummaryProp
       </div>
 
       {/* 3. Cancelaciones */}
-      <div className="rounded-md border border-outline-variant bg-white p-4 shadow-sm transition-all hover:border-amber-300">
+      <div className="rounded-md border border-outline-variant bg-white p-4 shadow-sm transition-all hover:border-amber-300 print:shadow-none print:p-2.5">
         <div className="flex items-center justify-between text-on-surface-variant">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
             Canceladas
@@ -124,7 +124,7 @@ export function HistorySummary({ resumen, cargando = false }: HistorySummaryProp
       </div>
 
       {/* 4. Porcentaje de asistencia */}
-      <div className="rounded-md border border-outline-variant bg-white p-4 shadow-sm transition-all hover:border-blue-300">
+      <div className="rounded-md border border-outline-variant bg-white p-4 shadow-sm transition-all hover:border-blue-300 print:shadow-none print:p-2.5">
         <div className="flex items-center justify-between text-on-surface-variant">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
             % Asistencia
@@ -146,7 +146,7 @@ export function HistorySummary({ resumen, cargando = false }: HistorySummaryProp
       </div>
 
       {/* 5. Fecha de la última clase */}
-      <div className="col-span-2 sm:col-span-1 rounded-md border border-outline-variant bg-white p-4 shadow-sm transition-all hover:border-indigo-300">
+      <div className="col-span-2 sm:col-span-1 print:col-span-1 rounded-md border border-outline-variant bg-white p-4 shadow-sm transition-all hover:border-indigo-300 print:shadow-none print:p-2.5">
         <div className="flex items-center justify-between text-on-surface-variant">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
             Última Clase

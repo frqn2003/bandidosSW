@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Pagination } from "@/components/ui/Pagination";
 import { useToast } from "@/components/ui/Toast";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { EncabezadoImpresion } from "@/components/layout/EncabezadoImpresion";
 import { RequiereSesion } from "@/components/auth/RequiereSesion";
 import { useStudents } from "@/modules/alumnos/useStudents";
 import type {
@@ -314,11 +315,13 @@ export function StudentsPage() {
 
   return (
     <RequiereSesion>
-      <div className="flex min-h-screen bg-surface">
-        <Sidebar />
+      <div className="flex min-h-screen bg-surface print:block print:bg-white print:min-h-0">
+        <div className="print:hidden">
+          <Sidebar />
+        </div>
 
-        <main className="flex-1 px-6 py-6 lg:px-8">
-          <div className="mx-auto flex max-w-6xl flex-col gap-5">
+        <main className="flex-1 px-6 py-6 lg:px-8 print:p-0 print:m-0 print:max-w-none print:w-full">
+          <div className="mx-auto flex max-w-6xl flex-col gap-5 print:max-w-none print:w-full print:m-0 print:gap-4">
             {viewingStudent ? (
               <StudentDetailView
                 student={viewingStudent}
@@ -337,8 +340,13 @@ export function StudentsPage() {
               />
             ) : (
               <>
+                <EncabezadoImpresion
+                  titulo="Listado de Alumnos del Centro"
+                  subtitulo="Registro de alumnos, legajos y estado académico"
+                />
+
                 {/* Header coherente con Usuarios y Profesores */}
-                <header className="flex flex-wrap items-center justify-between gap-3">
+                <header className="flex flex-wrap items-center justify-between gap-3 print:hidden">
               <div className="flex items-center gap-3">
                 <span className="flex h-11 w-11 items-center justify-center rounded-md bg-primary-container/30">
                   <Icon name="school" size={24} className="text-primary" />
@@ -382,7 +390,7 @@ export function StudentsPage() {
             </header>
 
             {/* Caja de Filtros con el botón Limpiar filtros según captura */}
-            <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-4 shadow-card">
+            <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-4 shadow-card print:hidden">
               <div className="flex flex-wrap items-end gap-4">
                 {/* Buscador General */}
                 <div className="min-w-[240px] flex-1">
@@ -516,7 +524,7 @@ export function StudentsPage() {
 
             {/* Paginación */}
             {totalItems > 0 && (
-              <div className="rounded-md border border-outline-variant bg-surface-container-lowest shadow-card">
+              <div className="rounded-md border border-outline-variant bg-surface-container-lowest shadow-card print:hidden">
                 <Pagination
                   page={page}
                   totalPages={totalPages}
