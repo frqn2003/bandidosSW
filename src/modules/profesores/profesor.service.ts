@@ -8,6 +8,7 @@ import { withTransaction } from "@/lib/db/tx";
 import { withAuditUser } from "@/lib/audit/audit";
 import type { Session } from "@/lib/auth/session";
 import { crearUsuarioAuth, eliminarUsuarioAuth } from "@/lib/auth/gotrue";
+import { enviarPasswordTemporal } from "@/lib/email";
 import {
   BusinessRuleError,
   ConflictError,
@@ -147,6 +148,12 @@ export async function crearCandidato(
         client,
       );
     });
+
+    await enviarPasswordTemporal(
+      input.email,
+      passwordTemporal,
+      `${input.nombre} ${input.apellido}`,
+    );
 
     return { usuario: mapper.toCandidatoApi(row), passwordTemporal };
   } catch (e) {

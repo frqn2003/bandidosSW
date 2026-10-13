@@ -312,17 +312,7 @@ export async function listarProfesoresPortal(materiaId: number): Promise<Profeso
  * Requiere que la ficha tenga Email cargado y que no posea una cuenta previa activa.
  */
 export async function habilitarAccesoPortal(alumnoId: number): Promise<HabilitarPortalResponse> {
-  try {
-    // BACKEND: return await apiSend<HabilitarPortalResponse>("POST", rutaHabilitarPortal(alumnoId), {});
-    return await apiSend<HabilitarPortalResponse>("POST", rutaHabilitarPortal(alumnoId), {});
-  } catch {
-    await demorar();
-    return {
-      alumnoId,
-      usuarioId: 500 + alumnoId,
-      email: "alumno@centro.edu.ar",
-    };
-  }
+  return await apiSend<HabilitarPortalResponse>("POST", rutaHabilitarPortal(alumnoId), {});
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

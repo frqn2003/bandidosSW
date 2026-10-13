@@ -17,7 +17,7 @@ const COLUMNAS = `
   telefono, email, nivel_educativo, responsable_nombre,
   responsable_dni, responsable_telefono, estado,
   institucion_origen, observaciones_generales,
-  created_at, updated_at
+  usuario_id, created_at, updated_at
 `;
 
 /**
@@ -265,6 +265,25 @@ export async function reactivar(
   `;
 
   const { rows } = await client.query<AlumnoRow>(sql, [id]);
+  return rows[0] ?? null;
+}
+
+/**
+ * Asocia un usuario de acceso al portal a la ficha del alumno (HU-POR-01).
+ */
+export async function asociarUsuario(
+  alumnoId: number,
+  usuarioId: number,
+  client: PoolClient,
+): Promise<AlumnoRow | null> {
+  const sql = `
+    UPDATE alumno
+    SET usuario_id = $1,
+        updated_at = now()
+    WHERE id = $2
+    RETURNING ${COLUMNAS}
+  `;
+  const { rows } = await client.query<AlumnoRow>(sql, [usuarioId, alumnoId]);
   return rows[0] ?? null;
 }
 

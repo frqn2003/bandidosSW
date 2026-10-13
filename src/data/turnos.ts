@@ -413,13 +413,12 @@ export const MENSAJES_ERROR: Partial<Record<ErrorTurno, string>> = {
  * PENDIENTE DBA: `alumno` no tiene email del responsable.
  */
 export async function enviarComprobantePorEmail(turnoId: number): Promise<{ destinatario: string }> {
-  void turnoId;
-  throw new ApiError(
-    "NO_DISPONIBLE",
-    "El envío por email todavía no está disponible.",
-    undefined,
-    501,
+  // BACKEND: POST /api/turnos/:id/email
+  const res = await apiSend<{ enviado: boolean; email: string; mensaje: string }>(
+    "POST",
+    `/api/turnos/${turnoId}/email`,
   );
+  return { destinatario: res.email };
 }
 
 
