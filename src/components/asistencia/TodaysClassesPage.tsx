@@ -33,6 +33,8 @@ import { PresentModal } from "./PresentModal";
 import { AbsentModal } from "./AbsentModal";
 import { AttendanceCorrectionModal } from "./AttendanceCorrectionModal";
 import { StudentAttendanceHistory } from "./StudentAttendanceHistory";
+import { StudentHistoryTab } from "@/components/alumnos/historial/StudentHistoryTab";
+import type { StudentUI } from "@/modules/alumnos/types";
 
 export function TodaysClassesPage() {
   const { sesion } = useSesion();
@@ -40,7 +42,6 @@ export function TodaysClassesPage() {
 
   const rolUsuario = sesion?.usuario.rol.nombre ?? "Profesor";
   const esProfesor = rolUsuario === "Profesor";
-  const esGerente = rolUsuario === "Gerente";
 
   const [fechaSeleccionada, setFechaSeleccionada] = useState(() => fechaAISO(new Date()));
   const [profesorFiltro, setProfesorFiltro] = useState<string>("todos");
@@ -55,7 +56,9 @@ export function TodaysClassesPage() {
   const [historialStudent, setHistorialStudent] = useState<{
     id: number;
     nombre: string;
+    legajo?: string;
   } | null>(null);
+  const [pestanaHistorialModal, setPestanaHistorialModal] = useState<"timeline" | "asistencia">("timeline");
 
   // Cargar clases del día según rol y filtro de profesor
   useEffect(() => {
@@ -401,6 +404,7 @@ export function TodaysClassesPage() {
                                 setHistorialStudent({
                                   id: clase.alumno.id,
                                   nombre: `${clase.alumno.nombre} ${clase.alumno.apellido}`,
+                                  legajo: clase.alumno.legajo,
                                 })
                               }
                               className="text-[10.5px] text-secondary hover:underline cursor-pointer flex items-center gap-1"
@@ -614,20 +618,74 @@ export function TodaysClassesPage() {
         }}
       />
 
-      {/* 4. Modal para ver Historial de Asistencia del Alumno */}
+      {/* 4. Modal para ver Historial del Alumno (HU-ALU-03 y HU-ASI-01) */}
       {historialStudent && (
         <Modal
           open={!!historialStudent}
-          onClose={() => setHistorialStudent(null)}
-          title={`Historial de Asistencia · ${historialStudent.nombre}`}
-          maxWidth="max-w-4xl"
+          onClose={() => {
+            setHistorialStudent(null);
+            setPestanaHistorialModal("timeline");
+          }}
+          title={`Historial · ${historialStudent.nombre}`}
+          maxWidth="max-w-5xl"
           icon={<Icon name="history_edu" size={24} className="text-secondary" />}
-          subtitle="Modo LECTURA · Registros sincrónicos de clases asistidas, ausencias y cancelaciones"
+          subtitle="Modo LECTURA · Línea de tiempo unificada, notas y asistencias"
         >
-          <StudentAttendanceHistory
-            alumnoId={historialStudent.id}
-            alumnoNombre={historialStudent.nombre}
-          />
+          <div className="space-y-4">
+            <div className="border-b border-outline-variant">
+              <nav aria-label="Vistas del historial" className="flex gap-4 -mb-px text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setPestanaHistorialModal("timeline")}
+                  className={`pb-2 border-b-2 transition-colors cursor-pointer ${
+                    pestanaHistorialModal === "timeline"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-on-surface-variant hover:text-on-surface"
+                  }`}
+                >
+                  Línea de tiempo y Notas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPestanaHistorialModal("asistencia")}
+                  className={`pb-2 border-b-2 transition-colors cursor-pointer ${
+                    pestanaHistorialModal === "asistencia"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-on-surface-variant hover:text-on-surface"
+                  }`}
+                >
+                  Registro de Asistencias
+                </button>
+              </nav>
+            </div>
+
+            {pestanaHistorialModal === "timeline" ? (
+              <StudentHistoryTab
+                student={
+                  {
+                    id: historialStudent.id,
+                    legajo:
+                      historialStudent.legajo ||
+                      `ALU-${historialStudent.id.toString().padStart(4, "0")}`,
+                    nombre: historialStudent.nombre.split(" ")[0] || "",
+                    apellido:
+                      historialStudent.nombre.split(" ").slice(1).join(" ") || "",
+                    dni: "",
+                    fechaNacimiento: "",
+                    nivelEducativo: "Secundario",
+                    estado: "activo",
+                    fechaCreacion: "",
+                    fechaActualizacion: "",
+                  } as StudentUI
+                }
+              />
+            ) : (
+              <StudentAttendanceHistory
+                alumnoId={historialStudent.id}
+                alumnoNombre={historialStudent.nombre}
+              />
+            )}
+          </div>
         </Modal>
       )}
     </div>

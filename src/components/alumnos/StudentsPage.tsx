@@ -20,6 +20,7 @@ import type {
   EstadoAlumno,
 } from "@/modules/alumnos/types";
 import { StudentsTable } from "./StudentsTable";
+import { StudentDetailView } from "./StudentDetailView";
 import { StudentFormModal, type ModoStudentModal } from "./StudentFormModal";
 import { DeactivateStudentModal } from "./DeactivateStudentModal";
 
@@ -85,6 +86,7 @@ export function StudentsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
   const [reactivatingId, setReactivatingId] = useState<number | null>(null);
+  const [viewingStudent, setViewingStudent] = useState<StudentUI | null>(null);
 
   const availableMaterias = useMemo(() => {
     const set = new Set<string>();
@@ -134,9 +136,9 @@ export function StudentsPage() {
     return filteredStudents.slice(start, start + pageSize);
   }, [filteredStudents, page, pageSize]);
 
-  // Handlers que abren los Modales (igual que en Usuarios)
+  // Handlers que abren la Ficha o Modales
   const handleView = (student: StudentUI) => {
-    setFormModal({ open: true, modo: "LECTURA", student });
+    setViewingStudent(student);
   };
 
   const handleEdit = (student: StudentUI) => {
@@ -317,8 +319,26 @@ export function StudentsPage() {
 
         <main className="flex-1 px-6 py-6 lg:px-8">
           <div className="mx-auto flex max-w-6xl flex-col gap-5">
-            {/* Header coherente con Usuarios y Profesores */}
-            <header className="flex flex-wrap items-center justify-between gap-3">
+            {viewingStudent ? (
+              <StudentDetailView
+                student={viewingStudent}
+                auditLogs={getAuditLogsForStudent(viewingStudent.id)}
+                onBack={() => setViewingStudent(null)}
+                onEdit={(student) => {
+                  setViewingStudent(null);
+                  handleEdit(student);
+                }}
+                onReactivate={async (student) => {
+                  await handleReactivate(student);
+                  setViewingStudent((prev) =>
+                    prev ? { ...prev, estado: "activo" } : null
+                  );
+                }}
+              />
+            ) : (
+              <>
+                {/* Header coherente con Usuarios y Profesores */}
+                <header className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <span className="flex h-11 w-11 items-center justify-center rounded-md bg-primary-container/30">
                   <Icon name="school" size={24} className="text-primary" />
@@ -513,6 +533,8 @@ export function StudentsPage() {
                   itemLabel="alumnos"
                 />
               </div>
+            )}
+              </>
             )}
           </div>
         </main>

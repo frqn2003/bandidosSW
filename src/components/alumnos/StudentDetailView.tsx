@@ -12,6 +12,9 @@ import { StatusBadge, type StatusVariant } from "@/components/ui/StatusBadge";
 import { inicialesDe, tonoAvatarDe } from "@/funciones/formato";
 import type { StudentUI, StudentAuditLog } from "@/modules/alumnos/types";
 import { StudentAttendanceHistory } from "@/components/asistencia/StudentAttendanceHistory";
+import { StudentHistoryTab } from "@/components/alumnos/historial/StudentHistoryTab";
+import { StudentTurnosTab } from "@/components/alumnos/StudentTurnosTab";
+import { StudentPagosTab } from "@/components/alumnos/StudentPagosTab";
 
 interface StudentDetailViewProps {
   student: StudentUI;
@@ -20,9 +23,10 @@ interface StudentDetailViewProps {
   onEdit: (student: StudentUI) => void;
   onReactivate: (student: StudentUI) => Promise<void>;
   reactivating?: boolean;
+  initialTab?: TabType;
 }
 
-type TabType = "datos" | "turnos" | "asistencias" | "pagos" | "bitacora";
+type TabType = "datos" | "turnos" | "asistencias" | "historial" | "pagos" | "bitacora";
 
 function formatearFecha(isoString?: string): string {
   if (!isoString) return "—";
@@ -45,8 +49,9 @@ export function StudentDetailView({
   onEdit,
   onReactivate,
   reactivating,
+  initialTab = "historial",
 }: StudentDetailViewProps) {
-  const [activeTab, setActiveTab] = useState<TabType>("bitacora");
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const isInactive = student.estado === "inactivo";
 
   const getActionVariant = (accion: StudentAuditLog["accion"]): StatusVariant => {
@@ -148,6 +153,7 @@ export function StudentDetailView({
                 { id: "datos", label: "Datos" },
                 { id: "turnos", label: "Turnos" },
                 { id: "asistencias", label: "Asistencias" },
+                { id: "historial", label: "Historial" },
                 { id: "pagos", label: "Pagos" },
                 { id: "bitacora", label: "Bitácora" },
               ] as const
@@ -312,17 +318,19 @@ export function StudentDetailView({
             />
           )}
 
-          {/* OTRAS PESTAÑAS (TURNOS / PAGOS) */}
-          {(activeTab === "turnos" || activeTab === "pagos") && (
-            <div className="rounded-md border border-dashed border-outline-variant p-8 text-center text-on-surface-variant">
-              <Icon name="event_note" size={32} className="mx-auto text-on-surface-variant/50 mb-2" />
-              <p className="text-sm font-bold text-on-surface capitalize">
-                Historial de {activeTab} de {student.nombre}
-              </p>
-              <p className="text-xs text-on-surface-variant mt-1">
-                Registros sincronizados con los módulos de {activeTab}.
-              </p>
-            </div>
+          {/* PESTAÑA: HISTORIAL GENERAL: LÍNEA DE TIEMPO Y NOTAS (HU-ALU-03) */}
+          {activeTab === "historial" && (
+            <StudentHistoryTab student={student} />
+          )}
+
+          {/* PESTAÑA: TURNOS */}
+          {activeTab === "turnos" && (
+            <StudentTurnosTab student={student} />
+          )}
+
+          {/* PESTAÑA: PAGOS */}
+          {activeTab === "pagos" && (
+            <StudentPagosTab student={student} />
           )}
         </div>
       </div>

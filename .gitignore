@@ -52,3 +52,6 @@ dev-server.log
 
 # imagenes subidas por los usuarios (no son codigo)
 /public/uploads/
+
+# scratch del agente
+scratch/
