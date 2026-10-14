@@ -29,6 +29,11 @@ export const GET = withRoute(async ({ req, session }) => {
     raw.materiaId = materiaId;
   }
 
+  const nivel = sp.get("nivel")?.trim();
+  if (nivel && nivel !== "todos" && nivel !== "Todos") {
+    raw.nivel = nivel;
+  }
+
   const resultado = indicadoresQuery.safeParse(raw);
   if (!resultado.success) {
     const primero = resultado.error.issues[0];

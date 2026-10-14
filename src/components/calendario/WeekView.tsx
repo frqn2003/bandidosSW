@@ -370,18 +370,26 @@ export function WeekView({
                         {turnosEnFranja.length === 0 && turnosOcupandoSlot.length === 0 && (
                           trabaja ? (
                             <div
-                              onClick={() => onReservarFranja && onReservarFranja(dia.fecha, hora)}
-                              className="h-full w-full rounded flex items-center justify-center text-transparent hover:text-blue-600 hover:border hover:border-dashed hover:border-blue-400 hover:bg-blue-50/50 cursor-pointer transition-all group"
-                              title={`Reservar turno para el ${dia.fecha} a las ${hora}`}
+                              onClick={() => !esProfesor && onReservarFranja && onReservarFranja(dia.fecha, hora)}
+                              className={`h-full w-full rounded flex items-center justify-center border border-dashed border-status-success/40 bg-status-success/10 text-status-success-strong transition-all select-none ${
+                                !esProfesor
+                                  ? "cursor-pointer hover:bg-status-success/20 hover:border-status-success-strong/60"
+                                  : "cursor-default"
+                              }`}
+                              title={
+                                !esProfesor
+                                  ? `Reservar turno para el ${dia.fecha} a las ${hora}`
+                                  : `Horario disponible para el ${dia.fecha} a las ${hora}`
+                              }
                             >
-                              <span className="text-[10px] font-semibold flex items-center gap-1 group-hover:text-blue-600">
-                                <Icon name="add" size={14} /> Libre
+                              <span className="text-[10px] font-semibold flex items-center gap-1">
+                                {!esProfesor && <Icon name="add" size={14} />} Libre
                               </span>
                             </div>
                           ) : (
                             <div
                               className="h-full w-full rounded select-none flex items-center justify-center"
-                              title="Fuera del horario de atención del profesor"
+                              title={esProfesor ? "Sin clases programadas" : "Fuera del horario de atención del profesor"}
                             >
                               <span className="sr-only">No disponible</span>
                             </div>

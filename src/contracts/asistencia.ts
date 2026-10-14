@@ -45,6 +45,7 @@ const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 export const listarClasesDelDiaQuery = z
   .object({
     fecha: z.string().regex(FECHA, "Formato: aaaa-mm-dd.").optional(),
+    profesorId: z.coerce.number().int().positive().optional(),
   })
   .strict();
 
@@ -148,6 +149,7 @@ export type ClaseDelDiaResponse = {
   turnoId: number;
   /** "TUR-000123". */
   codigo: string;
+  profesor?: { id: number; nombre: string; apellido: string };
   alumno: { id: number; legajo: string; nombre: string; apellido: string };
   materia: { id: number; nombre: string };
   /** "yyyy-mm-dd" */

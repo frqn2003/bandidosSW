@@ -40,3 +40,29 @@ export type RankingMateriaIngresosRow = {
   ingresos: string;
   turnos: number;
 };
+
+export type TarjetaDireccionRow = {
+  clave: string;
+  etiqueta: string;
+  unidad: string;
+  valor: string | null;
+  valor_anterior: string | null;
+  variacion_porcentual: string | null;
+  mejora: boolean | null;
+  menor_es_mejor: boolean;
+};
+
+export type RankingProfesorRow = {
+  profesor_id: number;
+  profesor: string;
+  clases_dictadas: number | string;
+  horas_dictadas: string | number;
+};
+
+export type MapaCalorRow = {
+  materia_id: number;
+  materia: string;
+  franja_hora: number;
+  franja: string;
+  turnos: number | string;
+};

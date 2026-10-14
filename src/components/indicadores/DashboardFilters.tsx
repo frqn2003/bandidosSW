@@ -41,6 +41,8 @@ export function DashboardFilters({
     }
   };
 
+  const hayErrorPeriodo = Boolean(errorValidacion);
+
   return (
     <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-5 shadow-card">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -49,7 +51,9 @@ export function DashboardFilters({
           <div className="flex flex-col gap-1.5 lg:col-span-2">
             <label
               htmlFor="filtro-desde"
-              className="text-xs font-bold uppercase tracking-wider text-on-surface-variant"
+              className={`text-xs font-bold uppercase tracking-wider ${
+                hayErrorPeriodo ? "text-error" : "text-on-surface-variant"
+              }`}
             >
               Desde
             </label>
@@ -58,7 +62,11 @@ export function DashboardFilters({
               type="date"
               value={filtros.desde}
               onChange={(e) => onFiltroChange("desde", e.target.value)}
-              className="h-11 rounded-sm border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface focus:border-secondary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-secondary/20"
+              className={`h-11 rounded-sm border px-3 text-sm focus:outline-none focus:ring-2 ${
+                hayErrorPeriodo
+                  ? "border-error bg-error/5 text-error focus:border-error focus:ring-error/20"
+                  : "border-outline-variant bg-surface-container-low text-on-surface focus:border-secondary focus:bg-surface-container-lowest focus:ring-secondary/20"
+              }`}
             />
           </div>
 
@@ -66,7 +74,9 @@ export function DashboardFilters({
           <div className="flex flex-col gap-1.5 lg:col-span-2">
             <label
               htmlFor="filtro-hasta"
-              className="text-xs font-bold uppercase tracking-wider text-on-surface-variant"
+              className={`text-xs font-bold uppercase tracking-wider ${
+                hayErrorPeriodo ? "text-error" : "text-on-surface-variant"
+              }`}
             >
               Hasta
             </label>
@@ -75,12 +85,16 @@ export function DashboardFilters({
               type="date"
               value={filtros.hasta}
               onChange={(e) => onFiltroChange("hasta", e.target.value)}
-              className="h-11 rounded-sm border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface focus:border-secondary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-secondary/20"
+              className={`h-11 rounded-sm border px-3 text-sm focus:outline-none focus:ring-2 ${
+                hayErrorPeriodo
+                  ? "border-error bg-error/5 text-error focus:border-error focus:ring-error/20"
+                  : "border-outline-variant bg-surface-container-low text-on-surface focus:border-secondary focus:bg-surface-container-lowest focus:ring-secondary/20"
+              }`}
             />
           </div>
 
           {/* Select Materia */}
-          <div className="flex flex-col gap-1.5 lg:col-span-3">
+          <div className="flex flex-col gap-1.5 lg:col-span-2">
             <label
               htmlFor="filtro-materia"
               className="text-xs font-bold uppercase tracking-wider text-on-surface-variant"
@@ -106,7 +120,7 @@ export function DashboardFilters({
           </div>
 
           {/* Select Profesor */}
-          <div className="flex flex-col gap-1.5 lg:col-span-3">
+          <div className="flex flex-col gap-1.5 lg:col-span-2">
             <label
               htmlFor="filtro-profesor"
               className="text-xs font-bold uppercase tracking-wider text-on-surface-variant"
@@ -128,6 +142,29 @@ export function DashboardFilters({
                   {p.nombre}
                 </option>
               ))}
+            </select>
+          </div>
+
+          {/* Select Nivel (HU-IND-03) */}
+          <div className="flex flex-col gap-1.5 lg:col-span-2">
+            <label
+              htmlFor="filtro-nivel"
+              className="text-xs font-bold uppercase tracking-wider text-on-surface-variant"
+            >
+              Nivel
+            </label>
+            <select
+              id="filtro-nivel"
+              value={filtros.nivel}
+              onChange={(e) => {
+                onFiltroChange("nivel", e.target.value as DashboardFiltersState["nivel"]);
+              }}
+              className="h-11 rounded-sm border border-outline-variant bg-surface-container-low px-3 text-sm text-on-surface focus:border-secondary focus:bg-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-secondary/20"
+            >
+              <option value="Todos">Todos los niveles</option>
+              <option value="Primario">Primario</option>
+              <option value="Secundario">Secundario</option>
+              <option value="Universitario">Universitario</option>
             </select>
           </div>
 
@@ -157,9 +194,12 @@ export function DashboardFilters({
           </div>
         </div>
 
-        {/* Mensaje de error de validación */}
+        {/* Mensaje de error de validación en rojo */}
         {errorValidacion && (
-          <div className="flex items-center gap-2 rounded-sm bg-error/10 px-3.5 py-2 text-xs font-medium text-error">
+          <div
+            id="filtro-periodo-error"
+            className="flex items-center gap-2 rounded-sm bg-error/10 px-3.5 py-2 text-xs font-semibold text-error border border-error/20"
+          >
             <Icon name="error" size={16} className="shrink-0" />
             <span>{errorValidacion}</span>
           </div>

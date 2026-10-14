@@ -16,13 +16,18 @@ import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { EncabezadoImpresion } from "@/components/layout/EncabezadoImpresion";
+import { AccesoDenegado } from "@/components/auth/AccesoDenegado";
+import { useSesion } from "@/funciones/sesion";
 import { useDashboardMetrics } from "@/modules/indicadores/useDashboardMetrics";
 import { DashboardFilters } from "./DashboardFilters";
 import { KPIGrid } from "./KPIGrid";
 import { DashboardCharts } from "./DashboardCharts";
+import { DemandHeatmap } from "./DemandHeatmap";
 import { EmptyStateDashboard } from "./EmptyStateDashboard";
 
 export function DashboardPage() {
+  const { sesion, cargando: cargandoSesion } = useSesion();
+
   const {
     filtros,
     cargando,
@@ -37,12 +42,34 @@ export function DashboardPage() {
     exportarPDF,
   } = useDashboardMetrics();
 
+  // Control de acceso de rol Gerente (HU-IND-03)
+  if (!cargandoSesion && sesion && sesion.usuario.rol.nombre !== "Gerente") {
+    return (
+      <div className="flex min-h-screen bg-slate-50">
+        <Sidebar />
+        <div className="flex flex-1 items-center justify-center p-6">
+          <AccesoDenegado
+            rol={sesion.usuario.rol.nombre}
+            modulo={{
+              id: "reportes",
+              label: "Tablero de Indicadores de Dirección",
+              href: "/reportes",
+              icon: "analytics",
+              construido: true,
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   const materiaSeleccionada = materias.find((m) => m.id === filtros.materiaId)?.nombre;
   const profesorSeleccionado = profesores.find((p) => p.id === filtros.profesorId)?.nombre;
 
   const filtrosParaImpresion = [
     `Desde: ${filtros.desde}`,
     `Hasta: ${filtros.hasta}`,
+    ...(filtros.nivel !== "Todos" ? [`Nivel: ${filtros.nivel}`] : []),
     ...(materiaSeleccionada ? [`Materia: ${materiaSeleccionada}`] : []),
     ...(profesorSeleccionado ? [`Profesor: ${profesorSeleccionado}`] : []),
   ];
@@ -57,8 +84,8 @@ export function DashboardPage() {
         <main className="flex-1 p-6 sm:p-8 max-w-7xl w-full mx-auto space-y-6 print:p-0 print:m-0 print:max-w-none print:w-full print:space-y-4">
           {/* ── ENCABEZADO DE IMPRESIÓN (PDF) ── */}
           <EncabezadoImpresion
-            titulo="Indicadores de Gestión"
-            subtitulo="Métricas analíticas del centro académico para la toma de decisiones directivas"
+            titulo="Tablero de Indicadores de Dirección"
+            subtitulo="Métricas analíticas consolidadas y comparativas del centro académico para la toma de decisiones directivas"
             filtrosAplicados={filtrosParaImpresion}
           />
 
@@ -72,7 +99,7 @@ export function DashboardPage() {
                 <div>
                   <div className="flex items-center gap-2.5">
                     <h1 className="font-display text-2xl font-bold tracking-tight text-on-surface">
-                      Indicadores de gestión
+                      Tablero de Indicadores de Dirección
                     </h1>
                     <StatusBadge
                       variant="neutral"
@@ -81,7 +108,7 @@ export function DashboardPage() {
                     />
                   </div>
                   <p className="text-xs text-on-surface-variant">
-                    Métricas analíticas del centro académico para la toma de decisiones directivas.
+                    Métricas analíticas consolidadas, comparativas de períodos y demanda del centro académico.
                   </p>
                 </div>
               </div>
@@ -100,7 +127,7 @@ export function DashboardPage() {
             </div>
           </header>
 
-          {/* ── 2. BARRA DE FILTROS ── */}
+          {/* ── 2. BARRA DE FILTROS GLOBALES (HU-IND-03) ── */}
           <div className="print:hidden">
             <DashboardFilters
               filtros={filtros}
@@ -114,19 +141,31 @@ export function DashboardPage() {
             />
           </div>
 
-          {/* ── 3. CUADRÍCULA DE 5 TARJETAS DE INDICADORES (KPIs) ── */}
+          {/* ── 3. CUADRÍCULA DE 8 TARJETAS DE INDICADORES (KPIS CON COMPARATIVA) ── */}
           <div>
             <KPIGrid cards={kpiCards} />
           </div>
 
-          {/* ── 4. GRÁFICOS ANALÍTICOS O ESTADO VACÍO ── */}
+          {/* ── 4. VISUALIZACIÓN GRÁFICA Y RANKINGS O ESTADO VACÍO ── */}
           <div>
             {!metricas.sinDatos ? (
-              <DashboardCharts
-                turnosPorSemana={metricas.turnosPorSemana}
-                rankingDemanda={metricas.rankingMateriasMasPedidas}
-                rankingIngresos={metricas.rankingMateriasMayorIngreso}
-              />
+              <div className="space-y-6">
+                {/* Gráficos y Rankings */}
+                <DashboardCharts
+                  turnosPorSemana={metricas.turnosPorSemana}
+                  rankingDemanda={metricas.rankingMateriasMasPedidas}
+                  rankingIngresos={metricas.rankingMateriasMayorIngreso}
+                  rankingProfesores={metricas.rankingProfesores}
+                />
+
+                {/* ── 5. MAPA DE CALOR DE DEMANDA (COMPONENTE INDEPENDIENTE) ── */}
+                <DemandHeatmap
+                  periodo={metricas.periodo}
+                  materias={materias}
+                  profesores={profesores}
+                  nivelGlobal={filtros.nivel}
+                />
+              </div>
             ) : (
               <EmptyStateDashboard onLimpiarFiltros={limpiarFiltros} />
             )}
@@ -136,3 +175,5 @@ export function DashboardPage() {
     </div>
   );
 }
+
+export const ManagerDashboardPage = DashboardPage;

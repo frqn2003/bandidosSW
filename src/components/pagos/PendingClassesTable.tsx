@@ -40,34 +40,32 @@ export function PendingClassesTable({
     }).format(valor);
 
   return (
-    <div className="flex flex-col">
-      {/* Tabla con scroll horizontal en móviles */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm text-slate-600">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500">
+    <div className="flex flex-col h-full justify-between">
+      <div className="overflow-hidden">
+        <table className="w-full text-left text-xs text-slate-600">
+          <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
             <tr>
-              <th scope="col" className="w-12 px-4 py-3 text-center">
+              <th scope="col" className="w-9 px-2 py-2.5 text-center">
                 <button
                   type="button"
                   onClick={allSelected ? onClearSelection : onSelectAll}
-                  className="flex h-5 w-5 items-center justify-center rounded text-blue-600 hover:text-blue-800 focus:outline-none"
+                  className="flex h-4 w-4 items-center justify-center rounded text-blue-600 hover:text-blue-800 focus:outline-none mx-auto cursor-pointer"
                   title={allSelected ? "Desmarcar todas" : "Seleccionar todas"}
                   aria-label={allSelected ? "Desmarcar todas las clases" : "Seleccionar todas las clases"}
                 >
                   {allSelected ? (
-                    <Icon name="check_box" size={18} className="text-secondary" />
+                    <Icon name="check_box" size={16} className="text-blue-600" />
                   ) : someSelected ? (
-                    <div className="h-3.5 w-3.5 rounded bg-blue-600" />
+                    <div className="h-3 w-3 rounded bg-blue-600" />
                   ) : (
-                    <Icon name="check_box_outline_blank" size={18} className="text-slate-400" />
+                    <Icon name="check_box_outline_blank" size={16} className="text-slate-400" />
                   )}
                 </button>
               </th>
-              <th scope="col" className="px-3 py-3">Fecha y Horario</th>
-              <th scope="col" className="px-3 py-3">Materia</th>
-              <th scope="col" className="px-3 py-3">Profesor</th>
-              <th scope="col" className="px-3 py-3 text-right">Importe</th>
-              <th scope="col" className="px-4 py-3 text-center">Estado</th>
+              <th scope="col" className="px-3 py-2.5 whitespace-nowrap">Fecha y Horario</th>
+              <th scope="col" className="px-3 py-2.5">Materia</th>
+              <th scope="col" className="px-3 py-2.5">Profesor</th>
+              <th scope="col" className="px-3 py-2.5 text-right whitespace-nowrap">Importe</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -82,46 +80,40 @@ export function PendingClassesTable({
                   }`}
                 >
                   <td
-                    className="px-4 py-3 text-center"
+                    className="px-2 py-2.5 text-center"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <input
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => onToggleSelect(item.id)}
-                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer align-middle"
                       aria-label={`Seleccionar clase de ${item.materia.nombre} del ${formatearFecha(item.fecha)}`}
                     />
                   </td>
-                  <td className="px-3 py-3">
-                    <div className="font-semibold text-slate-800">
+                  <td className="px-3 py-2.5 whitespace-nowrap">
+                    <div className="font-semibold text-slate-800 text-xs">
                       {formatearFecha(item.fecha)}
                     </div>
-                    <div className="text-xs text-slate-500 font-mono">
+                    <div className="text-[11px] text-slate-400 font-normal">
                       {item.horaInicio} - {item.horaFin}
                     </div>
                   </td>
-                  <td className="px-3 py-3">
-                    <div className="font-medium text-slate-900">
+                  <td className="px-3 py-2.5">
+                    <div className="font-semibold text-slate-900 text-xs truncate max-w-[150px]" title={item.materia.nombre}>
                       {item.materia.nombre}
                     </div>
-                    <div className="text-xs text-slate-400 font-mono">
+                    <span className="font-mono text-[10px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200 inline-block mt-0.5">
                       {item.codigo}
-                    </div>
+                    </span>
                   </td>
-                  <td className="px-3 py-3">
-                    <span className="text-slate-700">
+                  <td className="px-3 py-2.5 text-xs">
+                    <span className="text-slate-700 font-normal truncate block max-w-[130px]" title={`${item.profesor.nombre} ${item.profesor.apellido}`}>
                       {item.profesor.nombre} {item.profesor.apellido}
                     </span>
                   </td>
-                  <td className="px-3 py-3 text-right font-semibold text-slate-900">
+                  <td className="px-3 py-2.5 text-right font-bold text-slate-900 whitespace-nowrap text-xs tabular-nums">
                     {formatMonto(item.importe)}
-                  </td>
-                  <td className="px-4 py-3 text-center whitespace-nowrap">
-                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 border border-amber-200 shadow-2xs">
-                      <Icon name="schedule" size={13} className="text-amber-700" />
-                      <span>Pendiente</span>
-                    </span>
                   </td>
                 </tr>
               );
@@ -131,27 +123,27 @@ export function PendingClassesTable({
       </div>
 
       {/* Pie de tabla con resumen dinámico autocalculado */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 bg-slate-50 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50 px-3 py-2 text-xs">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-600">
-            <strong>{selectedIds.length}</strong> de {classes.length} clases seleccionadas
+          <span className="text-slate-600">
+            <strong>{selectedIds.length}</strong> de {classes.length} seleccionadas
           </span>
           {selectedIds.length > 0 && (
             <button
               type="button"
               onClick={onClearSelection}
-              className="text-xs text-slate-500 underline hover:text-slate-800 ml-2"
+              className="text-slate-500 underline hover:text-slate-800 text-[11px] cursor-pointer"
             >
-              Limpiar selección
+              Limpiar
             </button>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500 font-medium">
-            Total seleccionado:
+        <div className="flex items-center gap-1.5">
+          <span className="text-slate-500 font-medium">
+            Total:
           </span>
-          <span className="text-base font-bold text-slate-900">
+          <span className="text-sm font-bold text-slate-900 tabular-nums">
             {formatMonto(selectedTotal)}
           </span>
         </div>

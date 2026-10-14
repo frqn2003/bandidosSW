@@ -233,3 +233,62 @@ export async function obtenerRankingMateriasMayorIngreso(
     filtros.materiaId ?? null,
   ]);
 }
+
+/**
+ * HU-IND-03: Consulta las 8 tarjetas numéricas y su comparación contra el período anterior.
+ */
+export async function obtenerTarjetasDireccion(
+  filtros: FiltrosIndicadores,
+): Promise<import("./indicadores.types").TarjetaDireccionRow[]> {
+  const sql = `
+    SELECT clave, etiqueta, unidad, valor::text, valor_anterior::text, variacion_porcentual::text, mejora, menor_es_mejor
+    FROM fn_indicadores_direccion($1, $2, $3, $4, $5)
+  `;
+  return query<import("./indicadores.types").TarjetaDireccionRow>(sql, [
+    filtros.desde,
+    filtros.hasta,
+    filtros.materiaId ?? null,
+    filtros.profesorId ?? null,
+    filtros.nivel ?? null,
+  ]);
+}
+
+/**
+ * HU-IND-03: Ranking Top 5 de profesores por clases dictadas (estado 'Asistió').
+ */
+export async function obtenerRankingProfesores(
+  filtros: FiltrosIndicadores,
+): Promise<import("./indicadores.types").RankingProfesorRow[]> {
+  const sql = `
+    SELECT profesor_id, profesor, clases_dictadas, horas_dictadas
+    FROM fn_ind_top_profesores($1, $2, $3, $4, $5)
+  `;
+  return query<import("./indicadores.types").RankingProfesorRow>(sql, [
+    filtros.desde,
+    filtros.hasta,
+    filtros.materiaId ?? null,
+    filtros.profesorId ?? null,
+    filtros.nivel ?? null,
+  ]);
+}
+
+/**
+ * HU-IND-03: Celdas del mapa de calor de demanda por materia y franja horaria.
+ */
+export async function obtenerMapaCalor(
+  filtros: import("@/contracts/indicadores").MapaCalorQuery,
+): Promise<import("./indicadores.types").MapaCalorRow[]> {
+  const sql = `
+    SELECT materia_id, materia, franja_hora, franja, turnos
+    FROM fn_ind_mapa_calor($1, $2, $3, $4, $5, $6, $7)
+  `;
+  return query<import("./indicadores.types").MapaCalorRow>(sql, [
+    filtros.desde,
+    filtros.hasta,
+    filtros.materiaId ?? null,
+    filtros.profesorId ?? null,
+    filtros.nivel ?? null,
+    filtros.horaDesde ?? null,
+    filtros.horaHasta ?? null,
+  ]);
+}

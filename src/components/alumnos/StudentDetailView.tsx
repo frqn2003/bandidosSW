@@ -11,6 +11,12 @@ import { Button } from "@/components/ui/Button";
 import { StatusBadge, type StatusVariant } from "@/components/ui/StatusBadge";
 import { inicialesDe, tonoAvatarDe } from "@/funciones/formato";
 import type { StudentUI, StudentAuditLog } from "@/modules/alumnos/types";
+import { StudentAttendanceHistory } from "@/components/asistencia/StudentAttendanceHistory";
+import { StudentHistoryTab } from "@/components/alumnos/historial/StudentHistoryTab";
+import { StudentTurnosTab } from "@/components/alumnos/StudentTurnosTab";
+import { StudentPagosTab } from "@/components/alumnos/StudentPagosTab";
+import { EnablePortalAccess } from "@/components/alumnos/EnablePortalAccess";
+import { EncabezadoImpresion } from "@/components/layout/EncabezadoImpresion";
 
 interface StudentDetailViewProps {
   student: StudentUI;
@@ -19,9 +25,10 @@ interface StudentDetailViewProps {
   onEdit: (student: StudentUI) => void;
   onReactivate: (student: StudentUI) => Promise<void>;
   reactivating?: boolean;
+  initialTab?: TabType;
 }
 
-type TabType = "datos" | "turnos" | "asistencias" | "pagos" | "bitacora";
+type TabType = "datos" | "turnos" | "asistencias" | "historial" | "pagos" | "bitacora";
 
 function formatearFecha(isoString?: string): string {
   if (!isoString) return "—";
@@ -44,8 +51,9 @@ export function StudentDetailView({
   onEdit,
   onReactivate,
   reactivating,
+  initialTab = "historial",
 }: StudentDetailViewProps) {
-  const [activeTab, setActiveTab] = useState<TabType>("bitacora");
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const isInactive = student.estado === "inactivo";
 
   const getActionVariant = (accion: StudentAuditLog["accion"]): StatusVariant => {
@@ -66,16 +74,28 @@ export function StudentDetailView({
   return (
     <div className="space-y-5">
       {/* Botón Volver */}
-      <div>
+      <div className="print:hidden">
         <Button variant="ghost" size="sm" type="button" onClick={onBack} className="text-secondary gap-1">
           <Icon name="arrow_back" size={18} />
           Volver al listado
         </Button>
       </div>
 
-      {/* Header del Alumno */}
-      <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-6 shadow-card">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* Encabezado Institucional para Impresión (si no está en historial) */}
+      {activeTab !== "historial" && (
+        <EncabezadoImpresion
+          titulo={`Ficha del Alumno · ${student.nombre} ${student.apellido}`}
+          subtitulo={`Legajo: ${student.legajo} · Nivel: ${student.nivelEducativo}`}
+          filtrosAplicados={[
+            `Estado: ${student.estado === "activo" ? "Activo" : "Inactivo"}`,
+            `Alta: ${formatearFecha(student.fechaCreacion)}`,
+          ]}
+        />
+      )}
+
+      {/* Header del Alumno y Contenido */}
+      <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-6 shadow-card print:border-0 print:shadow-none print:p-0 print:bg-transparent">
+        <div className="flex flex-wrap items-center justify-between gap-4 print:hidden">
           <div className="flex items-center gap-4">
             <span
               className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-base font-bold ${tonoAvatarDe(
@@ -106,6 +126,7 @@ export function StudentDetailView({
           </div>
 
           <div className="flex items-center gap-2.5">
+            <EnablePortalAccess student={student} />
             {isInactive ? (
               <Button
                 variant="primary"
@@ -131,7 +152,7 @@ export function StudentDetailView({
 
         {/* Banner Informativo si el alumno está inactivo */}
         {isInactive && (
-          <div className="mt-5 flex items-start gap-2.5 rounded-sm border border-secondary/30 bg-secondary/10 p-3.5 text-xs text-on-surface">
+          <div className="mt-5 flex items-start gap-2.5 rounded-sm border border-secondary/30 bg-secondary/10 p-3.5 text-xs text-on-surface print:hidden">
             <Icon name="info" size={18} className="text-secondary shrink-0 mt-0.5" />
             <p>
               <strong>Alumno inactivo:</strong> no aparece en combos ni buscadores de otros módulos. Al reactivarlo se vuelve a validar que el DNI sea único.
@@ -140,13 +161,14 @@ export function StudentDetailView({
         )}
 
         {/* Pestañas de Navegación */}
-        <div className="mt-6 border-b border-outline-variant">
+        <div className="mt-6 border-b border-outline-variant print:hidden">
           <nav aria-label="Secciones de la ficha" className="flex gap-6 -mb-px text-sm font-bold">
             {(
               [
                 { id: "datos", label: "Datos" },
                 { id: "turnos", label: "Turnos" },
                 { id: "asistencias", label: "Asistencias" },
+                { id: "historial", label: "Historial" },
                 { id: "pagos", label: "Pagos" },
                 { id: "bitacora", label: "Bitácora" },
               ] as const
@@ -168,7 +190,7 @@ export function StudentDetailView({
         </div>
 
         {/* CONTENIDO DE LAS PESTAÑAS */}
-        <div className="pt-6">
+        <div className="pt-6 print:pt-0">
           {/* PESTAÑA: BITÁCORA DE AUDITORÍA */}
           {activeTab === "bitacora" && (
             <div className="space-y-4">
@@ -252,6 +274,24 @@ export function StudentDetailView({
                   </div>
                 </div>
                 <div className="sm:col-span-2">
+                  <span className="block text-xs font-bold text-on-surface-variant mb-1">Email</span>
+                  <div className="rounded-sm border border-outline-variant bg-surface-container-high px-3 py-2 text-on-surface">
+                    {student.email || "—"}
+                  </div>
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-on-surface-variant mb-1">Teléfono</span>
+                  <div className="rounded-sm border border-outline-variant bg-surface-container-high px-3 py-2 text-on-surface">
+                    {student.telefono || "—"}
+                  </div>
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-on-surface-variant mb-1">Fecha de nacimiento</span>
+                  <div className="rounded-sm border border-outline-variant bg-surface-container-high px-3 py-2 text-on-surface">
+                    {formatearFecha(student.fechaNacimiento)}
+                  </div>
+                </div>
+                <div className="sm:col-span-2">
                   <span className="block text-xs font-bold text-on-surface-variant mb-1">Institución de origen</span>
                   <div className="rounded-sm border border-outline-variant bg-surface-container-high px-3 py-2 text-on-surface">
                     {student.institucionOrigen || "—"}
@@ -300,20 +340,41 @@ export function StudentDetailView({
                   </div>
                 </div>
               )}
+
+              {student.observacionesGenerales && (
+                <div className="border-t border-outline-variant pt-4">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">
+                    Observaciones Generales
+                  </h4>
+                  <div className="rounded-sm border border-outline-variant bg-surface-container-high px-3 py-2 text-on-surface whitespace-pre-wrap">
+                    {student.observacionesGenerales}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* OTRAS PESTAÑAS (HISTORIAL) */}
-          {(activeTab === "turnos" || activeTab === "asistencias" || activeTab === "pagos") && (
-            <div className="rounded-md border border-dashed border-outline-variant p-8 text-center text-on-surface-variant">
-              <Icon name="event_note" size={32} className="mx-auto text-on-surface-variant/50 mb-2" />
-              <p className="text-sm font-bold text-on-surface capitalize">
-                Historial de {activeTab} de {student.nombre}
-              </p>
-              <p className="text-xs text-on-surface-variant mt-1">
-                Registros sincronizados con los módulos de {activeTab}.
-              </p>
-            </div>
+          {/* PESTAÑA: HISTORIAL DE ASISTENCIAS (HU-ASI-01) */}
+          {activeTab === "asistencias" && (
+            <StudentAttendanceHistory
+              alumnoId={student.id}
+              alumnoNombre={`${student.nombre} ${student.apellido}`}
+            />
+          )}
+
+          {/* PESTAÑA: HISTORIAL GENERAL: LÍNEA DE TIEMPO Y NOTAS (HU-ALU-03) */}
+          {activeTab === "historial" && (
+            <StudentHistoryTab student={student} />
+          )}
+
+          {/* PESTAÑA: TURNOS */}
+          {activeTab === "turnos" && (
+            <StudentTurnosTab student={student} />
+          )}
+
+          {/* PESTAÑA: PAGOS */}
+          {activeTab === "pagos" && (
+            <StudentPagosTab student={student} />
           )}
         </div>
       </div>

@@ -151,12 +151,16 @@ export function CalendarioTurnos({
         onIrAHoy={irAHoy}
         onAnterior={anterior}
         onSiguiente={siguiente}
-        onReservarTurno={() => {
-          const params = new URLSearchParams();
-          if (filtros.profesorId) params.set("profesorId", String(filtros.profesorId));
-          if (filtros.materiaId) params.set("materiaId", String(filtros.materiaId));
-          router.push(`/turnos/reservas${params.toString() ? `?${params.toString()}` : ""}`);
-        }}
+        onReservarTurno={
+          esProfesor
+            ? undefined
+            : () => {
+                const params = new URLSearchParams();
+                if (filtros.profesorId) params.set("profesorId", String(filtros.profesorId));
+                if (filtros.materiaId) params.set("materiaId", String(filtros.materiaId));
+                router.push(`/turnos/reservas${params.toString() ? `?${params.toString()}` : ""}`);
+              }
+        }
         profesores={profesores}
         materias={materias}
         filtros={filtros}
@@ -185,7 +189,9 @@ export function CalendarioTurnos({
               columnas={columnasDia}
               onSelectTurno={seleccionarTurno}
               onIniciarReprogramacion={esProfesor ? undefined : iniciarReprogramacion}
-              onReservarFranja={(fecha, hora, profId) => abrirReserva(fecha, hora, profId)}
+              onReservarFranja={
+                esProfesor ? undefined : (fecha, hora, profId) => abrirReserva(fecha, hora, profId)
+              }
               esProfesor={esProfesor}
             />
           )}
@@ -199,7 +205,9 @@ export function CalendarioTurnos({
               filtroProfesorId={filtros.profesorId}
               onSelectTurno={seleccionarTurno}
               onIniciarReprogramacion={esProfesor ? undefined : iniciarReprogramacion}
-              onReservarFranja={(fecha, hora) => abrirReserva(fecha, hora)}
+              onReservarFranja={
+                esProfesor ? undefined : (fecha, hora) => abrirReserva(fecha, hora)
+              }
               esProfesor={esProfesor}
             />
           )}

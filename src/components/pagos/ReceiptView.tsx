@@ -39,12 +39,24 @@ export function ReceiptView({ receipt, onVolver }: ReceiptViewProps) {
     }, 1000);
   };
 
-  const handleEnviarEmail = () => {
+  const handleEnviarEmail = async () => {
     setEnviandoEmail(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch(`/api/pagos/${receipt.id}/email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error?.mensaje || "Error al enviar el comprobante.");
+      }
+      showToast("success", `Comprobante enviado exitosamente a ${data.email}.`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "No se pudo enviar el correo.";
+      showToast("error", msg);
+    } finally {
       setEnviandoEmail(false);
-      showToast("success", `Comprobante ${receipt.comprobante} enviado con éxito.`);
-    }, 600);
+    }
   };
 
   const handleDescargarPdf = () => {

@@ -6,7 +6,9 @@ import {
   RUTA,
   RUTA_CLASES_PENDIENTES,
   RUTA_FORMAS_PAGO,
+  rutaAnular,
   rutaPago,
+  type AnularPagoBody,
   type ClasePendientePagoResponse,
   type CrearPagoBody,
   type ListarPagosQuery,
@@ -16,6 +18,7 @@ import type { FormaPagoResponse } from "@/contracts/catalogo";
 import { apiGet, apiGetOpcional, apiSend } from "@/lib/api-client";
 
 export type {
+  AnularPagoBody,
   ClasePendientePagoResponse,
   CrearPagoBody,
   FormaPagoResponse,
@@ -23,7 +26,7 @@ export type {
   PagoResponse,
 };
 
-export { RUTA, RUTA_CLASES_PENDIENTES, RUTA_FORMAS_PAGO, rutaPago };
+export { RUTA, RUTA_CLASES_PENDIENTES, RUTA_FORMAS_PAGO, rutaAnular, rutaPago };
 
 /** Formato de moneda ARS para importes en la interfaz. */
 export const formatearImporte = (valor: number) =>
@@ -67,4 +70,9 @@ export async function listarClasesPendientes(alumnoId?: number): Promise<ClasePe
 /** Catálogo de formas de pago activas. */
 export async function listarFormasPago(): Promise<FormaPagoResponse[]> {
   return apiGetOpcional<FormaPagoResponse[]>(`${RUTA_FORMAS_PAGO}?soloActivas=true`, []);
+}
+
+/** Anulación de un pago vigente con motivo obligatorio (HU-PAG-02). */
+export async function anularPago(id: number, body: AnularPagoBody): Promise<PagoResponse> {
+  return apiSend<PagoResponse>("POST", rutaAnular(id), body);
 }

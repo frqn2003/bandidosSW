@@ -53,6 +53,7 @@ export function toApi(
       row.updated_at instanceof Date
         ? row.updated_at.toISOString()
         : String(row.updated_at),
+    accesoPortal: Boolean(row.usuario_id),
   };
 }
 

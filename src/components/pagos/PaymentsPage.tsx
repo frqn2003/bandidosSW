@@ -1,19 +1,25 @@
 // src/components/pagos/PaymentsPage.tsx
 //
-// Vista Principal del Módulo "Gestión de Pagos" (HU-PAG-01).
-// Implementa:
-//  · Control de acceso por rol (Profesor no accede → Acceso Denegado).
-//  · Navegación por pestañas: "Registrar pago" e "Historial del alumno".
-//  · Buscador de alumnos con tarjeta de resumen de deuda.
-//  · Layout de 2 columnas: PendingClassesTable a la izquierda y PaymentForm a la derecha.
-//  · Modal de confirmación (PaymentConfirmModal) con fondo oscuro y botón verde Confirmar.
-//  · Comprobante estilo ticket (ReceiptView) tras el registro con banner de éxito.
-//  · Pestaña Historial en modo solo lectura ordenada por fecha descendente.
+// Vista Principal del Módulo "Gestión de Pagos" Unificado (HU-PAG-01 + HU-PAG-02).
+// Arquitectura completa:
+//  · Control de acceso por rol:
+//      - Profesor: accede exclusivamente a "Rendición por Profesor" en modo lectura.
+//      - Gerente y Mesa de Entrada: acceden a todas las pestañas.
+//  · Sistema de Pestañas Unificado:
+//      1. "Cobros y Deudores" (ancho completo con métricas, filtros y modal de cobro).
+//      2. "Historial de pagos" (listado de comprobantes, reimpresión y anulación).
+//      3. "Cierre de Caja" (conciliación diaria, arqueo y reapertura para Gerente).
+//      4. "Rendición por Profesor" (liquidaciones y detalle de alumnos por docente).
+//  · Modales:
+//      - RegisterPaymentModal: cobro de clases enfocado sin quitar espacio a la tabla.
+//      - AccountStatementModal: movimientos y saldo histórico del alumno.
+//      - PaymentConfirmModal: confirmación previa al alta del cobro.
+//      - AnnulPaymentModal: anulación con validación estricta de caja del día abierta.
+//      - ReceiptView: visualización estilo ticket para impresión o descarga.
 
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -21,18 +27,25 @@ import { RequiereSesion } from "@/components/auth/RequiereSesion";
 import { useToast } from "@/components/ui/Toast";
 import { useSesion } from "@/funciones/sesion";
 import { usePayments } from "@/modules/pagos/usePayments";
-import type { PaymentReceipt } from "@/modules/pagos/types";
-import { StudentSearch } from "./StudentSearch";
-import { PendingClassesTable } from "./PendingClassesTable";
-import { PendingStudentsList } from "./PendingStudentsList";
-import { PaymentForm, type PaymentFormData } from "./PaymentForm";
+import type { PaymentReceipt, StudentPaymentSummary, PaymentsTab } from "@/modules/pagos/types";
+import { UnifiedDebtorsTab } from "./UnifiedDebtorsTab";
+import { RegisterPaymentModal } from "./RegisterPaymentModal";
 import { PaymentConfirmModal } from "./PaymentConfirmModal";
 import { ReceiptView } from "./ReceiptView";
 import { PaymentHistoryTab } from "./PaymentHistoryTab";
+import { AnnulPaymentModal } from "./AnnulPaymentModal";
+import { AccountStatementModal } from "./deudores/AccountStatementModal";
+import { DailyCashRegister } from "./deudores/DailyCashRegister";
+import { ProfessorRendition } from "./deudores/ProfessorRendition";
+import { obtenerCajaDelDia } from "@/data/caja";
+import { anularPago } from "@/data/pagos";
+import type { PagoResponse } from "@/contracts/pago";
+import type { PaymentFormData } from "./PaymentForm";
 
 export function PaymentsPage() {
   const { sesion } = useSesion();
   const rolNombre = sesion?.usuario.rol.nombre;
+  const esProfesor = rolNombre === "Profesor";
   const { showToast } = useToast();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
@@ -52,65 +65,68 @@ export function PaymentsPage() {
     selectedCount,
     formasPagoCatalogo,
     paymentHistory,
-    searchStudents,
     registerPayment,
     lastReceipt,
     clearLastReceipt,
+    recargarDatos,
   } = usePayments();
 
+  // Si el usuario es Profesor, solo puede acceder a "Rendición por Profesor"
   useEffect(() => {
-    if (tabParam === "historial" || tabParam === "history") {
+    if (esProfesor) {
+      setActiveTab("rendicion");
+    } else if (tabParam === "historial" || tabParam === "history") {
       setActiveTab("historial");
-    } else if (tabParam === "registrar" || tabParam === "register") {
+    } else if (tabParam === "caja") {
+      setActiveTab("caja");
+    } else if (tabParam === "rendicion") {
+      setActiveTab("rendicion");
+    } else if (tabParam === "registrar" || tabParam === "deudores") {
       setActiveTab("registrar");
     }
-  }, [tabParam, setActiveTab]);
+  }, [esProfesor, tabParam, setActiveTab]);
 
-  // Alumnos que tienen al menos un pago pendiente
-  const studentsWithDebt = React.useMemo(() => {
-    return students.filter((s) => s.totalDeudaPendiente > 0);
-  }, [students]);
+  // Estados para modales de cobro y deudores
+  const [modalCobroOpen, setModalCobroOpen] = useState(false);
+  const [studentParaCobrar, setStudentParaCobrar] = useState<StudentPaymentSummary | null>(null);
+  const [alumnoParaEstadoCuenta, setAlumnoParaEstadoCuenta] = useState<{
+    id: number;
+    legajo: string;
+    nombre: string;
+    apellido: string;
+    dni: string;
+  } | null>(null);
 
-  // Estado para el modal de confirmación
+  // Estado para el modal de confirmación de pago
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [pendingFormData, setPendingFormData] = useState<PaymentFormData | null>(null);
   const [confirmando, setConfirmando] = useState(false);
 
-  // Estado para ver comprobante desde el historial
+  // Estado para ver comprobante desde el historial o post-pago
   const [historicalReceiptToView, setHistoricalReceiptToView] = useState<PaymentReceipt | null>(null);
 
-  // REGLA DE NEGOCIO: Rol Profesor no tiene acceso al módulo de pagos
-  if (rolNombre === "Profesor") {
-    return (
-      <RequiereSesion>
-        <div className="flex min-h-screen bg-slate-50">
-          <Sidebar />
-          <main className="flex-1 p-6 lg:p-8 flex items-center justify-center">
-            <div className="max-w-md w-full rounded-lg border border-red-200 bg-white p-8 text-center shadow-sm">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-100 text-red-600 mb-4">
-                <Icon name="shield_person" size={32} />
-              </div>
-              <h1 className="text-xl font-bold text-slate-900 mb-2">
-                Acceso denegado
-              </h1>
-              <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-                El módulo de <span className="font-semibold text-slate-800">Gestión de Pagos</span> está reservado exclusivamente para el personal de Mesa de Entrada y Gerencia. El rol Profesor no posee permisos para consultar ni registrar cobros.
-              </p>
-              <Link
-                href="/calendario"
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
-              >
-                <Icon name="arrow_back" size={16} />
-                Ir a mi calendario
-              </Link>
-            </div>
-          </main>
-        </div>
-      </RequiereSesion>
-    );
-  }
+  // Estado para anulación de pago (Diagrama 4)
+  const [pagoParaAnular, setPagoParaAnular] = useState<PagoResponse | null>(null);
 
-  // Clases seleccionadas actualmente para el modal
+  // Abrir modal de cobro para un alumno específico
+  const handleAbrirCobro = (student: StudentPaymentSummary) => {
+    setStudentParaCobrar(student);
+    selectStudent(student.id);
+    setModalCobroOpen(true);
+  };
+
+  // Abrir modal de estado de cuenta para un alumno
+  const handleAbrirEstadoCuenta = (alumno: {
+    id: number;
+    legajo: string;
+    nombre: string;
+    apellido: string;
+    dni: string;
+  }) => {
+    setAlumnoParaEstadoCuenta(alumno);
+  };
+
+  // Clases seleccionadas actualmente para el modal de confirmación
   const selectedClassesForModal = pendingClasses.filter((c) =>
     selectedClassIds.includes(c.id)
   );
@@ -136,7 +152,10 @@ export function PaymentsPage() {
       if (result.success && result.receipt) {
         setConfirmModalOpen(false);
         setPendingFormData(null);
+        setModalCobroOpen(false);
         showToast("success", `Pago registrado con éxito. Comprobante ${result.receipt.comprobante}`);
+        setHistoricalReceiptToView(result.receipt);
+        recargarDatos();
       } else {
         showToast("error", result.errorMessage ?? "No se pudo registrar el pago.");
       }
@@ -159,6 +178,61 @@ export function PaymentsPage() {
     }, 150);
   };
 
+  // DIAGRAMA 4: Validación crítica antes de anular (la caja de esa fecha no debe estar cerrada)
+  const handleSolicitarAnulacion = async (pago: PagoResponse) => {
+    try {
+      const caja = await obtenerCajaDelDia(pago.fechaPago);
+      if (caja.cerrada) {
+        showToast("error", "No se permite anular pagos de una caja cerrada.");
+        return;
+      }
+      setPagoParaAnular(pago);
+    } catch {
+      setPagoParaAnular(pago);
+    }
+  };
+
+  const handleConfirmarAnulacion = async (motivo: string) => {
+    if (!pagoParaAnular) return;
+    try {
+      await anularPago(pagoParaAnular.id, { motivo });
+      showToast("success", `Pago ${pagoParaAnular.comprobante} anulado con éxito.`);
+      setPagoParaAnular(null);
+      recargarDatos();
+    } catch {
+      showToast("error", "Error al procesar la anulación del pago.");
+    }
+  };
+
+  // Configuración de pestañas según rol
+  const tabsConfig = [
+    {
+      id: "registrar" as PaymentsTab,
+      label: "Cobros y Deudores",
+      icon: "add_card",
+      visible: !esProfesor,
+    },
+    {
+      id: "historial" as PaymentsTab,
+      label: "Historial de pagos",
+      icon: "history",
+      count: paymentHistory.length,
+      visible: !esProfesor,
+    },
+    {
+      id: "caja" as PaymentsTab,
+      label: "Cierre de Caja",
+      icon: "point_of_sale",
+      visible: !esProfesor,
+    },
+    {
+      id: "rendicion" as PaymentsTab,
+      label: esProfesor ? "Mi Rendición" : "Rendición por Profesor",
+      icon: "person",
+      visible: true,
+    },
+  ];
+
   return (
     <RequiereSesion>
       <div className="flex min-h-screen bg-slate-50 print:bg-white print:min-h-0">
@@ -179,200 +253,82 @@ export function PaymentsPage() {
                     Gestión de Pagos
                   </h1>
                   <p className="text-sm text-slate-500">
-                    Registro de cobros de clases dictadas y emisión de comprobantes
+                    {esProfesor
+                      ? "Consulta de clases dictadas y liquidaciones vigentes"
+                      : "Cobros de clases dictadas, listado de deudores, conciliación de caja y rendiciones"}
                   </p>
                 </div>
               </div>
 
-              {/* Pestañas de navegación */}
-              <div className="flex items-center rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab("registrar");
-                    setHistoricalReceiptToView(null);
-                  }}
-                  className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-all cursor-pointer ${
-                    activeTab === "registrar"
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                  }`}
-                >
-                  <Icon name="add_card" size={18} />
-                  Registrar pago
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab("historial");
-                    setHistoricalReceiptToView(null);
-                  }}
-                  className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-all cursor-pointer ${
-                    activeTab === "historial"
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                  }`}
-                >
-                  <Icon name="history" size={18} />
-                  {selectedStudent ? "Historial del alumno" : "Historial de pagos"}
-                  {paymentHistory.length > 0 && (
-                    <span
-                      className={`ml-1 rounded-full px-2 py-0.5 text-xs font-bold ${
-                        activeTab === "historial"
-                          ? "bg-blue-500 text-white"
-                          : "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {paymentHistory.length}
-                    </span>
-                  )}
-                </button>
+              {/* Sistema de Pestañas (Pill nav style idéntico a captura) */}
+              <div className="flex items-center rounded-lg border border-slate-200 bg-white p-1 shadow-sm overflow-x-auto scrollbar-none">
+                {tabsConfig
+                  .filter((t) => t.visible)
+                  .map((tab) => {
+                    const isActive = activeTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveTab(tab.id);
+                          setHistoricalReceiptToView(null);
+                        }}
+                        className={`flex items-center gap-2 rounded-md px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                          isActive
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                        }`}
+                      >
+                        <Icon name={tab.icon} size={17} />
+                        <span>{tab.label}</span>
+                        {tab.count !== undefined && tab.count > 0 && (
+                          <span
+                            className={`ml-0.5 rounded-full px-2 py-0.2 text-[11px] font-bold ${
+                              isActive
+                                ? "bg-blue-500 text-white"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {tab.count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
               </div>
             </header>
 
-            {/* Si acabamos de emitir un comprobante o estamos viendo uno desde el historial */}
+            {/* Vista de Comprobante (cuando se emitió o se consulta del historial) */}
             {lastReceipt && activeTab === "registrar" ? (
-              <ReceiptView
-                receipt={lastReceipt}
-                onVolver={clearLastReceipt}
-              />
-            ) : historicalReceiptToView && activeTab === "historial" ? (
+              <ReceiptView receipt={lastReceipt} onVolver={clearLastReceipt} />
+            ) : historicalReceiptToView ? (
               <ReceiptView
                 receipt={historicalReceiptToView}
                 onVolver={() => setHistoricalReceiptToView(null)}
               />
             ) : (
               <>
-                {/* Buscador de Alumno (Oculto en impresión) */}
-                <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm print:hidden">
-                  <StudentSearch
-                    selectedStudent={selectedStudent}
-                    onSelectStudent={(student) => selectStudent(student.id)}
-                    onClearStudent={() => selectStudent(null)}
-                    searchStudents={searchStudents}
+                {/* 1. Pestaña: Cobros y Deudores (Ancho completo) */}
+                {activeTab === "registrar" && (
+                  <UnifiedDebtorsTab
+                    students={students}
+                    onCobrar={handleAbrirCobro}
+                    onVerEstadoCuenta={handleAbrirEstadoCuenta}
+                    onRefresh={recargarDatos}
                   />
-                </section>
+                )}
 
-                {/* Contenido según pestaña activa */}
-                {activeTab === "registrar" ? (
-                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 print:block">
-                    {/* Columna Izquierda: Lista de clases pendientes o Listado de alumnos con deuda */}
-                    <div className={`${!selectedStudent ? "lg:col-span-8" : "lg:col-span-7"} flex flex-col gap-4`}>
-                      <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
-                        <div className="border-b border-slate-200 bg-slate-50/50 px-5 py-3.5 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Icon name="event_available" size={18} className="text-secondary" />
-                            <h2 className="font-bold text-slate-800 text-sm">
-                              {selectedStudent
-                                ? `Clases pendientes de ${selectedStudent.apellido}, ${selectedStudent.nombre}`
-                                : "Alumnos con pagos pendientes"}
-                            </h2>
-                          </div>
-                          {selectedStudent ? (
-                            <button
-                              type="button"
-                              onClick={() => selectStudent(null)}
-                              className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
-                            >
-                              ← Ver todos los alumnos
-                            </button>
-                          ) : (
-                            <span className="text-xs text-slate-500 font-medium">
-                              {studentsWithDebt.length} {studentsWithDebt.length === 1 ? "alumno con deuda" : "alumnos con deuda"}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="p-0">
-                          {!selectedStudent ? (
-                            <PendingStudentsList
-                              studentsWithDebt={studentsWithDebt}
-                              onSelectStudent={(student) => selectStudent(student.id)}
-                            />
-                          ) : pendingClasses.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-center text-slate-500 p-6">
-                              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-3">
-                                <Icon name="receipt_long" size={24} />
-                              </div>
-                              <h3 className="font-bold text-slate-800 text-base">
-                                Sin deuda pendiente
-                              </h3>
-                              <p className="text-xs text-slate-500 mt-1 max-w-sm">
-                                El alumno {selectedStudent.apellido}, {selectedStudent.nombre} está al día con sus pagos de clases dictadas.
-                              </p>
-                              <button
-                                type="button"
-                                onClick={() => selectStudent(null)}
-                                className="mt-4 text-xs font-bold text-blue-600 hover:underline cursor-pointer"
-                              >
-                                Volver al listado de alumnos con deuda
-                              </button>
-                            </div>
-                          ) : (
-                            <PendingClassesTable
-                              classes={pendingClasses}
-                              selectedIds={selectedClassIds}
-                              onToggleSelect={toggleSelectClass}
-                              onSelectAll={selectAllClasses}
-                              onClearSelection={clearClassSelection}
-                              selectedTotal={selectedTotal}
-                            />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Columna Derecha: Formulario de Pago */}
-                    <div className={`${!selectedStudent ? "lg:col-span-4" : "lg:col-span-5"} flex flex-col gap-4`}>
-                      <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
-                        <div className="border-b border-slate-200 bg-slate-50/50 px-5 py-3.5 flex items-center justify-between">
-                          <h2 className="font-bold text-slate-800 text-sm">
-                            Detalle del cobro
-                          </h2>
-                          {selectedCount > 0 && (
-                            <span className="text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
-                              {selectedCount} {selectedCount === 1 ? "clase seleccionada" : "clases seleccionadas"}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="p-5">
-                          {selectedStudent ? (
-                            <PaymentForm
-                              montoCalculado={selectedTotal}
-                              clasesSeleccionadasCount={selectedCount}
-                              formasPagoCatalogo={formasPagoCatalogo}
-                              onIniciarRegistro={handleIniciarRegistro}
-                            />
-                          ) : (
-                            <div className="flex flex-col items-center justify-center py-10 text-center text-slate-400">
-                              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 mb-3">
-                                <Icon name="payments" size={24} />
-                              </div>
-                              <h3 className="font-bold text-slate-700 text-sm">
-                                Selecciona un alumno para cobrar
-                              </h3>
-                              <p className="text-xs text-slate-400 mt-1 max-w-xs leading-relaxed">
-                                Haz click en &quot;Cobrar&quot; en cualquier alumno de la lista o búscalo por DNI/nombre arriba para ver sus clases y emitir el pago.
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  /* Pestaña: Historial del Alumno */
-                  <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
-                    <div className="border-b border-slate-200 bg-slate-50/50 px-5 py-3.5 flex items-center justify-between">
+                {/* 2. Pestaña: Historial de pagos */}
+                {activeTab === "historial" && (
+                  <div className="rounded-xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
+                    <div className="border-b border-slate-200 bg-slate-50/80 px-5 py-3.5 flex items-center justify-between">
                       <div>
                         <h2 className="font-bold text-slate-800 text-sm">
-                          {selectedStudent
-                            ? `Historial de pagos de ${selectedStudent.apellido}, ${selectedStudent.nombre}`
-                            : "Historial general de pagos del centro"}
+                          Historial General de Comprobantes
                         </h2>
                         <p className="text-xs text-slate-400 mt-0.5">
-                          Comprobantes de clases dictadas emitidos en orden cronológico descendente
+                          Registro cronológico descendente de cobros emitidos y anulados
                         </p>
                       </div>
                       <span className="text-xs text-slate-500 font-medium">
@@ -384,21 +340,44 @@ export function PaymentsPage() {
                       history={paymentHistory}
                       onSelectReceipt={(receipt) => setHistoricalReceiptToView(receipt)}
                       onDownloadReceipt={handleDownloadDirectReceipt}
-                      selectedStudentName={
-                        selectedStudent
-                          ? `${selectedStudent.apellido}, ${selectedStudent.nombre}`
-                          : undefined
-                      }
+                      onAnularPago={handleSolicitarAnulacion}
                     />
                   </div>
                 )}
+
+                {/* 3. Pestaña: Cierre de Caja */}
+                {activeTab === "caja" && <DailyCashRegister />}
+
+                {/* 4. Pestaña: Rendición por Profesor */}
+                {activeTab === "rendicion" && <ProfessorRendition />}
               </>
             )}
           </div>
         </main>
 
-        {/* Modal de confirmación de pago */}
-        {selectedStudent && pendingFormData && (
+        {/* Modal de Registro de Cobro Enfocado */}
+        {modalCobroOpen && studentParaCobrar && (
+          <RegisterPaymentModal
+            open={modalCobroOpen}
+            student={studentParaCobrar}
+            pendingClasses={pendingClasses}
+            selectedClassIds={selectedClassIds}
+            onToggleSelectClass={toggleSelectClass}
+            onSelectAllClasses={selectAllClasses}
+            onClearClassSelection={clearClassSelection}
+            selectedTotal={selectedTotal}
+            selectedCount={selectedCount}
+            formasPagoCatalogo={formasPagoCatalogo}
+            onIniciarRegistro={handleIniciarRegistro}
+            onClose={() => {
+              setModalCobroOpen(false);
+              setStudentParaCobrar(null);
+            }}
+          />
+        )}
+
+        {/* Modal de Confirmación de Pago */}
+        {studentParaCobrar && pendingFormData && (
           <PaymentConfirmModal
             open={confirmModalOpen}
             onClose={() => {
@@ -406,10 +385,28 @@ export function PaymentsPage() {
             }}
             onConfirm={handleConfirmarPago}
             confirmando={confirmando}
-            student={selectedStudent}
+            student={studentParaCobrar}
             selectedClasses={selectedClassesForModal}
             formData={pendingFormData}
             total={selectedTotal}
+          />
+        )}
+
+        {/* Modal de Estado de Cuenta (Diagrama 1) */}
+        {alumnoParaEstadoCuenta && (
+          <AccountStatementModal
+            alumnoId={alumnoParaEstadoCuenta.id}
+            alumnoNombre={`${alumnoParaEstadoCuenta.apellido}, ${alumnoParaEstadoCuenta.nombre}`}
+            onClose={() => setAlumnoParaEstadoCuenta(null)}
+          />
+        )}
+
+        {/* Modal de Anulación de Pago (Diagrama 4) */}
+        {pagoParaAnular && (
+          <AnnulPaymentModal
+            pago={pagoParaAnular}
+            onClose={() => setPagoParaAnular(null)}
+            onConfirmar={handleConfirmarAnulacion}
           />
         )}
       </div>

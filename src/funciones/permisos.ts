@@ -21,9 +21,9 @@ import type { NombreRol } from "@/contracts/rol";
 
 export type ModuloId =
   | "dashboard"
-  | "sedes"
   | "turnos"
   | "calendario"
+  | "asistencia"
   | "alumnos"
   | "profesores"
   | "mi-ficha"
@@ -48,12 +48,18 @@ export type Modulo = {
 /** El orden de este array es el orden del menú. */
 export const MODULOS: Modulo[] = [
   { id: "dashboard", label: "Indicadores", href: "/reportes", icon: "analytics", construido: true },
-  { id: "sedes", label: "Sedes", href: "#", icon: "location_city", construido: false },
   {
     id: "calendario",
     label: "Calendario",
     href: "/calendario",
     icon: "calendar_view_month",
+    construido: true,
+  },
+  {
+    id: "asistencia",
+    label: "Mis clases",
+    href: "/asistencia",
+    icon: "how_to_reg",
     construido: true,
   },
   // Después de Calendario a propósito: `inicioDe` toma el primer módulo
@@ -69,15 +75,13 @@ export const MODULOS: Modulo[] = [
   },
   { id: "alumnos", label: "Alumnos", href: "/alumnos", icon: "group", construido: true },
   { id: "profesores", label: "Cuerpo Docente", href: "/profesores", icon: "groups", construido: true },
-  // Solo para el rol Profesor: su propia ficha en modo LECTURA. Todavía no
-  // existe como pantalla, así que no navega a ningún lado (chip "Próx.").
-  { id: "mi-ficha", label: "Mi ficha", href: "#", icon: "badge", construido: false },
+  // Solo para el rol Profesor: su propia ficha en modo LECTURA y edición de disponibilidad.
+  { id: "mi-ficha", label: "Mi ficha", href: "/mi-ficha", icon: "badge", construido: true },
   { id: "materias", label: "Materias", href: "/materias", icon: "menu_book", construido: true },
   { id: "cobranzas", label: "Cobranzas", href: "/pagos", icon: "receipt_long", construido: true },
-  { id: "usuarios", label: "Usuarios", href: "/usuarios", icon: "manage_accounts", construido: true },
-  // Solo para el rol Alumno (portal, HU-POR-01). Todavía no existen como pantalla.
-  { id: "reservar-turno", label: "Reservar turno", href: "#", icon: "event_available", construido: false },
-  { id: "mis-turnos", label: "Mis turnos", href: "#", icon: "event_note", construido: false },
+  // Solo para el rol Alumno (portal, HU-POR-01).
+  { id: "reservar-turno", label: "Reservar turno", href: "/portal/reservar", icon: "event_available", construido: true },
+  { id: "mis-turnos", label: "Mis turnos", href: "/portal/mis-turnos", icon: "event_note", construido: true },
 ];
 
 /**
@@ -85,22 +89,30 @@ export const MODULOS: Modulo[] = [
  *
  * - Gerente: todos los módulos (incluyendo Indicadores de gestión de forma exclusiva).
  * - Mesa de Entrada: alumnos, turnos, calendarios y pagos (sin usuarios ni indicadores).
- * - Profesor: calendario y su ficha en modo LECTURA.
+ * - Profesor: calendario, mis clases (asistencia) y su ficha en modo LECTURA.
  * - Alumno (portal): solo reservar turno y mis turnos.
  */
 export const PERMISOS_POR_ROL: Record<NombreRol, ModuloId[]> = {
   Gerente: MODULOS.map((m) => m.id).filter(
-    (id) => id !== "mi-ficha" && id !== "reservar-turno" && id !== "mis-turnos",
+    (id) =>
+      id !== "mi-ficha" &&
+      id !== "reservar-turno" &&
+      id !== "mis-turnos",
   ),
-  "Mesa de Entrada": ["turnos", "calendario", "alumnos", "cobranzas"],
-  Profesor: ["calendario", "mi-ficha"],
+  "Mesa de Entrada": ["turnos", "calendario", "asistencia", "alumnos", "cobranzas"],
+  Profesor: ["calendario", "asistencia", "dashboard", "mi-ficha"],
   Alumno: ["reservar-turno", "mis-turnos"],
 };
 
 /** Los módulos que le corresponden al rol, en el orden del menú. */
 export function modulosDe(rol: NombreRol): Modulo[] {
   const permitidos = PERMISOS_POR_ROL[rol] ?? [];
-  return MODULOS.filter((m) => permitidos.includes(m.id));
+  return MODULOS.filter((m) => permitidos.includes(m.id)).map((m) => {
+    if (m.id === "asistencia" && (rol === "Gerente" || rol === "Mesa de Entrada")) {
+      return { ...m, label: "Asistencias a clases" };
+    }
+    return m;
+  });
 }
 
 export function puedeVer(rol: NombreRol, modulo: ModuloId): boolean {

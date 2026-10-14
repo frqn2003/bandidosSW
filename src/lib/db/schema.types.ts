@@ -23,11 +23,19 @@
 
 export type EstadoActivoInactivo = "activo" | "inactivo";
 
-export type EstadoTurno = "Reservado" | "Cancelado";
+export type EstadoCierreCaja = "Cerrada" | "Reabierta";
+
+export type EstadoPago = "Vigente" | "Anulado";
+
+export type EstadoTurno = "Reservado" | "Cancelado" | "Asistió" | "Ausente";
 
 export type ModoAbm = "INSERCION" | "EDICION" | "LECTURA";
 
 export type NivelMateria = "Primario" | "Secundario" | "Universitario";
+
+export type OrigenTurno = "Centro" | "Portal del Alumno";
+
+export type ResponsableCancelacion = "Alumno" | "Profesor" | "Centro";
 
 export type TipoEventoSesion = "login" | "logout" | "login_fallido" | "bloqueado" | "acceso_denegado";
 
@@ -88,11 +96,24 @@ export interface DbTables {
     updated_at: Date;  // auto (default)
     institucion_origen: string | null;
     observaciones_generales: string | null;
+    usuario_id: number | null;
   };
   alumno_materia_interes: {
     id: number;  // auto (identity)
     alumno_id: number;
     materia_id: number;
+  };
+  asistencia: {
+    id: number;  // auto (default)
+    turno_id: number;
+    presente: boolean;
+    tema_trabajado: string | null;
+    observaciones: string | null;
+    usuario_id: number;
+    registrado_at: Date;  // auto (default)
+    modificado_at: Date | null;
+    modificado_por: number | null;
+    motivo_correccion: string | null;
   };
   auditoria: {
     id: string;  // auto (identity)
@@ -112,6 +133,33 @@ export interface DbTables {
     ip_origen: string | null;
     detalle: unknown | null;
   };
+  bloqueo_fecha: {
+    id: number;  // auto (default)
+    fecha_desde: Date;
+    fecha_hasta: Date;
+    profesor_id: number | null;
+    motivo: string;
+    estado: EstadoActivoInactivo;  // auto (default)
+    usuario_id: number;
+    created_at: Date;  // auto (default)
+    fecha_baja: Date | null;
+    usuario_baja_id: number | null;
+  };
+  cierre_caja: {
+    id: number;  // auto (default)
+    fecha: Date;
+    estado: EstadoCierreCaja;  // auto (default)
+    total_registrado: string;
+    efectivo_registrado: string;
+    efectivo_contado: string;
+    diferencia: string;
+    observaciones: string | null;
+    cerrado_por: number;
+    cerrado_at: Date;  // auto (default)
+    reabierto_por: number | null;
+    reabierto_at: Date | null;
+    motivo_reapertura: string | null;
+  };
   forma_pago: {
     id: number;  // auto (identity)
     nombre: string;
@@ -119,6 +167,7 @@ export interface DbTables {
     estado: EstadoActivoInactivo;  // auto (default)
     created_at: Date;  // auto (default)
     updated_at: Date;  // auto (default)
+    es_efectivo: boolean;  // auto (default)
   };
   materia: {
     id: number;  // auto (identity)
@@ -146,6 +195,14 @@ export interface DbTables {
     estado: EstadoActivoInactivo;  // auto (default)
     created_at: Date;  // auto (default)
     updated_at: Date;  // auto (default)
+    responsable: ResponsableCancelacion;  // auto (default)
+  };
+  nota_alumno: {
+    id: number;  // auto (default)
+    alumno_id: number;
+    texto: string;
+    usuario_id: number;
+    created_at: Date;  // auto (default)
   };
   pago: {
     id: number;  // auto (identity)
@@ -156,18 +213,24 @@ export interface DbTables {
     observaciones: string | null;
     usuario_id: number;
     created_at: Date;  // auto (default)
+    estado: EstadoPago;  // auto (default)
+    anulado_at: Date | null;
+    anulado_por: number | null;
+    motivo_anulacion: string | null;
   };
   pago_forma_pago: {
     id: number;  // auto (identity)
     pago_id: number;
     forma_pago_id: number;
     nro_operacion: string | null;
+    monto: string | null;
   };
   pago_turno: {
     id: number;  // auto (identity)
     pago_id: number;
     turno_id: number;
     importe: string;
+    vigente: boolean;  // auto (default)
   };
   parametro: {
     id: number;  // auto (identity)
@@ -222,6 +285,7 @@ export interface DbTables {
     fecha_cancelacion: Date | null;
     cancelacion_tardia: boolean;  // auto (default)
     pagado: boolean;  // auto (default)
+    origen: OrigenTurno;  // auto (default)
   };
   usuario: {
     id: number;  // auto (identity)
@@ -248,12 +312,122 @@ export interface DbTables {
 // ── Vistas ──────────────────────────────────────────────────────────────────
 
 export interface DbViews {
+  vw_bloqueo_fecha: {
+    id: number | null;
+    fecha_desde: Date | null;
+    fecha_hasta: Date | null;
+    profesor_id: number | null;
+    profesor: string | null;
+    motivo: string | null;
+    estado: EstadoActivoInactivo | null;
+    usuario_id: number | null;
+    created_at: Date | null;
+    fecha_baja: Date | null;
+    usuario_baja_id: number | null;
+  };
+  vw_cajas_pendientes: {
+    fecha: Date | null;
+    pagos_vigentes: string | null;
+    total: string | null;
+  };
+  vw_cierre_caja: {
+    id: number | null;
+    fecha: Date | null;
+    estado: EstadoCierreCaja | null;
+    total_registrado: string | null;
+    efectivo_registrado: string | null;
+    efectivo_contado: string | null;
+    diferencia: string | null;
+    observaciones: string | null;
+    cerrado_por: number | null;
+    cerrado_por_nombre: string | null;
+    cerrado_at: Date | null;
+    reabierto_por: number | null;
+    reabierto_por_nombre: string | null;
+    reabierto_at: Date | null;
+    motivo_reapertura: string | null;
+  };
+  vw_deuda_clase: {
+    turno_id: number | null;
+    codigo: string | null;
+    alumno_id: number | null;
+    fecha: Date | null;
+    hora_inicio: string | null;
+    materia_id: number | null;
+    materia: string | null;
+    profesor_id: number | null;
+    profesor: string | null;
+    estado: EstadoTurno | null;
+    importe: string | null;
+    dias_antiguedad: number | null;
+  };
+  vw_historial_alumno: {
+    alumno_id: number | null;
+    fecha_hora: Date | null;
+    orden_evento: number | null;
+    tipo: string | null;
+    materia_id: number | null;
+    materia: string | null;
+    profesor_id: number | null;
+    profesor: string | null;
+    detalle: string | null;
+    observaciones: string | null;
+    cancelacion_tardia: boolean | null;
+    responsable: string | null;
+    usuario_id: number | null;
+    usuario: string | null;
+    turno_id: number | null;
+    fecha_clase: Date | null;
+    hora_clase: string | null;
+  };
+  vw_historial_asistencia: {
+    turno_id: number | null;
+    codigo: string | null;
+    alumno_id: number | null;
+    fecha: Date | null;
+    hora_inicio: string | null;
+    materia_id: number | null;
+    materia: string | null;
+    profesor_id: number | null;
+    profesor: string | null;
+    estado: EstadoTurno | null;
+    tema_trabajado: string | null;
+  };
   vw_huecos_disponibles: {
     agenda_profesional_id: number | null;
     profesor_id: number | null;
     fecha: Date | null;
     hueco_inicio: string | null;
     hueco_fin: string | null;
+  };
+  vw_mis_turnos: {
+    alumno_id: number | null;
+    turno_id: number | null;
+    codigo: string | null;
+    fecha: Date | null;
+    hora_inicio: string | null;
+    hora_fin: string | null;
+    materia_id: number | null;
+    materia: string | null;
+    profesor_id: number | null;
+    profesor: string | null;
+    estado: EstadoTurno | null;
+    origen: OrigenTurno | null;
+    es_proximo: boolean | null;
+  };
+  vw_pago_medio: {
+    pago_forma_pago_id: number | null;
+    pago_id: number | null;
+    comprobante: string | null;
+    alumno_id: number | null;
+    fecha_pago: Date | null;
+    estado: EstadoPago | null;
+    usuario_id: number | null;
+    forma_pago_id: number | null;
+    medio: string | null;
+    es_efectivo: boolean | null;
+    nro_operacion: string | null;
+    monto_medio: string | null;
   };
 }
 

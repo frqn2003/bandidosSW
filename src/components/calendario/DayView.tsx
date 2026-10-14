@@ -8,6 +8,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { Icon } from "@/components/ui/Icon";
 import { aISO } from "@/funciones/fechas-calendario";
 import type { TurnoCalendario, ColumnaProfesorDia } from "./types";
 
@@ -340,18 +341,30 @@ export function DayView({
                         /* Franja Libre (Dashed border, clickable) */
                         <div
                           onClick={() =>
-                            onReservarFranja && onReservarFranja(fecha, hora, col.profesor.id)
+                            !esProfesor &&
+                            onReservarFranja &&
+                            onReservarFranja(fecha, hora, col.profesor.id)
                           }
-                          className="h-full w-full rounded-md border border-dashed border-slate-200 bg-white/70 flex items-center justify-center text-slate-400 font-medium text-xs hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/40 cursor-pointer transition-all shadow-2xs"
-                          title={`Franja libre para ${col.profesor.apellido} a las ${hora}. Clic para reservar o arrastre un turno aquí para reprogramar.`}
+                          className={`h-full w-full rounded-md border border-dashed border-status-success/40 bg-status-success/10 flex items-center justify-center text-status-success-strong font-medium text-xs transition-all shadow-2xs select-none ${
+                            !esProfesor
+                              ? "hover:border-status-success-strong/60 hover:bg-status-success/20 cursor-pointer"
+                              : "cursor-default"
+                          }`}
+                          title={
+                            !esProfesor
+                              ? `Franja libre para ${col.profesor.apellido} a las ${hora}. Clic para reservar o arrastre un turno aquí para reprogramar.`
+                              : `Franja libre para ${col.profesor.apellido} a las ${hora}.`
+                          }
                         >
-                          <span>Libre</span>
+                          <span className="flex items-center gap-1">
+                            {!esProfesor && <Icon name="add" size={14} />} Libre
+                          </span>
                         </div>
                       ) : (
-                        /* Fuera de disponibilidad del profesor */
+                        /* Fuera de disponibilidad del profesor o modo lectura */
                         <div
                           className="h-full w-full rounded-md bg-slate-50/40 select-none flex items-center justify-center text-slate-300 text-[11px]"
-                          title={`Fuera del horario de atención de ${col.profesor.apellido}`}
+                          title={esProfesor ? "Sin clases programadas" : `Fuera del horario de atención de ${col.profesor.apellido}`}
                         >
                           <span className="sr-only">No disponible</span>
                         </div>

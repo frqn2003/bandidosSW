@@ -1,5 +1,7 @@
+import { randomInt } from "node:crypto";
 import type {
   AlumnoResponse,
+  HabilitarPortalResponse,
   PosiblesDuplicadosQuery,
 } from "@/contracts/alumno";
 import { withTransaction } from "@/lib/db/tx";
@@ -7,9 +9,14 @@ import { withAuditUser } from "@/lib/audit/audit";
 import {
   BusinessRuleError,
   ConflictError,
+  ForbiddenError,
   NotFoundError,
+  ServicioAuthNoDisponibleError,
   ValidationError,
 } from "@/lib/http/errors";
+import { crearUsuarioAuth, eliminarUsuarioAuth } from "@/lib/auth/gotrue";
+import { enviarPasswordTemporal } from "@/lib/email";
+import * as usuarioRepo from "@/modules/usuarios/usuario.repo";
 import { edadEnAnios } from "@/funciones/formato";
 import type {
   FiltrosAlumno,
@@ -363,4 +370,165 @@ export async function posiblesDuplicados(
   ]);
 
   return mapper.toApiList(rows, materiasMapa, deudasSet);
+}
+
+const MAYUS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+const MINUS = "abcdefghijkmnopqrstuvwxyz";
+const DIGITOS = "23456789";
+
+function generarPasswordTemporal(): string {
+  const todos = MAYUS + MINUS + DIGITOS;
+  const elegir = (set: string) => set[randomInt(set.length)];
+  const chars = [elegir(MAYUS), elegir(MINUS), elegir(DIGITOS)];
+
+  while (chars.length < 10) {
+    chars.push(elegir(todos));
+  }
+
+  // Mezcla de Fisher-Yates para distribución uniforme de caracteres obligatorios
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+
+  return chars.join("");
+}
+
+/**
+ * Habilita el acceso al portal del alumno (HU-POR-01).
+ * Crea el usuario con rol "Alumno", lo vincula a la ficha y envía la contraseña temporal por correo electrónico.
+ */
+export async function habilitarPortal(
+  id: number,
+  actor: { usuarioId: number; rol: string },
+): Promise<HabilitarPortalResponse> {
+  const rolActor = (actor.rol || "").toLowerCase().trim();
+  if (rolActor !== "gerente" && rolActor !== "mesa de entrada") {
+    throw new ForbiddenError(
+      "Solo Mesa de Entrada o el Gerente pueden habilitar el acceso al portal.",
+    );
+  }
+
+  const alumno = await repo.findById(id);
+  if (!alumno) {
+    throw new NotFoundError("el alumno", id);
+  }
+
+  if (alumno.estado !== "activo") {
+    throw new ValidationError(
+      "ALUMNO_INACTIVO",
+      "La ficha del alumno está inactiva: no se puede habilitar el acceso al portal.",
+    );
+  }
+
+  const emailLimpio = alumno.email?.trim().toLowerCase();
+  if (!emailLimpio) {
+    throw new ValidationError(
+      "ALUMNO_SIN_EMAIL",
+      "El alumno no tiene Email cargado: es obligatorio para habilitar el acceso al portal.",
+      "email",
+    );
+  }
+
+  if (alumno.usuario_id) {
+    const usuarioActual = await usuarioRepo.findById(alumno.usuario_id);
+    if (usuarioActual && usuarioActual.estado === "activo") {
+      throw new ConflictError(
+        "PORTAL_YA_HABILITADO",
+        "La ficha ya tiene una cuenta activa en el portal (una sola cuenta por ficha).",
+      );
+    }
+  }
+
+  const duplicado = await usuarioRepo.buscarDuplicadoActivo(alumno.dni, emailLimpio);
+  if (duplicado) {
+    if (duplicado.email.toLowerCase() === emailLimpio) {
+      throw new ConflictError(
+        "EMAIL_DUPLICADO",
+        "Ya existe una cuenta con el email de la ficha.",
+        "email",
+      );
+    }
+    if (duplicado.dni === alumno.dni) {
+      throw new ConflictError(
+        "DNI_DUPLICADO",
+        `Ya existe un usuario activo con el DNI ${alumno.dni}.`,
+        "dni",
+      );
+    }
+  }
+
+  const passwordTemporal = generarPasswordTemporal();
+  let authIdCreado: string | null = null;
+
+  try {
+    const usuarioCreado = await withTransaction(async (client) => {
+      // 1. Fijar auditoría para cumplir triggers
+      await withAuditUser(client, actor.usuarioId);
+
+      // 2. Rol Alumno (id 4)
+      const rolAlumno = await client.query<{ id: number }>(
+        "SELECT id FROM rol WHERE lower(nombre) = 'alumno' LIMIT 1",
+      );
+      const rolId = rolAlumno.rows[0]?.id ?? 4;
+
+      // 3. Crear usuario en el servicio de Auth
+      const altaAuth = await crearUsuarioAuth(emailLimpio, passwordTemporal, {
+        nombre: alumno.nombre,
+        apellido: alumno.apellido,
+      });
+
+      if (!altaAuth.ok) {
+        if (altaAuth.motivo === "email_existente") {
+          throw new ConflictError(
+            "EMAIL_DUPLICADO",
+            "Ya existe un usuario registrado en el sistema de autenticación con ese email.",
+            "email",
+          );
+        }
+        throw new ServicioAuthNoDisponibleError(
+          "No se pudo crear la cuenta de autenticación en este momento. Intentá de nuevo en unos segundos.",
+        );
+      }
+      authIdCreado = altaAuth.authId;
+
+      // 4. Insertar en tabla usuario
+      const nuevoUsuario = await usuarioRepo.insert(
+        {
+          rolId,
+          academiaId: null,
+          nombre: alumno.nombre,
+          apellido: alumno.apellido,
+          dni: alumno.dni,
+          email: emailLimpio,
+          telefono: alumno.telefono,
+          authId: altaAuth.authId,
+        },
+        client,
+      );
+
+      // 5. Vincular usuario a la ficha del alumno
+      await repo.asociarUsuario(alumno.id, nuevoUsuario.id, client);
+
+      // 6. Enviar contraseña temporal por correo electrónico
+      await enviarPasswordTemporal(
+        emailLimpio,
+        passwordTemporal,
+        `${alumno.nombre} ${alumno.apellido}`,
+      );
+
+      return nuevoUsuario;
+    });
+
+    return {
+      alumnoId: alumno.id,
+      usuarioId: usuarioCreado.id,
+      email: emailLimpio,
+    };
+  } catch (error) {
+    if (authIdCreado) {
+      await eliminarUsuarioAuth(authIdCreado);
+    }
+    throw error;
+  }
 }
