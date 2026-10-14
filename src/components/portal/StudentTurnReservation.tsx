@@ -22,20 +22,12 @@ import {
   listarMateriasPortal,
   listarProfesoresPortal,
   reservarTurnoPortal,
+  listarHorariosPortal,
+  type HorarioPortal,
   type MateriaPortalResponse,
   type ProfesorPortalResponse,
   type TurnoPortalResponse,
 } from "@/data/portal";
-
-const HORARIOS_DISPONIBLES = [
-  { horaInicio: "09:00", horaFin: "10:00", cupos: 3 },
-  { horaInicio: "10:00", horaFin: "11:00", cupos: 2 },
-  { horaInicio: "11:30", horaFin: "12:30", cupos: 4 },
-  { horaInicio: "15:00", horaFin: "16:00", cupos: 1 },
-  { horaInicio: "16:00", horaFin: "17:00", cupos: 3 },
-  { horaInicio: "17:30", horaFin: "18:30", cupos: 2 },
-  { horaInicio: "18:30", horaFin: "19:30", cupos: 5 },
-];
 
 export function StudentTurnReservation() {
   const { sesion } = useSesion();
@@ -56,6 +48,7 @@ export function StudentTurnReservation() {
   const [fecha, setFecha] = useState<string>("");
   const [horaInicio, setHoraInicio] = useState<string>("");
   const [observaciones, setObservaciones] = useState<string>("");
+  const [horarios, setHorarios] = useState<HorarioPortal[]>([]);
 
   // Modales y flujo de éxito
   const [modalResumenOpen, setModalResumenOpen] = useState(false);
@@ -139,6 +132,24 @@ export function StudentTurnReservation() {
       setProfesores([]);
     }
   };
+
+  // Horarios libres del profesor en la fecha elegida (huecos de su agenda)
+  const duracionMateria = materias.find((m) => m.id === materiaId)?.duracionClaseMinutos;
+  const horariosListos = Boolean(profesorId && fecha && duracionMateria);
+  useEffect(() => {
+    if (!profesorId || !fecha || !duracionMateria) return;
+    let cancelado = false;
+    listarHorariosPortal(Number(profesorId), fecha, duracionMateria)
+      .then((lista) => {
+        if (!cancelado) setHorarios(lista);
+      })
+      .catch(() => {
+        if (!cancelado) setHorarios([]);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [profesorId, fecha, duracionMateria]);
 
   // ¿Límite alcanzado?
   const limiteAlcanzado = turnosFuturosCount >= limiteMaximo;
@@ -377,7 +388,7 @@ export function StudentTurnReservation() {
           {/* 1. REGLA CRÍTICA: Campo de Alumno FIJO y NO EDITABLE */}
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              Alumno (Fijo - Sesión Activa)
+              Alumno
             </label>
             <div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs">
               <div className="flex items-center gap-2.5">
@@ -495,9 +506,9 @@ export function StudentTurnReservation() {
                 <option value="">
                   {!profesorId ? "Elegí primero el profesor..." : "Seleccioná una franja horaria..."}
                 </option>
-                {HORARIOS_DISPONIBLES.map((h) => (
+                {(horariosListos ? horarios : []).map((h) => (
                   <option key={h.horaInicio} value={h.horaInicio}>
-                    {h.horaInicio} a {h.horaFin} hs · {h.cupos} cupo(s) libre(s)
+                    {h.horaInicio} a {h.horaFin} hs
                   </option>
                 ))}
               </select>

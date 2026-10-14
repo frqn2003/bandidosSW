@@ -15,6 +15,7 @@ import { formatearFecha } from "@/funciones/formato";
 import { useSesion } from "@/funciones/sesion";
 import { useToast } from "@/components/ui/Toast";
 import { obtenerCajaDelDia, cerrarCaja, reabrirCaja } from "@/data/caja";
+import { mensajeDeError } from "@/lib/api-client";
 import type { CajaDelDiaResponse } from "@/contracts/caja";
 import { CloseCashRegisterModal } from "./CloseCashRegisterModal";
 import { ReopenCashRegisterModal } from "./ReopenCashRegisterModal";
@@ -46,7 +47,7 @@ export function DailyCashRegister() {
       .then((res) => setCaja(res))
       .catch((err) => {
         console.error("Error al cargar caja diaria:", err);
-        showToast("error", "No se pudo obtener la información de la caja.");
+        showToast("error", mensajeDeError(err));
       })
       .finally(() => setCargando(false));
   }, [fechaHoy, showToast]);
@@ -77,8 +78,10 @@ export function DailyCashRegister() {
       showToast("success", `Caja del día ${formatearFecha(fechaSeleccionada)} cerrada exitosamente.`);
       setModalCerrarOpen(false);
       cargarCaja(fechaSeleccionada);
-    } catch {
-      showToast("error", "Error al procesar el cierre de caja.");
+    } catch (err) {
+      // OBSERVACIONES_REQUERIDAS, CAJA_YA_CERRADA, FECHA_FUTURA: el back manda el mensaje.
+      showToast("error", mensajeDeError(err));
+      cargarCaja(fechaSeleccionada);
     }
   };
 
@@ -89,8 +92,9 @@ export function DailyCashRegister() {
       showToast("success", `Caja reabierta exitosamente.`);
       setModalReabrirOpen(false);
       cargarCaja(fechaSeleccionada);
-    } catch {
-      showToast("error", "Error al reabrir la caja.");
+    } catch (err) {
+      showToast("error", mensajeDeError(err));
+      cargarCaja(fechaSeleccionada);
     }
   };
 

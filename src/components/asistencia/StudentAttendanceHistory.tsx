@@ -16,7 +16,6 @@ import { Select } from "@/components/ui/Select";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { RangoFechas } from "@/components/ui/RangoFechas";
 import { Pagination } from "@/components/ui/Pagination";
-import { useSesion } from "@/funciones/sesion";
 import { obtenerHistorialAlumno } from "@/data/asistencia";
 import type {
   HistorialAsistenciaResponse,
@@ -36,7 +35,6 @@ export function StudentAttendanceHistory({
   alumnoId,
   alumnoNombre,
 }: StudentAttendanceHistoryProps) {
-  const { sesion } = useSesion();
 
   const [cargando, setCargando] = useState(true);
   const [errorAcceso, setErrorAcceso] = useState<string | null>(null);
@@ -55,12 +53,6 @@ export function StudentAttendanceHistory({
 
   useEffect(() => {
     let cancelado = false;
-    const sesionCtx = {
-      usuarioId: sesion?.usuario.id,
-      rol: sesion?.usuario.rol.nombre,
-      profesorId: sesion?.usuario.id,
-    };
-
     obtenerHistorialAlumno(
       alumnoId,
       {
@@ -70,7 +62,6 @@ export function StudentAttendanceHistory({
         profesorId: profesorId !== "todos" ? Number(profesorId) : undefined,
         estado: estado !== "todos" ? (estado as EstadoHistorial) : undefined,
       },
-      sesionCtx,
     )
       .then((res) => {
         if (cancelado) return;
@@ -94,7 +85,7 @@ export function StudentAttendanceHistory({
     return () => {
       cancelado = true;
     };
-  }, [alumnoId, desde, hasta, materiaId, profesorId, estado, sesion]);
+  }, [alumnoId, desde, hasta, materiaId, profesorId, estado]);
 
   // Catálogos únicos derivados de los ítems existentes para los combos
   const { materiasDisponibles, profesoresDisponibles } = useMemo(() => {

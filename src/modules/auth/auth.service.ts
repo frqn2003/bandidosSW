@@ -59,7 +59,12 @@ export async function login(
 
   // Error genérico: mismo código para email inexistente, contraseña incorrecta
   // y usuario inactivo. Sin `campo` porque marcarlo diría cuál estaba bien.
-  if (!resultado.ok || !usuario || usuario.estado !== "activo") {
+  // HU-POR-01: la cuenta de un Alumno necesita su ficha activa; si la ficha se
+  // inactivó, el login falla con el mismo error genérico.
+  const alumnoSinFicha =
+    usuario?.rol_nombre === "Alumno" && !(await repo.tieneFichaAlumnoActiva(usuario.id));
+
+  if (!resultado.ok || !usuario || usuario.estado !== "activo" || alumnoSinFicha) {
     if (usuario) {
       // Registrar intento fallido y sumar contador (puede disparar el bloqueo)
       await repo.sumarIntentoFallido(usuario.id);

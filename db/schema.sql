@@ -2059,7 +2059,7 @@ END;
 $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.fn_ocupacion(p_desde date, p_hasta date, p_profesor_id integer DEFAULT NULL::integer, p_materia_id integer DEFAULT NULL::integer)
+CREATE OR REPLACE FUNCTION public.fn_ocupacion(p_desde date, p_hasta date, p_profesor_id integer DEFAULT NULL::integer, p_materia_id integer DEFAULT NULL::integer, p_nivel nivel_materia DEFAULT NULL::nivel_materia)
  RETURNS TABLE(profesor_id integer, fecha date, horas_disponibles numeric, horas_reservadas numeric, porcentaje_ocupacion numeric, semaforo text, bloqueado boolean)
  LANGUAGE sql
  STABLE
@@ -2078,7 +2078,14 @@ AS $function$
                                AND ap.estado = 'activo'
     JOIN profesor           pr  ON pr.id = ap.profesor_id
                                AND pr.estado = 'activo'
-    WHERE p_profesor_id IS NULL OR ap.profesor_id = p_profesor_id
+    WHERE (p_profesor_id IS NULL OR ap.profesor_id = p_profesor_id)
+      AND (p_materia_id IS NULL OR ap.profesor_id IN (
+             SELECT pm.profesor_id FROM profesor_materia pm
+             WHERE pm.materia_id = p_materia_id))
+      AND (p_nivel IS NULL OR ap.profesor_id IN (
+             SELECT pm.profesor_id FROM profesor_materia pm
+             JOIN materia mm ON mm.id = pm.materia_id
+             WHERE mm.nivel = p_nivel))
     GROUP BY ap.profesor_id, d.dia
   ),
   tur AS (
@@ -2092,6 +2099,8 @@ AS $function$
       AND t.estado <> 'Cancelado'
       AND (p_profesor_id IS NULL OR t.profesor_id = p_profesor_id)
       AND (p_materia_id  IS NULL OR t.materia_id  = p_materia_id)
+      AND (p_nivel IS NULL OR t.materia_id IN (
+             SELECT mm.id FROM materia mm WHERE mm.nivel = p_nivel))
   ),
   islas AS (
     SELECT prof, dia, hora_inicio, hora_fin,
@@ -2294,7 +2303,6 @@ BEGIN
   IF NEW.estado <> 'Anulado'
      OR NEW.alumno_id     IS DISTINCT FROM OLD.alumno_id
      OR NEW.monto         IS DISTINCT FROM OLD.monto
-     OR NEW.comprobante   IS DISTINCT FROM OLD.comprobante
      OR NEW.fecha_pago    IS DISTINCT FROM OLD.fecha_pago
      OR NEW.observaciones IS DISTINCT FROM OLD.observaciones
      OR NEW.usuario_id    IS DISTINCT FROM OLD.usuario_id

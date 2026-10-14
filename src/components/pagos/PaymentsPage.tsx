@@ -39,6 +39,7 @@ import { DailyCashRegister } from "./deudores/DailyCashRegister";
 import { ProfessorRendition } from "./deudores/ProfessorRendition";
 import { obtenerCajaDelDia } from "@/data/caja";
 import { anularPago } from "@/data/pagos";
+import { mensajeDeError } from "@/lib/api-client";
 import type { PagoResponse } from "@/contracts/pago";
 import type { PaymentFormData } from "./PaymentForm";
 
@@ -199,8 +200,10 @@ export function PaymentsPage() {
       showToast("success", `Pago ${pagoParaAnular.comprobante} anulado con éxito.`);
       setPagoParaAnular(null);
       recargarDatos();
-    } catch {
-      showToast("error", "Error al procesar la anulación del pago.");
+    } catch (err) {
+      // CAJA_CERRADA, PAGO_YA_ANULADO: mensaje del back y recarga.
+      showToast("error", mensajeDeError(err));
+      recargarDatos();
     }
   };
 

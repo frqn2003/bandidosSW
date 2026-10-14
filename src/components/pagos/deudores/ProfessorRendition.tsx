@@ -16,6 +16,7 @@ import { formatearFecha } from "@/funciones/formato";
 import { useSesion } from "@/funciones/sesion";
 import { useToast } from "@/components/ui/Toast";
 import { obtenerRendicion, getRangoMesActual } from "@/data/rendicion";
+import { mensajeDeError } from "@/lib/api-client";
 import { listarMaterias } from "@/data/materias";
 import { listarProfesores } from "@/data/profesores";
 import type { RendicionResponse } from "@/contracts/rendicion";
@@ -55,11 +56,7 @@ export function ProfessorRendition() {
       setProfesores(profs);
       setMaterias(mats);
 
-      // Si es profesor, buscar su profesorId asociado
-      if (esProfesor && profs.length > 0) {
-        // En front de desarrollo toma el primer profesor si no hay mapeo específico
-        setProfesorId(profs[0].id);
-      }
+      // El Profesor no elige: el back usa el profesor de la sesión.
     });
   }, [esProfesor]);
 
@@ -100,7 +97,7 @@ export function ProfessorRendition() {
 
     setCargando(true);
     obtenerRendicion({
-      profesorId,
+      profesorId: esProfesor ? undefined : profesorId,
       desde,
       hasta,
       materiaId,
@@ -110,13 +107,13 @@ export function ProfessorRendition() {
       })
       .catch((err) => {
         console.error("Error al obtener rendición:", err);
-        showToast("error", "Error al consultar la rendición docente.");
+        showToast("error", mensajeDeError(err));
       })
       .finally(() => setCargando(false));
-  }, [esMesa, esGerente, profesorId, desde, hasta, materiaId, showToast]);
+  }, [esMesa, esGerente, esProfesor, profesorId, desde, hasta, materiaId, showToast]);
 
   useEffect(() => {
-    if ((esProfesor && profesorId) || (esGerente && profesorId)) {
+    if (esProfesor || (esGerente && profesorId)) {
       consultarRendicion();
     }
   }, [profesorId, consultarRendicion, esProfesor, esGerente]);
@@ -281,14 +278,6 @@ export function ProfessorRendition() {
             >
               Finalizar / Limpiar consulta
             </button>
-            <button
-              type="button"
-              onClick={consultarRendicion}
-              className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3.5 py-1 font-semibold text-white shadow-2xs hover:bg-blue-700 transition-colors cursor-pointer"
-            >
-              <Icon name="search" size={14} />
-              Consultar Rendición
-            </button>
           </div>
         </div>
       </div>
@@ -304,8 +293,8 @@ export function ProfessorRendition() {
           <Icon name="manage_search" size={36} className="mx-auto text-slate-300 mb-2" />
           <p className="text-sm font-semibold text-slate-700">
             {esGerente
-              ? "Seleccioná un profesor y presioná 'Consultar Rendición'"
-              : "Seleccioná el período y presioná 'Consultar Rendición'"}
+              ? "Seleccioná un profesor y se consultará automáticamente"
+              : "Seleccioná el período y se consultará automáticamente"}
           </p>
           <p className="text-xs text-slate-400 mt-1">
             Los datos reflejarán únicamente las clases dictadas que ya cuentan con pago vigente.

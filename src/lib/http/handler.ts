@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { requireSession, type Session } from "@/lib/auth/session";
+import { denegarAcceso, requireSession, type Session } from "@/lib/auth/session";
+import { ipDelRequest } from "./ip";
 import { ValidationError, traducirErrorPostgres } from "./errors";
 import { errorResponse } from "./responses";
 
@@ -23,6 +24,21 @@ import { errorResponse } from "./responses";
  *   });
  */
 
+/**
+ * HU-POR-01: el rol Alumno solo usa el portal. Cualquier otro endpoint de
+ * gestión → ACCESO_DENEGADO, registrado en `auditoria_sesion`. Se controla acá
+ * y no en cada service para que un endpoint nuevo no quede abierto por olvido.
+ */
+const RUTAS_ALUMNO = ["/api/portal/", "/api/calendario/huecos", "/api/auth/"];
+
+async function exigirRutaDelPortal(req: Request, session: Session): Promise<void> {
+  if (session.rol !== "Alumno") return;
+  const ruta = new URL(req.url).pathname;
+  if (!RUTAS_ALUMNO.some((r) => ruta === r.replace(/\/$/, "") || ruta.startsWith(r))) {
+    await denegarAcceso(session, ipDelRequest(req), { ruta, metodo: req.method });
+  }
+}
+
 type Ctx<P> = {
   req: Request;
   session: Session;
@@ -35,6 +51,7 @@ export function withRoute<P = Record<string, never>>(
   return async (req: Request, ctx: { params: Promise<P> }): Promise<Response> => {
     try {
       const session = await requireSession();
+      await exigirRutaDelPortal(req, session);
       return await fn({ req, session, params: ctx.params });
     } catch (e) {
       if (e instanceof z.ZodError) {

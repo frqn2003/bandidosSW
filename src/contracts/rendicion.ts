@@ -7,10 +7,11 @@
 //    El Profesor ve únicamente la propia: el back usa el profesor de la sesión y devuelve
 //    ACCESO_DENEGADO si pide otro.
 //  · Período por defecto: el mes en curso. Máximo 12 meses.
-//  · Se rinde solo lo efectivamente cobrado: clases no canceladas (Asistió o Ausente) con pago
-//    VIGENTE cuya fecha de pago cae en el período. Agrupadas por materia, con subtotal por
-//    materia y total rendido. Se siguió la base (`fn_rendicion_detalle`): una clase 'Ausente'
-//    cobrada también se rinde; cada fila trae `estadoClase` para distinguirla.
+//  · Se rinde solo lo efectivamente cobrado: clases no canceladas (Reservado, Asistió o Ausente)
+//    con pago VIGENTE cuya fecha de pago cae en el período. Agrupadas por materia, con subtotal
+//    por materia y total rendido. Se siguió la base (`fn_rendicion_detalle`): una clase 'Ausente'
+//    o una 'Reservado' cobrada sin asistencia registrada también se rinde; cada fila trae
+//    `estadoClase` para distinguirla.
 //  · Las clases dictadas pendientes de cobro se listan aparte (`pendientes`), solo informativas:
 //    no suman al total rendido.
 //  · Las cifras coinciden con HU-PAG-01 y con los indicadores de ingresos y deuda (HU-IND-03).
@@ -65,7 +66,7 @@ export type RendicionItemResponse = {
   comprobante: string;
   /** "yyyy-mm-dd" */
   fechaPago: string;
-  estadoClase: "Asistió" | "Ausente";
+  estadoClase: EstadoClaseRendicion;
 };
 
 export type RendicionMateriaResponse = {

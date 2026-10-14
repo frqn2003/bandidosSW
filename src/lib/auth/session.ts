@@ -134,6 +134,27 @@ export async function destroySession(): Promise<void> {
 }
 
 /**
+ * Registra el intento como `acceso_denegado` en `auditoria_sesion` y lanza
+ * `ForbiddenError` (403). Best-effort: si la bitácora falla, igual sale el 403.
+ */
+export async function denegarAcceso(
+  session: Session,
+  ip: string | null = null,
+  detalle?: Record<string, unknown>,
+): Promise<never> {
+  try {
+    await query(
+      `INSERT INTO auditoria_sesion (usuario_id, evento, ip_origen, detalle)
+       VALUES ($1, 'acceso_denegado'::tipo_evento_sesion, $2, $3)`,
+      [session.usuarioId, ip, detalle ? JSON.stringify(detalle) : null],
+    );
+  } catch {
+    // Best-effort para asegurar que el intento denegado siempre lance 403
+  }
+  throw new ForbiddenError(`Tu rol (${session.rol}) no tiene permisos para esta acción.`);
+}
+
+/**
  * Valida que el rol del usuario esté en la lista permitida.
  * Si no está, registra el intento como `acceso_denegado` en `auditoria_sesion`
  * y lanza `ForbiddenError` (403).
@@ -146,15 +167,6 @@ export async function exigirRol(
 ): Promise<void> {
   const permitidos = Array.isArray(rolesPermitidos) ? rolesPermitidos : [rolesPermitidos];
   if (!permitidos.includes(session.rol)) {
-    try {
-      await query(
-        `INSERT INTO auditoria_sesion (usuario_id, evento, ip_origen, detalle)
-         VALUES ($1, 'acceso_denegado'::tipo_evento_sesion, $2, $3)`,
-        [session.usuarioId, ip, detalle ? JSON.stringify(detalle) : null],
-      );
-    } catch {
-      // Best-effort para asegurar que el intento denegado siempre lance 403
-    }
-    throw new ForbiddenError(`Tu rol (${session.rol}) no tiene permisos para esta acción.`);
+    await denegarAcceso(session, ip, detalle);
   }
 }

@@ -1,4 +1,6 @@
+import type { EstadoTurno } from "@/contracts/turno";
 import type {
+  CalendarioOcupacionQuery,
   HuecosQuery,
   AgendaQuery,
   AgendaDiaQuery,
@@ -29,7 +31,8 @@ export type TurnoCalendarioRow = {
   fecha: string;
   hora_inicio: string;
   hora_fin: string;
-  estado: "Reservado" | "Cancelado";
+  /** HU-CAL-03: los turnos pasados llegan como 'Asistió' o 'Ausente'. */
+  estado: EstadoTurno;
   cantidad_modificaciones: number;
   cancelacion_tardia: boolean;
   pagado: boolean;
@@ -53,7 +56,28 @@ export type TurnosPorDiaRow = {
   cantidad_turnos: number;
 };
 
+export type BloqueoCalendarioRow = {
+  id: number;
+  fecha_desde: string;
+  fecha_hasta: string;
+  profesor_id: number | null;
+  motivo: string;
+};
+
+export type OcupacionRow = {
+  profesor_id: number;
+  profesor_nombre: string;
+  profesor_apellido: string;
+  fecha: string;
+  horas_disponibles: string;
+  horas_reservadas: string;
+  porcentaje_ocupacion: string | null;
+  semaforo: "verde" | "amarillo" | "rojo" | null;
+  bloqueado: boolean;
+};
+
 export type FiltrosHuecos = HuecosQuery;
+export type FiltrosOcupacion = CalendarioOcupacionQuery;
 export type FiltrosAgenda = AgendaQuery;
 export type FiltrosAgendaDia = AgendaDiaQuery;
 export type FiltrosCalendarioMes = CalendarioMesQuery;

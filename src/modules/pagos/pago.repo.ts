@@ -228,10 +228,17 @@ export async function obtenerPagoPorId(
       p.usuario_id,
       u.nombre AS usuario_nombre,
       u.apellido AS usuario_apellido,
-      p.created_at
+      p.created_at,
+      p.estado,
+      p.anulado_at,
+      p.anulado_por,
+      ua.nombre AS anulado_por_nombre,
+      ua.apellido AS anulado_por_apellido,
+      p.motivo_anulacion
     FROM pago p
     JOIN alumno a ON a.id = p.alumno_id
     JOIN usuario u ON u.id = p.usuario_id
+    LEFT JOIN usuario ua ON ua.id = p.anulado_por
     WHERE p.id = $1
   `;
 
@@ -346,6 +353,12 @@ export async function listarPagos(
     condiciones.push(`p.fecha_pago <= $${params.length}::date`);
   }
 
+  // Sin `estado` van vigentes y anulados: el historial distingue los anulados (HU-PAG-02).
+  if (filtros.estado) {
+    params.push(filtros.estado);
+    condiciones.push(`p.estado = $${params.length}::estado_pago`);
+  }
+
   const where = condiciones.length > 0 ? `WHERE ${condiciones.join(" AND ")}` : "";
   const sql = `
     SELECT
@@ -362,10 +375,17 @@ export async function listarPagos(
       p.usuario_id,
       u.nombre AS usuario_nombre,
       u.apellido AS usuario_apellido,
-      p.created_at
+      p.created_at,
+      p.estado,
+      p.anulado_at,
+      p.anulado_por,
+      ua.nombre AS anulado_por_nombre,
+      ua.apellido AS anulado_por_apellido,
+      p.motivo_anulacion
     FROM pago p
     JOIN alumno a ON a.id = p.alumno_id
     JOIN usuario u ON u.id = p.usuario_id
+    LEFT JOIN usuario ua ON ua.id = p.anulado_por
     ${where}
     ORDER BY p.fecha_pago DESC, p.created_at DESC
   `;
@@ -375,4 +395,39 @@ export async function listarPagos(
     return rows;
   }
   return query<PagoRow>(sql, params);
+}
+
+/** true si la caja de esa fecha está cerrada (HU-PAG-02). */
+export async function cajaCerrada(fecha: string, ejecutor: Ejecutor = pool): Promise<boolean> {
+  const sql = `SELECT fn_caja_cerrada($1::date) AS cerrada`;
+  if ("query" in ejecutor && ejecutor !== pool) {
+    const { rows } = await ejecutor.query<{ cerrada: boolean }>(sql, [fecha]);
+    return Boolean(rows[0]?.cerrada);
+  }
+  const filas = await query<{ cerrada: boolean }>(sql, [fecha]);
+  return Boolean(filas[0]?.cerrada);
+}
+
+/** Lock del pago antes de anularlo. */
+export async function bloquearPago(
+  id: number,
+  client: PoolClient,
+): Promise<{ estado: string; fecha_pago: string; comprobante: string | null } | null> {
+  const { rows } = await client.query<{ estado: string; fecha_pago: string; comprobante: string | null }>(
+    `SELECT estado, fecha_pago::text AS fecha_pago, comprobante FROM pago WHERE id = $1 FOR UPDATE`,
+    [id],
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * Anulación (HU-PAG-02): único UPDATE que admite `fn_pago_validar_anulacion`.
+ * Fecha y usuario los fija el trigger; `fn_pago_anular_liberar_turnos` deja las
+ * clases impagas otra vez y el comprobante REC queda con el pago anulado.
+ */
+export async function anular(id: number, motivo: string, client: PoolClient): Promise<void> {
+  await client.query(
+    `UPDATE pago SET estado = 'Anulado', motivo_anulacion = $2 WHERE id = $1`,
+    [id, motivo],
+  );
 }

@@ -93,15 +93,6 @@ export function StudentHistoryTab({
   useEffect(() => {
     let cancelado = false;
 
-    const sesionCtx = {
-      usuarioId: sesion?.usuario.id,
-      nombreCompleto: sesion?.usuario
-        ? `${sesion.usuario.nombre} ${sesion.usuario.apellido}`.trim()
-        : undefined,
-      rol: sesion?.usuario.rol.nombre,
-      profesorId: sesion?.usuario.id,
-    };
-
     const tipoFinal: TipoEventoHistorial | undefined = soloNotas
       ? "Nota"
       : tipoEvento !== "todos"
@@ -123,7 +114,6 @@ export function StudentHistoryTab({
             ? Number(profesorId)
             : undefined,
       },
-      sesionCtx
     )
       .then((respuesta) => {
         if (cancelado) return;

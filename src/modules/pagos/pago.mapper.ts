@@ -97,5 +97,18 @@ export function pagoToApi(
       apellido: pago.usuario_apellido,
     },
     fechaCreacion: fechaCreacionStr,
+    estado: pago.estado,
+    anuladoAt: pago.anulado_at
+      ? (pago.anulado_at instanceof Date ? pago.anulado_at : new Date(pago.anulado_at)).toISOString()
+      : null,
+    anuladoPor:
+      pago.anulado_por !== null
+        ? {
+            id: pago.anulado_por,
+            nombre: pago.anulado_por_nombre ?? "",
+            apellido: pago.anulado_por_apellido ?? "",
+          }
+        : null,
+    motivoAnulacion: pago.motivo_anulacion,
   };
 }

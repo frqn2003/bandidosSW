@@ -15,7 +15,6 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
 import { useToast } from "@/components/ui/Toast";
-import { useSesion } from "@/funciones/sesion";
 import { agregarNotaAlumno } from "@/data/historial";
 import type { NotaResponse } from "@/contracts/historial";
 import { StickyNote, AlertTriangle, CheckCircle2, ArrowLeft } from "lucide-react";
@@ -39,7 +38,6 @@ export function AddNoteModal({
   alumnoNombre,
   alumnoInactivo = false,
 }: AddNoteModalProps) {
-  const { sesion } = useSesion();
   const { showToast } = useToast();
 
   const [texto, setTexto] = useState("");
@@ -73,21 +71,8 @@ export function AddNoteModal({
     setGuardando(true);
     setErrorEnvio(null);
 
-    const sesionCtx = {
-      usuarioId: sesion?.usuario.id,
-      nombreCompleto: sesion?.usuario
-        ? `${sesion.usuario.nombre} ${sesion.usuario.apellido}`.trim()
-        : "Usuario de Mesa de Entrada",
-      rol: sesion?.usuario.rol.nombre ?? "Mesa de Entrada",
-      profesorId: sesion?.usuario.id,
-    };
-
     try {
-      const nuevaNota = await agregarNotaAlumno(
-        alumnoId,
-        { texto: texto.trim() },
-        sesionCtx
-      );
+      const nuevaNota = await agregarNotaAlumno(alumnoId, { texto: texto.trim() });
 
       showToast("success", "Nota agregada al historial correctamente.");
       onSuccess(nuevaNota);

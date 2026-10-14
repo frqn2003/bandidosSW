@@ -3,44 +3,7 @@ import type { IndicadoresQuery, IndicadoresResponse } from "@/contracts/indicado
 export type FiltrosIndicadores = IndicadoresQuery;
 export type IndicadoresResult = IndicadoresResponse;
 
-export type MetricasTurnosRow = {
-  turnos_generados: number;
-  turnos_cancelados: number;
-  horas_turnos: string;
-};
-
-export type HorasDisponibilidadRow = {
-  horas_disponibles: string;
-};
-
-export type AlumnosMetricasRow = {
-  alumnos_activos: number;
-  altas_alumnos: number;
-};
-
-export type IngresosRow = {
-  ingresos: string;
-};
-
-export type TurnosPorSemanaRow = {
-  fecha_inicio: string;
-  cantidad: number;
-};
-
-export type RankingMateriaDemandaRow = {
-  materia_id: number;
-  materia_nombre: string;
-  turnos: number;
-  horas_dictadas: string;
-};
-
-export type RankingMateriaIngresosRow = {
-  materia_id: number;
-  materia_nombre: string;
-  ingresos: string;
-  turnos: number;
-};
-
+/** Fila de `fn_indicadores_direccion` (numeric llega como texto). */
 export type TarjetaDireccionRow = {
   clave: string;
   etiqueta: string;
@@ -52,17 +15,41 @@ export type TarjetaDireccionRow = {
   menor_es_mejor: boolean;
 };
 
+/** Fila de `fn_ind_turnos_por_semana`. */
+export type TurnosPorSemanaRow = {
+  semana_inicio: string;
+  turnos: string;
+};
+
+/** Fila de `fn_ind_top_materias_demanda`. */
+export type RankingMateriaDemandaRow = {
+  materia_id: number;
+  materia: string;
+  turnos: string;
+  horas_dictadas: string;
+};
+
+/** Fila de `fn_ind_top_materias_ingresos`. */
+export type RankingMateriaIngresosRow = {
+  materia_id: number;
+  materia: string;
+  ingresos: string;
+  turnos: string;
+};
+
+/** Fila de `fn_ind_top_profesores`. */
 export type RankingProfesorRow = {
   profesor_id: number;
   profesor: string;
-  clases_dictadas: number | string;
-  horas_dictadas: string | number;
+  clases_dictadas: string;
+  horas_dictadas: string;
 };
 
+/** Fila de `fn_ind_mapa_calor`. */
 export type MapaCalorRow = {
   materia_id: number;
   materia: string;
   franja_hora: number;
   franja: string;
-  turnos: number | string;
+  turnos: string;
 };

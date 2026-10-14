@@ -36,6 +36,10 @@ export function AccountStatementModal({
       .then((res) => {
         if (activo) setData(res);
       })
+      .catch((err) => {
+        console.error("Error al cargar el estado de cuenta:", err);
+        if (activo) setData(null);
+      })
       .finally(() => {
         if (activo) setCargando(false);
       });

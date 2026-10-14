@@ -7,6 +7,8 @@ import type {
   CalendarioMesQuery,
   CalendarioMesResponse,
   DiaResumenMesResponse,
+  CalendarioOcupacionQuery,
+  OcupacionDiaResponse,
 } from "@/contracts/calendario";
 import { ForbiddenError, ValidationError } from "@/lib/http/errors";
 import type { ProfesorInfoRow } from "./calendario.types";
@@ -41,7 +43,8 @@ export async function huecos(
   filtros: HuecosQuery,
   session: Session,
 ): Promise<HuecoResponse[]> {
-  const rolesPermitidos = ["Gerente", "Mesa de Entrada", "Profesor"];
+  // HU-POR-01: el Alumno elige horario libre desde el portal.
+  const rolesPermitidos = ["Gerente", "Mesa de Entrada", "Profesor", "Alumno"];
   if (!rolesPermitidos.includes(session.rol)) {
     throw new ForbiddenError(`Tu rol (${session.rol}) no tiene permisos para ver el calendario.`);
   }
@@ -149,13 +152,16 @@ export async function resumenMes(
   const ultimoDia = new Date(filtros.anio, filtros.mes, 0).getDate();
   const hasta = `${filtros.anio}-${mesStr}-${String(ultimoDia).padStart(2, "0")}`;
 
-  const filas = await repo.contarTurnosPorDiaMes({
-    desde,
-    hasta,
-    profesorId: filtros.profesorId,
-    materiaId: filtros.materiaId,
-    verCancelados: filtros.verCancelados,
-  });
+  const [filas, bloqueos] = await Promise.all([
+    repo.contarTurnosPorDiaMes({
+      desde,
+      hasta,
+      profesorId: filtros.profesorId,
+      materiaId: filtros.materiaId,
+      verCancelados: filtros.verCancelados,
+    }),
+    repo.bloqueosVigentes(desde, hasta, filtros.profesorId),
+  ]);
 
   const conteosMap = new Map(filas.map((f) => [f.fecha.slice(0, 10), f.cantidad_turnos]));
   const dias: DiaResumenMesResponse[] = [];
@@ -172,6 +178,7 @@ export async function resumenMes(
     anio: filtros.anio,
     mes: filtros.mes,
     dias,
+    bloqueos: bloqueos.map(mapper.bloqueoCalendarioToApi),
   };
 }
 
@@ -249,7 +256,7 @@ export async function agenda(
   const diasSemana = obtenerDiasSemanaEnRango(desde, hasta);
 
   // 2. Consultas en paralelo
-  const [bloques, turnos, filasHuecos] = await Promise.all([
+  const [bloques, turnos, filasHuecos, bloqueos] = await Promise.all([
     repo.bloquesEnRango(profesorIds, diasSemana),
     repo.turnosEnRango({
       desde,
@@ -266,6 +273,7 @@ export async function agenda(
           materiaId: filtros.materiaId,
         })
       : Promise.resolve([]),
+    repo.bloqueosVigentes(desde, hasta, filtros.profesorId),
   ]);
 
   return mapper.agendaToApi(
@@ -276,6 +284,7 @@ export async function agenda(
     turnos,
     filasHuecos,
     esProfesor,
+    bloqueos,
   );
 }
 
@@ -289,4 +298,55 @@ export async function agendaDelDia(
   session: Session,
 ): Promise<AgendaDiaResponse> {
   return agenda({ profesorId, fecha, verCancelados: false }, session);
+}
+
+/**
+ * % de ocupación por profesor y día para el expander de las vistas Semana y Mes
+ * (HU-CAL-03). El semáforo y `bloqueado` los calcula `fn_ocupacion`.
+ * El Profesor ve solo su propia ocupación.
+ */
+export async function ocupacion(
+  filtros: CalendarioOcupacionQuery,
+  session: Session,
+): Promise<OcupacionDiaResponse[]> {
+  const rolesPermitidos = ["Gerente", "Mesa de Entrada", "Profesor"];
+  if (!rolesPermitidos.includes(session.rol)) {
+    throw new ForbiddenError(`Tu rol (${session.rol}) no tiene permisos para ver el calendario.`);
+  }
+
+  if (session.rol === "Profesor") {
+    const profe = await repo.obtenerProfesorPorUsuarioId(session.usuarioId);
+    if (!profe) {
+      throw new ForbiddenError("El usuario no tiene una ficha de profesor asignada.");
+    }
+    if (filtros.profesorId !== undefined && filtros.profesorId !== profe.id) {
+      throw new ForbiddenError("Solo podés consultar tu propio calendario.");
+    }
+    filtros = { ...filtros, profesorId: profe.id };
+  }
+
+  if (filtros.hasta < filtros.desde) {
+    throw new ValidationError(
+      "RANGO_INVALIDO",
+      "La fecha de fin no puede ser anterior a la de inicio.",
+      "hasta",
+    );
+  }
+  if (diasEntre(filtros.desde, filtros.hasta) > 42) {
+    throw new ValidationError(
+      "RANGO_DEMASIADO_AMPLIO",
+      "El rango de ocupación no puede superar los 42 días.",
+      "hasta",
+    );
+  }
+
+  if (filtros.profesorId !== undefined && !(await repo.obtenerProfesor(filtros.profesorId))) {
+    throw new ValidationError("REFERENCIA_INVALIDA", "El profesor no existe.", "profesorId");
+  }
+  if (filtros.materiaId !== undefined && !(await repo.existeMateria(filtros.materiaId))) {
+    throw new ValidationError("REFERENCIA_INVALIDA", "La materia no existe.", "materiaId");
+  }
+
+  const filas = await repo.ocupacion(filtros);
+  return filas.map(mapper.ocupacionToApi);
 }

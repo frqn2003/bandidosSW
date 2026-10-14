@@ -126,7 +126,7 @@ export function StudentMyTurns() {
             onClick={toggleHistorial}
             className="gap-1.5"
           >
-            <Icon name={verHistorial ? "history" : "history_toggle_drop_down"} size={16} />
+            <Icon name={verHistorial ? "history" : ""} size={16} />
             {verHistorial ? "Ver solo próximos" : "Ver historial completo"}
           </Button>
 

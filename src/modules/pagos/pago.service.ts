@@ -4,6 +4,7 @@ import type {
   PagoResponse,
   ListarPagosQuery,
   CrearPagoInput,
+  AnularPagoInput,
 } from "@/contracts/pago";
 import { withTransaction } from "@/lib/db/tx";
 import { withAuditUser } from "@/lib/audit/audit";
@@ -115,6 +116,15 @@ export async function registrarPago(
         "ALUMNO_INACTIVO",
         "El alumno no se encuentra activo; no se puede registrar el pago.",
         "alumnoId",
+      );
+    }
+
+    // 1b. HU-PAG-02: no se registran pagos en una fecha con caja cerrada
+    if (await repo.cajaCerrada(input.fechaPago, client)) {
+      throw new ConflictError(
+        "CAJA_CERRADA",
+        "La caja de esa fecha está cerrada: no se pueden registrar pagos.",
+        "fechaPago",
       );
     }
 
@@ -289,4 +299,54 @@ export async function listar(
       clasesPorPago.get(p.id) ?? [],
     ),
   );
+}
+
+/**
+ * El `.min(1)` del contrato devuelve DATOS_INVALIDOS; el contrato pide
+ * MOTIVO_ANULACION_REQUERIDO cuando falta el motivo.
+ */
+export function motivoAnulacionRequerido(e: unknown): unknown {
+  if (e instanceof ValidationError && e.campo === "motivo" && !/250/.test(e.message)) {
+    return new ValidationError("MOTIVO_ANULACION_REQUERIDO", "Indicá el motivo de la anulación.", "motivo");
+  }
+  return e;
+}
+
+/**
+ * Anula un pago vigente (HU-PAG-02). Gerente y Mesa de Entrada, con motivo.
+ * No se anula un pago de una fecha con caja cerrada. La bitácora la escribe
+ * `trg_auditoria_pago` con el usuario de `withAuditUser` (incluye monto,
+ * comprobante y motivo en el valor nuevo).
+ */
+export async function anular(
+  id: number,
+  input: AnularPagoInput,
+  session: Session,
+): Promise<PagoResponse> {
+  validarAcceso(session);
+
+  return withTransaction(async (client) => {
+    await withAuditUser(client, session.usuarioId);
+
+    const actual = await repo.bloquearPago(id, client);
+    if (!actual) throw new NotFoundError("el pago", id);
+    if (actual.estado === "Anulado") {
+      throw new ConflictError("PAGO_YA_ANULADO", `El pago ${actual.comprobante ?? id} ya está anulado.`);
+    }
+    if (await repo.cajaCerrada(actual.fecha_pago, client)) {
+      throw new ConflictError(
+        "CAJA_CERRADA",
+        "La caja de la fecha del pago está cerrada: no se puede anular.",
+      );
+    }
+
+    await repo.anular(id, input.motivo, client);
+
+    const [pago, formas, clases] = await Promise.all([
+      repo.obtenerPagoPorId(id, client),
+      repo.obtenerPagoFormasPago([id], client),
+      repo.obtenerPagoTurnos([id], client),
+    ]);
+    return mapper.pagoToApi(pago!, formas, clases);
+  });
 }

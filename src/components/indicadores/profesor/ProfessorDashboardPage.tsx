@@ -83,7 +83,7 @@ export function ProfessorDashboardPage() {
           desde: fDesde,
           hasta: fHasta,
           materiaId: mId,
-          profesorId: sesion?.usuario?.id,
+          // Sin profesorId: el back usa el profesor de la sesión.
         });
         setDatos(respuesta);
       } catch (err: unknown) {
@@ -96,7 +96,7 @@ export function ProfessorDashboardPage() {
         setCargando(false);
       }
     },
-    [sesion?.usuario?.id]
+    []
   );
 
   // Carga inicial al montar si es profesor

@@ -7,6 +7,9 @@ import type {
   ProfesorInfoRow,
   TurnosPorDiaRow,
   FiltrosHuecos,
+  BloqueoCalendarioRow,
+  OcupacionRow,
+  FiltrosOcupacion,
 } from "./calendario.types";
 
 type Ejecutor = Pool | PoolClient;
@@ -96,8 +99,9 @@ export async function turnosEnRango(
     condiciones.push(`t.materia_id = $${params.length}`);
   }
 
+  // HU-CAL-03: sin cancelados se ven igual los Asistió/Ausente (estado de asistencia).
   if (!filtros.verCancelados) {
-    condiciones.push(`t.estado = 'Reservado'`);
+    condiciones.push(`t.estado <> 'Cancelado'`);
   }
 
   const where = `WHERE ${condiciones.join(" AND ")}`;
@@ -182,8 +186,9 @@ export async function contarTurnosPorDiaMes(
     condiciones.push(`t.materia_id = $${params.length}`);
   }
 
+  // HU-CAL-03: sin cancelados se ven igual los Asistió/Ausente (estado de asistencia).
   if (!filtros.verCancelados) {
-    condiciones.push(`t.estado = 'Reservado'`);
+    condiciones.push(`t.estado <> 'Cancelado'`);
   }
 
   const where = `WHERE ${condiciones.join(" AND ")}`;
@@ -382,4 +387,70 @@ export async function obtenerDiaSemanaIso(
   }
   const filas = await query<{ dia_semana: number }>(sql, [fecha]);
   return filas[0]?.dia_semana ?? 1;
+}
+
+/**
+ * Bloqueos vigentes que se superponen con [desde, hasta] (HU-CAL-03). Con
+ * `profesorId` trae los de ese profesor y los de "Todos" (profesor_id NULL).
+ */
+export async function bloqueosVigentes(
+  desde: string,
+  hasta: string,
+  profesorId?: number,
+  ejecutor: Ejecutor = pool,
+): Promise<BloqueoCalendarioRow[]> {
+  const sql = `
+    SELECT
+      b.id,
+      b.fecha_desde::text AS fecha_desde,
+      b.fecha_hasta::text AS fecha_hasta,
+      b.profesor_id,
+      b.motivo
+    FROM bloqueo_fecha b
+    WHERE b.estado = 'activo'
+      AND b.fecha_desde <= $2::date
+      AND b.fecha_hasta >= $1::date
+      AND ($3::int IS NULL OR b.profesor_id IS NULL OR b.profesor_id = $3::int)
+    ORDER BY b.fecha_desde ASC, b.id ASC
+  `;
+  const params = [desde, hasta, profesorId ?? null];
+
+  if ("query" in ejecutor && ejecutor !== pool) {
+    const { rows } = await ejecutor.query<BloqueoCalendarioRow>(sql, params);
+    return rows;
+  }
+  return query<BloqueoCalendarioRow>(sql, params);
+}
+
+/**
+ * % de ocupación por profesor y día (HU-CAL-03). El cálculo, el semáforo y
+ * `bloqueado` salen de `fn_ocupacion`; acá solo se suman nombre y apellido.
+ */
+export async function ocupacion(
+  filtros: FiltrosOcupacion,
+  ejecutor: Ejecutor = pool,
+): Promise<OcupacionRow[]> {
+  const sql = `
+    SELECT
+      o.profesor_id,
+      u.nombre AS profesor_nombre,
+      u.apellido AS profesor_apellido,
+      o.fecha::text AS fecha,
+      o.horas_disponibles::text AS horas_disponibles,
+      o.horas_reservadas::text AS horas_reservadas,
+      o.porcentaje_ocupacion::text AS porcentaje_ocupacion,
+      o.semaforo,
+      o.bloqueado
+    FROM fn_ocupacion($1::date, $2::date, $3::int, $4::int) o
+    JOIN profesor p ON p.id = o.profesor_id
+    JOIN usuario u ON u.id = p.usuario_id
+    ORDER BY o.fecha ASC, u.apellido ASC, u.nombre ASC
+  `;
+  const params = [filtros.desde, filtros.hasta, filtros.profesorId ?? null, filtros.materiaId ?? null];
+
+  if ("query" in ejecutor && ejecutor !== pool) {
+    const { rows } = await ejecutor.query<OcupacionRow>(sql, params);
+    return rows;
+  }
+  return query<OcupacionRow>(sql, params);
 }

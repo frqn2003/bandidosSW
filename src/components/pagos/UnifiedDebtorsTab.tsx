@@ -2,6 +2,9 @@
 //
 // Pestaña unificada: "Cobros y Deudores" (HU-PAG-01 + HU-PAG-02).
 // Combina la lista de deudores y alumnos con pagos pendientes a ancho completo.
+// La deuda (monto, clases adeudadas, antigüedad, totales) sale de GET /api/deudores
+// (HU-PAG-02): incluye los turnos reservados aunque todavía no se hayan dictado.
+// `students[].clasesPendientesCount` (HU-PAG-01) solo indica qué se puede cobrar ya.
 // Incorpora métricas globales, filtros por antigüedad/materia/profesor/búsqueda,
 // acción directa "Cobrar" (abre modal de cobro) y "Estado de cuenta" (abre modal de movimientos).
 
@@ -40,8 +43,11 @@ export function UnifiedDebtorsTab({
   // Catálogos
   const [materias, setMaterias] = useState<MateriaResponse[]>([]);
   const [profesores, setProfesores] = useState<ProfesorResponse[]>([]);
+  /** Deudores con los filtros de antigüedad, materia y profesor aplicados por el back. */
   const [deudoresData, setDeudoresData] = useState<DeudorResponse[]>([]);
-  const [cargandoDeuda, setCargandoDeuda] = useState(false);
+  /** Todos los deudores, sin filtros: estado de cada alumno y totales de las tarjetas. */
+  const [deudoresTodos, setDeudoresTodos] = useState<DeudorResponse[]>([]);
+  const [totalDeudaGlobal, setTotalDeudaGlobal] = useState(0);
 
   useEffect(() => {
     Promise.all([
@@ -54,28 +60,38 @@ export function UnifiedDebtorsTab({
   }, []);
 
   const cargarInfoDeudores = useCallback(() => {
-    setCargandoDeuda(true);
-    listarDeudores({
-      busqueda: busqueda.trim() || undefined,
-      antiguedad: antiguedad === "todas" ? undefined : antiguedad,
-      materiaId,
-      profesorId,
-    })
-      .then((res) => setDeudoresData(res.items))
-      .catch((err) => console.error("Error al cargar datos de deudores:", err))
-      .finally(() => setCargandoDeuda(false));
-  }, [busqueda, antiguedad, materiaId, profesorId]);
+    Promise.all([
+      listarDeudores({
+        antiguedad: antiguedad === "todas" ? undefined : antiguedad,
+        materiaId,
+        profesorId,
+      }),
+      listarDeudores(),
+    ])
+      .then(([filtrados, todos]) => {
+        setDeudoresData(filtrados.items);
+        setDeudoresTodos(todos.items);
+        setTotalDeudaGlobal(todos.totalGeneral);
+      })
+      .catch((err) => console.error("Error al cargar datos de deudores:", err));
+  }, [antiguedad, materiaId, profesorId]);
 
   useEffect(() => {
     cargarInfoDeudores();
   }, [cargarInfoDeudores]);
 
-  // Mapa de deudores por alumnoId para enriquecer la lista de alumnos
+  // Deuda de cada alumno según /api/deudores (sin filtros) y el subconjunto filtrado
   const deudoresMap = useMemo(() => {
     const map = new Map<number, DeudorResponse>();
-    deudoresData.forEach((d) => map.set(d.alumno.id, d));
+    deudoresTodos.forEach((d) => map.set(d.alumno.id, d));
     return map;
-  }, [deudoresData]);
+  }, [deudoresTodos]);
+
+  const filtradosIds = useMemo(
+    () => new Set(deudoresData.map((d) => d.alumno.id)),
+    [deudoresData],
+  );
+  const hayFiltroDeuda = antiguedad !== "todas" || materiaId !== undefined || profesorId !== undefined;
 
   // Formato moneda
   const formatMonto = (val: number) =>
@@ -99,36 +115,24 @@ export function UnifiedDebtorsTab({
         if (!coincide) return false;
       }
 
-      // Filtro por Estado (con deuda vs al día)
-      if (filtroEstado === "deudores" && s.totalDeudaPendiente <= 0) return false;
-      if (filtroEstado === "al_dia" && s.totalDeudaPendiente > 0) return false;
+      // Filtro por Estado (con deuda vs al día), según /api/deudores
+      const tieneDeuda = deudoresMap.has(s.id);
+      if (filtroEstado === "deudores" && !tieneDeuda) return false;
+      if (filtroEstado === "al_dia" && tieneDeuda) return false;
 
-      // Filtro por Antigüedad si es deudor
-      if (antiguedad !== "todas" && s.totalDeudaPendiente > 0) {
-        const d = deudoresMap.get(s.id);
-        if (d) {
-          if (antiguedad === "0-30" && (d.diasAntiguedad < 0 || d.diasAntiguedad > 30)) return false;
-          if (antiguedad === "31-60" && (d.diasAntiguedad <= 30 || d.diasAntiguedad > 60)) return false;
-          if (antiguedad === "mas-60" && d.diasAntiguedad <= 60) return false;
-        }
-      }
+      // Antigüedad / materia / profesor: los aplica el back sobre los deudores
+      if (hayFiltroDeuda && tieneDeuda && !filtradosIds.has(s.id)) return false;
 
       return true;
     });
-  }, [students, busqueda, filtroEstado, antiguedad, deudoresMap]);
+  }, [students, busqueda, filtroEstado, deudoresMap, filtradosIds, hayFiltroDeuda]);
 
-  // Métricas generales
-  const totalDeudaGlobal = useMemo(() => {
-    return students.reduce((acc, curr) => acc + curr.totalDeudaPendiente, 0);
-  }, [students]);
-
+  // Métricas generales (padrón activo vs deudores de /api/deudores)
   const countDeudores = useMemo(() => {
-    return students.filter((s) => s.totalDeudaPendiente > 0).length;
-  }, [students]);
+    return students.filter((s) => deudoresMap.has(s.id)).length;
+  }, [students, deudoresMap]);
 
-  const countAlDia = useMemo(() => {
-    return students.filter((s) => s.totalDeudaPendiente === 0).length;
-  }, [students]);
+  const countAlDia = students.length - countDeudores;
 
   const badgeSemaforo = (semaforo?: SemaforoDeuda, dias?: number) => {
     if (!semaforo || dias === undefined) return null;
@@ -164,8 +168,8 @@ export function UnifiedDebtorsTab({
       `"${s.apellido}"`,
       `"${s.nombre}"`,
       s.dni,
-      s.clasesPendientesCount,
-      s.totalDeudaPendiente,
+      deudoresMap.get(s.id)?.clasesAdeudadas ?? 0,
+      deudoresMap.get(s.id)?.montoAdeudado ?? 0,
     ]);
     const csvContent =
       "data:text/csv;charset=utf-8," +
@@ -403,7 +407,10 @@ export function UnifiedDebtorsTab({
               <tbody className="divide-y divide-slate-100">
                 {filteredStudents.map((student) => {
                   const deudorInfo = deudoresMap.get(student.id);
-                  const tieneDeuda = student.totalDeudaPendiente > 0;
+                  const tieneDeuda = !!deudorInfo;
+                  // Solo se cobran clases ya dictadas (HU-PAG-01): puede haber deuda
+                  // por turnos reservados que todavía no se pueden cobrar.
+                  const puedeCobrar = student.clasesPendientesCount > 0;
 
                   return (
                     <tr
@@ -441,7 +448,7 @@ export function UnifiedDebtorsTab({
                           <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200">
                             <Icon name="schedule" size={13} className="text-amber-700 shrink-0" />
                             <span>
-                              {student.clasesPendientesCount} {student.clasesPendientesCount === 1 ? "clase" : "clases"}
+                              {deudorInfo?.clasesAdeudadas} {deudorInfo?.clasesAdeudadas === 1 ? "clase" : "clases"}
                             </span>
                           </span>
                         ) : (
@@ -465,7 +472,7 @@ export function UnifiedDebtorsTab({
                       <td className="px-4 py-3 text-right font-bold text-xs sm:text-sm whitespace-nowrap tabular-nums">
                         {tieneDeuda ? (
                           <span className="text-slate-900">
-                            {formatMonto(student.totalDeudaPendiente)}
+                            {formatMonto(deudorInfo?.montoAdeudado ?? 0)}
                           </span>
                         ) : (
                           <span className="text-emerald-600 font-semibold text-xs">
@@ -481,13 +488,19 @@ export function UnifiedDebtorsTab({
                           <button
                             type="button"
                             onClick={() => onCobrar(student)}
-                            disabled={!tieneDeuda}
+                            disabled={!puedeCobrar}
                             className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold transition-all ${
-                              tieneDeuda
+                              puedeCobrar
                                 ? "bg-blue-600 text-white shadow-2xs hover:bg-blue-700 cursor-pointer"
                                 : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
                             }`}
-                            title={tieneDeuda ? "Registrar cobro de clases pendientes" : "El alumno no posee deuda"}
+                            title={
+                              puedeCobrar
+                                ? "Registrar cobro de clases pendientes"
+                                : tieneDeuda
+                                ? "Las clases adeudadas todavía no se dictaron: se cobran una vez dictadas"
+                                : "El alumno no posee deuda"
+                            }
                           >
                             <Icon name="payments" size={14} />
                             Cobrar

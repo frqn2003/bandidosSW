@@ -65,6 +65,18 @@ export async function buscarPorId(
 }
 
 /**
+ * HU-POR-01: true si el usuario tiene una ficha de alumno activa asociada
+ * (`fn_alumno_de_usuario`). Un alumno inactivo no puede iniciar sesión.
+ */
+export async function tieneFichaAlumnoActiva(usuarioId: number): Promise<boolean> {
+  const filas = await query<{ alumno_id: number | null }>(
+    `SELECT fn_alumno_de_usuario($1) AS alumno_id`,
+    [usuarioId],
+  );
+  return filas[0]?.alumno_id != null;
+}
+
+/**
  * Incrementa intentos_fallidos en 1.
  * El CHECK ck_usuario_intentos_fallidos (0..5) está en la BD; al llegar a 5
  * el service ya habrá seteado bloqueado_hasta ANTES de llamar a sumarIntentoFallido,

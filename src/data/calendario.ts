@@ -21,7 +21,11 @@
 import {
   RUTA_AGENDA,
   RUTA_MES,
+  RUTA_OCUPACION,
   type AgendaDiaResponse,
+  type BloqueoCalendarioResponse,
+  type CalendarioOcupacionQuery,
+  type OcupacionDiaResponse,
   type CalendarioMesResponse,
   type CalendarioMesQuery,
   type HuecoResponse,
@@ -39,6 +43,8 @@ import { aISO, aMin, sumarDias } from "@/funciones/fechas-calendario";
 
 export type {
   AgendaDiaResponse,
+  BloqueoCalendarioResponse,
+  OcupacionDiaResponse,
   CalendarioMesResponse,
   HuecoResponse,
   TurnoCalendarioResponse,
@@ -239,6 +245,17 @@ export async function verResumenMes(filtros: CalendarioMesQuery): Promise<Calend
   if (filtros.materiaId !== undefined) params.set("materiaId", String(filtros.materiaId));
   if (filtros.verCancelados !== undefined) params.set("verCancelados", String(filtros.verCancelados));
   return apiGet<CalendarioMesResponse>(`${RUTA_MES}?${params.toString()}`);
+}
+
+/**
+ * % de ocupación por profesor y día (HU-CAL-03). Se pide al abrir el expander de
+ * las vistas Semana y Mes. El semáforo y `bloqueado` vienen del back.
+ */
+export async function verOcupacion(filtros: CalendarioOcupacionQuery): Promise<OcupacionDiaResponse[]> {
+  const params = new URLSearchParams({ desde: filtros.desde, hasta: filtros.hasta });
+  if (filtros.profesorId !== undefined) params.set("profesorId", String(filtros.profesorId));
+  if (filtros.materiaId !== undefined) params.set("materiaId", String(filtros.materiaId));
+  return apiGet<OcupacionDiaResponse[]>(`${RUTA_OCUPACION}?${params.toString()}`);
 }
 
 /** Ruta del endpoint mensual. */

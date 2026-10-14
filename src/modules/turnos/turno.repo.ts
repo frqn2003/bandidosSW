@@ -211,6 +211,33 @@ export async function hayDisponibilidad(
   return filas.length > 0;
 }
 
+/**
+ * Bloqueo vigente (feriado, licencia) que cubre la fecha para ese profesor o
+ * para "Todos" (HU-CAL-03). Mismo criterio que `fn_turno_validar_bloqueo`.
+ */
+export async function bloqueoVigente(
+  profesorId: number,
+  fecha: string,
+  ejecutor: Ejecutor = pool,
+): Promise<{ motivo: string; fecha_desde: string; fecha_hasta: string } | null> {
+  const sql = `
+    SELECT b.motivo, b.fecha_desde::text AS fecha_desde, b.fecha_hasta::text AS fecha_hasta
+    FROM bloqueo_fecha b
+    WHERE b.estado = 'activo'
+      AND $2::date BETWEEN b.fecha_desde AND b.fecha_hasta
+      AND (b.profesor_id IS NULL OR b.profesor_id = $1)
+    ORDER BY b.fecha_desde ASC
+    LIMIT 1
+  `;
+  type Fila = { motivo: string; fecha_desde: string; fecha_hasta: string };
+  if ("query" in ejecutor && ejecutor !== pool) {
+    const { rows } = await ejecutor.query<Fila>(sql, [profesorId, fecha]);
+    return rows[0] ?? null;
+  }
+  const filas = await query<Fila>(sql, [profesorId, fecha]);
+  return filas[0] ?? null;
+}
+
 export async function contarOcupadosBloqueando(
   profesorId: number,
   fecha: string,

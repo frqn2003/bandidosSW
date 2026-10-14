@@ -102,12 +102,18 @@ export function SesionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const cerrar = useCallback(async () => {
-    // BACKEND: POST /api/auth/logout invalida el token y registra el evento
-    // `logout` en auditoria_sesion.
-    await apiLogout();
-    setSesion(null);
-    setSegundosParaExpirar(null);
-    router.replace("/");
+    // POST /api/auth/logout invalida el token y registra el evento `logout` en
+    // auditoria_sesion. Si falla (p. ej. 401 porque la sesión ya venció), el
+    // front igual se desloguea: no hay nada que cerrar del lado del server.
+    try {
+      await apiLogout();
+    } catch {
+      // sin sesión en el server: se limpia solo la del front
+    } finally {
+      setSesion(null);
+      setSegundosParaExpirar(null);
+      router.replace("/");
+    }
   }, [router]);
 
   const renovar = useCallback(() => {

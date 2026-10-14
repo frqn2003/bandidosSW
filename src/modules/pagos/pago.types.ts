@@ -40,6 +40,13 @@ export type PagoRow = {
   usuario_nombre: string;
   usuario_apellido: string;
   created_at: Date | string;
+  /** HU-PAG-02: anulación. */
+  estado: "Vigente" | "Anulado";
+  anulado_at: Date | string | null;
+  anulado_por: number | null;
+  anulado_por_nombre: string | null;
+  anulado_por_apellido: string | null;
+  motivo_anulacion: string | null;
 };
 
 export type PagoFormaPagoRow = {

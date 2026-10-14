@@ -21,8 +21,9 @@ import {
   listarClasesDelDia,
   registrarAsistencia,
   corregirAsistencia,
-  PROFESORES_ASISTENCIA,
+  listarProfesoresAsistencia,
   type ClaseDelDiaResponse,
+  type ProfesorOpcion,
 } from "@/data/asistencia";
 import {
   fechaAISO,
@@ -46,6 +47,7 @@ export function TodaysClassesPage() {
   const [fechaSeleccionada, setFechaSeleccionada] = useState(() => fechaAISO(new Date()));
   const [profesorFiltro, setProfesorFiltro] = useState<string>("todos");
   const [clases, setClases] = useState<ClaseDelDiaResponse[]>([]);
+  const [profesores, setProfesores] = useState<ProfesorOpcion[]>([]);
   const [cargando, setCargando] = useState(true);
   const [recargaVersion, setRecargaVersion] = useState(0);
 
@@ -60,42 +62,48 @@ export function TodaysClassesPage() {
   } | null>(null);
   const [pestanaHistorialModal, setPestanaHistorialModal] = useState<"timeline" | "asistencia">("timeline");
 
-  // Cargar clases del día según rol y filtro de profesor
+  // Catálogo de profesores para el filtro (solo Gerente y Mesa de Entrada)
+  useEffect(() => {
+    if (esProfesor) return;
+    let cancelado = false;
+    listarProfesoresAsistencia()
+      .then((lista) => {
+        if (!cancelado) setProfesores(lista);
+      })
+      .catch(() => {
+        // El filtro queda solo con "Todos los profesores"; la lista sigue funcionando.
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [esProfesor]);
+
+  // Cargar clases del día. El Profesor no manda su id: el back lo toma de la sesión.
   useEffect(() => {
     let cancelado = false;
-    const profesorIdQuery = esProfesor
-      ? sesion?.usuario.id
-      : profesorFiltro !== "todos"
-        ? Number(profesorFiltro)
-        : undefined;
+    const profesorIdQuery =
+      !esProfesor && profesorFiltro !== "todos" ? Number(profesorFiltro) : undefined;
 
-    listarClasesDelDia(
-      {
-        fecha: fechaSeleccionada,
-        profesorId: profesorIdQuery,
-      },
-      {
-        usuarioId: sesion?.usuario.id,
-        rol: rolUsuario,
-        profesorId: esProfesor ? sesion?.usuario.id : undefined,
-      },
-    )
+    listarClasesDelDia({
+      fecha: fechaSeleccionada,
+      profesorId: profesorIdQuery,
+    })
       .then((data) => {
         if (cancelado) return;
         setClases(data);
         setCargando(false);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         if (!cancelado) {
           setCargando(false);
-          showToast("error", "Error al cargar las clases del día.");
+          showToast("error", err instanceof Error ? err.message : "Error al cargar las clases del día.");
         }
       });
 
     return () => {
       cancelado = true;
     };
-  }, [fechaSeleccionada, profesorFiltro, sesion, showToast, recargaVersion, esProfesor, rolUsuario]);
+  }, [fechaSeleccionada, profesorFiltro, showToast, recargaVersion, esProfesor]);
 
   // Manejo de clicks en botones bloqueados fuera de la ventana de 15 minutos
   const handleIntentoBotonBloqueado = (clase: ClaseDelDiaResponse) => {
@@ -112,19 +120,12 @@ export function TodaysClassesPage() {
   }) => {
     if (!presentClase) return;
     try {
-      await registrarAsistencia(
-        {
+      await registrarAsistencia({
           turnoId: presentClase.turnoId,
           presente: true,
           temaTrabajado: data.temaTrabajado,
           observaciones: data.observaciones,
-        },
-        {
-          usuarioId: sesion?.usuario.id,
-          rol: "Profesor",
-          profesorId: sesion?.usuario.id,
-        },
-      );
+        });
       showToast(
         "success",
         `Asistencia registrada con éxito para ${presentClase.alumno.nombre} ${presentClase.alumno.apellido}.`,
@@ -142,19 +143,12 @@ export function TodaysClassesPage() {
   const handleConfirmarAusente = async (data: { observaciones?: string | null }) => {
     if (!absentClase) return;
     try {
-      await registrarAsistencia(
-        {
+      await registrarAsistencia({
           turnoId: absentClase.turnoId,
           presente: false,
           temaTrabajado: null,
           observaciones: data.observaciones,
-        },
-        {
-          usuarioId: sesion?.usuario.id,
-          rol: "Profesor",
-          profesorId: sesion?.usuario.id,
-        },
-      );
+        });
       showToast(
         "success",
         `Inasistencia registrada para ${absentClase.alumno.nombre} ${absentClase.alumno.apellido}.`,
@@ -177,20 +171,12 @@ export function TodaysClassesPage() {
     motivoCorreccion?: string | null;
   }) => {
     try {
-      await corregirAsistencia(
-        data.asistenciaId,
-        {
+      await corregirAsistencia(data.asistenciaId, {
           presente: data.presente,
           temaTrabajado: data.temaTrabajado,
           observaciones: data.observaciones,
           motivoCorreccion: data.motivoCorreccion,
-        },
-        {
-          usuarioId: sesion?.usuario.id,
-          rol: rolUsuario,
-          profesorId: esProfesor ? sesion?.usuario.id : undefined,
-        },
-      );
+        });
       showToast("success", "Registro de asistencia actualizado exitosamente.");
       setCorrectClase(null);
       setCargando(true);
@@ -242,7 +228,7 @@ export function TodaysClassesPage() {
               wrapperClassName="w-48"
             >
               <option value="todos">Todos los profesores</option>
-              {PROFESORES_ASISTENCIA.map((p) => (
+              {profesores.map((p) => (
                 <option key={p.id} value={String(p.id)}>
                   {p.apellido}, {p.nombre}
                 </option>

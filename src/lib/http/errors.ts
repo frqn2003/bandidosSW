@@ -94,12 +94,17 @@ export class UnauthorizedError extends AppError {
   }
 }
 
-/** 403 — sin permisos para esta acción (rol insuficiente). */
+/**
+ * 403 — sin permisos para esta acción (rol insuficiente).
+ *
+ * `codigo` opcional: algunos contratos piden un código propio para el 403
+ * (asistencia usa TURNO_AJENO y SIN_PERMISO).
+ */
 export class ForbiddenError extends AppError {
   readonly status = 403;
 
-  constructor(mensaje = "No tenés permisos para acceder a este recurso.") {
-    super("ACCESO_DENEGADO", mensaje);
+  constructor(mensaje = "No tenés permisos para acceder a este recurso.", codigo = "ACCESO_DENEGADO") {
+    super(codigo, mensaje);
   }
 }
 
@@ -250,6 +255,13 @@ export function traducirErrorPostgres(e: unknown): AppError | null {
     if (constraint.includes("uq_profesor_materia")) {
       return new ValidationError("MATERIA_DUPLICADA", "Hay una materia repetida en la lista.", "materias");
     }
+    if (constraint.includes("uq_asistencia_turno")) {
+      return new ConflictError(
+        "ASISTENCIA_YA_REGISTRADA",
+        "El turno ya tiene la asistencia registrada: corregila en lugar de registrarla de nuevo.",
+        "turnoId",
+      );
+    }
     return new ConflictError("DUPLICADO", "El registro ya existe.");
   }
 
@@ -320,6 +332,39 @@ export function traducirErrorPostgres(e: unknown): AppError | null {
         "UMBRAL_INVALIDO",
         "El umbral crítico no puede ser mayor que el mínimo.",
         "stockCritico",
+      );
+    }
+    if (constraint.includes("ck_cierre_observaciones")) {
+      return new ValidationError(
+        "OBSERVACIONES_REQUERIDAS",
+        "Hay una diferencia entre el efectivo contado y el registrado: indicá las observaciones.",
+        "observaciones",
+      );
+    }
+    if (constraint.includes("ck_pago_anulacion")) {
+      return new ValidationError("MOTIVO_ANULACION_REQUERIDO", "Indicá el motivo de la anulación.", "motivo");
+    }
+    if (constraint.includes("ck_cierre_reapertura")) {
+      return new ValidationError("MOTIVO_REAPERTURA_REQUERIDO", "Indicá el motivo de la reapertura.", "motivo");
+    }
+    if (constraint.includes("ck_bloqueo_rango")) {
+      return new ValidationError(
+        "RANGO_INVALIDO",
+        "La fecha hasta no puede ser anterior a la fecha desde.",
+        "fechaHasta",
+      );
+    }
+    if (constraint.includes("ck_bloqueo_motivo")) {
+      return new ValidationError("DATOS_INVALIDOS", "Indicá el motivo.", "motivo");
+    }
+    if (constraint.includes("ck_asistencia_tema")) {
+      return new ValidationError("TEMA_REQUERIDO", "Indicá el tema trabajado.", "temaTrabajado");
+    }
+    if (constraint.includes("ck_asistencia_motivo")) {
+      return new ValidationError(
+        "MOTIVO_CORRECCION_REQUERIDO",
+        "Indicá el motivo de la corrección.",
+        "motivoCorreccion",
       );
     }
     // ⚠️ Un `RAISE EXCEPTION ... USING ERRCODE = 'check_violation'` desde un
@@ -421,6 +466,120 @@ export function traducirErrorPostgres(e: unknown): AppError | null {
   // constraint estable.
   if (codigo === "P0001") {
     const mensaje = (e as { message?: string }).message ?? "";
+
+    // HU-ASI-01 · triggers de `asistencia` (fn_asistencia_validar). El service
+    // ya valida lo mismo antes con mensajes propios; esto cubre la carrera.
+    if (/propios turnos/i.test(mensaje) && /asistencia/i.test(mensaje)) {
+      return new ForbiddenError("Solo podés registrar o corregir la asistencia de tus propios turnos.", "TURNO_AJENO");
+    }
+    if (
+      /Solo el Profesor puede registrar la asistencia/i.test(mensaje) ||
+      /pueden modificar la asistencia/i.test(mensaje) ||
+      /usuario que registra la asistencia/i.test(mensaje)
+    ) {
+      return new ForbiddenError("Tu rol no puede registrar ni corregir asistencias.", "SIN_PERMISO");
+    }
+    if (/solo se registra asistencia sobre turnos Reservados/i.test(mensaje)) {
+      return new BusinessRuleError("TURNO_NO_RESERVADO", "Solo se registra asistencia sobre turnos Reservados.");
+    }
+    if (/asistencia .* solo puede registrarse entre/i.test(mensaje)) {
+      return new ValidationError(
+        "FUERA_DE_VENTANA_HORARIA",
+        "La asistencia se registra desde 15 minutos antes del inicio hasta el final de la jornada.",
+      );
+    }
+    if (/plazo de .* horas para corregir la asistencia/i.test(mensaje)) {
+      return new BusinessRuleError(
+        "PLAZO_CORRECCION_VENCIDO",
+        "Pasó el plazo para corregir la asistencia: solo el Gerente puede modificarla.",
+      );
+    }
+    if (/Gerente debe indicar el motivo/i.test(mensaje)) {
+      return new ValidationError(
+        "MOTIVO_CORRECCION_REQUERIDO",
+        "Fuera del plazo de corrección hay que indicar un motivo nuevo.",
+        "motivoCorreccion",
+      );
+    }
+
+    // HU-POR-01 · reservas desde el portal (fn_turno_validar_portal). El límite
+    // de turnos futuros lo traduce portal.service (necesita `datos.limite`).
+    if (/no está asociada a una ficha de alumno activa/i.test(mensaje)) {
+      return new ForbiddenError("Tu cuenta no está asociada a una ficha de alumno activa.", "CUENTA_SIN_FICHA");
+    }
+    if (/solo puede reservar turnos para sí mismo/i.test(mensaje)) {
+      return new ForbiddenError("Desde el portal solo podés reservar turnos para vos.");
+    }
+
+    // HU-ALU-03 · notas del historial (fn_nota_alumno_validar).
+    if (/está inactivo: su historial es de solo lectura/i.test(mensaje)) {
+      return new ConflictError("ALUMNO_INACTIVO", "El alumno está inactivo: su historial es de solo lectura.");
+    }
+    if (/solo puede agregar notas de los alumnos que atiende/i.test(mensaje)) {
+      return new ForbiddenError("Solo podés agregar notas de los alumnos que atendés.", "PROFESOR_NO_ATIENDE_ALUMNO");
+    }
+    if (/pueden agregar notas al historial/i.test(mensaje) || /usuario que agrega la nota/i.test(mensaje)) {
+      return new ForbiddenError("Tu rol no puede agregar notas al historial.");
+    }
+
+    // HU-PAG-02 · caja, anulación y período (fn_cierre_caja_validar,
+    // fn_pago_validar_caja, fn_pago_validar_anulacion, fn_validar_periodo).
+    if (/está cerrada: no se pueden registrar ni anular pagos/i.test(mensaje)) {
+      return new ConflictError("CAJA_CERRADA", "La caja de esa fecha está cerrada: no se pueden registrar ni anular pagos.");
+    }
+    if (/La caja del .* ya está cerrada/i.test(mensaje)) {
+      return new ConflictError("CAJA_YA_CERRADA", "La caja de esa fecha ya está cerrada.", "fecha");
+    }
+    if (/La caja del .* ya fue reabierta/i.test(mensaje)) {
+      return new ConflictError("CAJA_YA_REABIERTA", "Ese cierre de caja ya fue reabierto.");
+    }
+    if (/cerrar la caja de una fecha futura/i.test(mensaje)) {
+      return new ValidationError("FECHA_FUTURA", "La fecha de la caja no puede ser futura.", "fecha");
+    }
+    if (/motivo de la reapertura es obligatorio/i.test(mensaje)) {
+      return new ValidationError("MOTIVO_REAPERTURA_REQUERIDO", "Indicá el motivo de la reapertura.", "motivo");
+    }
+    if (/ya está anulado y no admite cambios/i.test(mensaje)) {
+      return new ConflictError("PAGO_YA_ANULADO", "El pago ya está anulado.");
+    }
+    if (/motivo de la anulación es obligatorio/i.test(mensaje)) {
+      return new ValidationError("MOTIVO_ANULACION_REQUERIDO", "Indicá el motivo de la anulación.", "motivo");
+    }
+    if (
+      /Solo el Gerente puede reabrir una caja/i.test(mensaje) ||
+      /pueden cerrar la caja/i.test(mensaje) ||
+      /pueden anular pagos/i.test(mensaje)
+    ) {
+      return new ForbiddenError("Tu rol no tiene permisos para esta operación de caja o pagos.");
+    }
+    if (/El período no puede superar .* meses/i.test(mensaje)) {
+      return new ValidationError("PERIODO_DEMASIADO_AMPLIO", "El período no puede superar 12 meses.", "hasta");
+    }
+    if (/La fecha hasta .* no puede ser anterior a la fecha desde/i.test(mensaje)) {
+      return new ValidationError("RANGO_INVALIDO", "La fecha hasta no puede ser anterior a la fecha desde.", "hasta");
+    }
+
+    // HU-CAL-03 · bloqueos de fechas (fn_turno_validar_bloqueo, fn_bloqueo_fecha_validar).
+    if (/está bloqueada .* No admite reservas ni modificaciones/i.test(mensaje)) {
+      return new ValidationError(
+        "FECHA_BLOQUEADA",
+        "La fecha está bloqueada: no admite reservas ni modificaciones.",
+        "fecha",
+      );
+    }
+    if (/Solo el Gerente puede cargar o dar de baja bloqueos/i.test(mensaje) || /usuario que opera el bloqueo/i.test(mensaje)) {
+      return new ForbiddenError("Solo el Gerente puede cargar o dar de baja bloqueos de fechas.", "SIN_PERMISO");
+    }
+    if (/El bloqueo .* ya fue dado de baja/i.test(mensaje)) {
+      return new BusinessRuleError("BLOQUEO_YA_DADO_DE_BAJA", "El bloqueo ya fue dado de baja.");
+    }
+    if (/no se le puede cargar un bloqueo/i.test(mensaje)) {
+      return new ValidationError("PROFESOR_INACTIVO", "El profesor seleccionado está inactivo.", "profesorId");
+    }
+    if (/El profesor indicado .* no existe/i.test(mensaje)) {
+      return new ValidationError("REFERENCIA_INVALIDA", "El profesor no existe.", "profesorId");
+    }
+
     if (/stock insuficiente/i.test(mensaje)) {
       return new BusinessRuleError(
         "STOCK_INSUFICIENTE",

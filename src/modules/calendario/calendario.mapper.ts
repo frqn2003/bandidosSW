@@ -4,6 +4,8 @@ import type {
   AgendaDiaResponse,
   BloqueHorarioResponse,
   DiaResumenMesResponse,
+  BloqueoCalendarioResponse,
+  OcupacionDiaResponse,
 } from "@/contracts/calendario";
 import type {
   HuecoRow,
@@ -11,6 +13,8 @@ import type {
   BloqueHorarioRow,
   ProfesorInfoRow,
   TurnosPorDiaRow,
+  BloqueoCalendarioRow,
+  OcupacionRow,
 } from "./calendario.types";
 
 const hhmm = (t: string) => t.slice(0, 5);
@@ -47,7 +51,8 @@ export function calcularAccionesTurno(
   if (esProfesor) {
     return { puedeModificar: false, puedeCancelar: false };
   }
-  if (row.estado === "Cancelado" || row.pagado) {
+  // Solo un turno Reservado se modifica o cancela: Asistió/Ausente ya tienen asistencia.
+  if (row.estado !== "Reservado" || row.pagado) {
     return { puedeModificar: false, puedeCancelar: false };
   }
 
@@ -125,6 +130,7 @@ export function agendaToApi(
   turnos: TurnoCalendarioRow[],
   huecos: HuecoRow[],
   esProfesor = false,
+  bloqueos: BloqueoCalendarioRow[] = [],
 ): AgendaDiaResponse {
   return {
     profesor: profesor
@@ -143,6 +149,29 @@ export function agendaToApi(
     bloques: bloques.map(bloqueHorarioToApi),
     turnos: turnos.map((t) => turnoCalendarioToApi(t, esProfesor)),
     huecos: huecos.map(huecoToApi),
+    bloqueos: bloqueos.map(bloqueoCalendarioToApi),
+  };
+}
+
+export function bloqueoCalendarioToApi(row: BloqueoCalendarioRow): BloqueoCalendarioResponse {
+  return {
+    id: row.id,
+    fechaDesde: row.fecha_desde.slice(0, 10),
+    fechaHasta: row.fecha_hasta.slice(0, 10),
+    profesorId: row.profesor_id,
+    motivo: row.motivo,
+  };
+}
+
+export function ocupacionToApi(row: OcupacionRow): OcupacionDiaResponse {
+  return {
+    profesor: { id: row.profesor_id, nombre: row.profesor_nombre, apellido: row.profesor_apellido },
+    fecha: row.fecha.slice(0, 10),
+    horasDisponibles: Number(row.horas_disponibles),
+    horasReservadas: Number(row.horas_reservadas),
+    porcentajeOcupacion: row.porcentaje_ocupacion === null ? null : Number(row.porcentaje_ocupacion),
+    semaforo: row.semaforo,
+    bloqueado: Boolean(row.bloqueado),
   };
 }
 

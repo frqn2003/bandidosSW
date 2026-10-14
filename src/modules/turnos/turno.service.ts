@@ -34,6 +34,25 @@ function faltanMenosDe(horasMinimas: number, fecha: string, hora: string): boole
   return diffHoras < horasMinimas;
 }
 
+const ddmmaaaa = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
+
+/** HU-CAL-03: una fecha bloqueada no admite reservas ni modificaciones hacia ella. */
+async function exigirFechaNoBloqueada(
+  profesorId: number,
+  fecha: string,
+  client: Parameters<typeof repo.bloqueoVigente>[2],
+): Promise<void> {
+  const bloqueo = await repo.bloqueoVigente(profesorId, fecha, client);
+  if (bloqueo) {
+    throw new ValidationError(
+      "FECHA_BLOQUEADA",
+      `La fecha ${ddmmaaaa(fecha)} está bloqueada (${ddmmaaaa(bloqueo.fecha_desde)} al ` +
+        `${ddmmaaaa(bloqueo.fecha_hasta)}: ${bloqueo.motivo}). No admite reservas ni modificaciones.`,
+      "fecha",
+    );
+  }
+}
+
 function yaOcurrio(fecha: string, hora: string): boolean {
   const ahora = new Date();
   const [hh, mm] = hora.slice(0, 5).split(":").map(Number);
@@ -111,6 +130,18 @@ export async function reservar(
     throw new ForbiddenError("Los profesores no pueden registrar reservas de turnos.");
   }
 
+  return crearReserva(input, usuarioId);
+}
+
+/**
+ * Reglas de HU-TUR-01 sin el control de rol: la usan la reserva del Centro y la
+ * del Portal del Alumno (HU-POR-01), que llega con el alumno de la sesión. El
+ * origen ('Centro' / 'Portal del Alumno') lo fija `fn_turno_validar_portal`.
+ */
+export async function crearReserva(
+  input: CrearTurnoInput,
+  usuarioId: number,
+): Promise<TurnoResponse> {
   return withTransaction(async (client) => {
     await withAuditUser(client, usuarioId);
 
@@ -187,6 +218,9 @@ export async function reservar(
           "horaInicio",
         );
       }
+
+      // 5b. La fecha no puede estar bloqueada (HU-CAL-03)
+      await exigirFechaNoBloqueada(input.profesorId, input.fecha, client);
 
       // 6. El horario debe caer en un bloque de disponibilidad activo del profesor
       const enDisponibilidad = await repo.hayDisponibilidad(
@@ -325,6 +359,9 @@ export async function reprogramar(
     }
 
     const horaFin = sumarMinutos(input.horaInicio, pm.duracion_clase_minutos);
+
+    // HU-CAL-03: no se reprograma hacia una fecha bloqueada
+    await exigirFechaNoBloqueada(profesorId, input.fecha, client);
 
     const enDisponibilidad = await repo.hayDisponibilidad(
       profesorId,
