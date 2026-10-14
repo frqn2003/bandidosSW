@@ -23,11 +23,18 @@ import {
   listarProfesoresPortal,
   reservarTurnoPortal,
   listarHorariosPortal,
+  sugerirProximoHorarioPortal,
   type HorarioPortal,
+  type SugerenciaPortal,
   type MateriaPortalResponse,
   type ProfesorPortalResponse,
   type TurnoPortalResponse,
 } from "@/data/portal";
+import { formatearFecha } from "@/funciones/formato";
+import { sumarDias } from "@/funciones/fechas-calendario";
+
+const DIAS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+const diaCorto = (iso: string) => DIAS[new Date(`${iso}T00:00:00`).getDay()];
 
 export function StudentTurnReservation() {
   const { sesion } = useSesion();
@@ -48,7 +55,8 @@ export function StudentTurnReservation() {
   const [fecha, setFecha] = useState<string>("");
   const [horaInicio, setHoraInicio] = useState<string>("");
   const [observaciones, setObservaciones] = useState<string>("");
-  const [horarios, setHorarios] = useState<HorarioPortal[]>([]);
+  const [horariosCarga, setHorariosCarga] = useState<{ clave: string; lista: HorarioPortal[] } | null>(null);
+  const [sugerencia, setSugerencia] = useState<{ clave: string; valor: SugerenciaPortal | null } | null>(null);
 
   // Modales y flujo de éxito
   const [modalResumenOpen, setModalResumenOpen] = useState(false);
@@ -61,8 +69,9 @@ export function StudentTurnReservation() {
     : "Alumno Registrado";
   const emailAlumno = sesion?.usuario?.email || "alumno@centro.edu.ar";
 
-  // Fecha mínima: mañana o hoy
+  // Fecha mínima y máxima (máximo 60 días)
   const hoyIso = new Date().toISOString().slice(0, 10);
+  const fechaMax = sumarDias(hoyIso, 60);
 
   useEffect(() => {
     let cancelado = false;
@@ -75,10 +84,6 @@ export function StudentTurnReservation() {
         setTurnosFuturosCount(misTurnos.turnosFuturosReservados);
         setLimiteMaximo(misTurnos.limiteTurnosFuturos);
         setMaterias(mats);
-
-        const manana = new Date();
-        manana.setDate(manana.getDate() + 1);
-        setFecha(manana.toISOString().slice(0, 10));
       })
       .catch(() => {
         if (!cancelado) {
@@ -116,6 +121,7 @@ export function StudentTurnReservation() {
     const val = e.target.value ? Number(e.target.value) : "";
     setMateriaId(val);
     setProfesorId("");
+    setFecha("");
     setHoraInicio("");
 
     if (val) {
@@ -133,23 +139,93 @@ export function StudentTurnReservation() {
     }
   };
 
+  const handleProfesorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value ? Number(e.target.value) : "";
+    setProfesorId(val);
+    setHoraInicio("");
+  };
+
+  const handleFechaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFecha(e.target.value);
+    setHoraInicio("");
+  };
+
   // Horarios libres del profesor en la fecha elegida (huecos de su agenda)
   const duracionMateria = materias.find((m) => m.id === materiaId)?.duracionClaseMinutos;
-  const horariosListos = Boolean(profesorId && fecha && duracionMateria);
+
+  // Sugerencia del próximo horario libre desde la fecha elegida o hoy
+  const desdeSugerencia = fecha && fecha >= hoyIso ? fecha : hoyIso;
+  const claveSugerencia =
+    materiaId && profesorId && duracionMateria
+      ? `${materiaId}|${profesorId}|${duracionMateria}|${desdeSugerencia}`
+      : null;
+
   useEffect(() => {
-    if (!profesorId || !fecha || !duracionMateria) return;
+    if (!claveSugerencia) return;
+    const [m, p, d, f] = claveSugerencia.split("|");
     let cancelado = false;
-    listarHorariosPortal(Number(profesorId), fecha, duracionMateria)
-      .then((lista) => {
-        if (!cancelado) setHorarios(lista);
+    sugerirProximoHorarioPortal(Number(p), Number(m), Number(d), f)
+      .then((valor) => {
+        if (!cancelado) setSugerencia({ clave: claveSugerencia, valor });
       })
       .catch(() => {
-        if (!cancelado) setHorarios([]);
+        if (!cancelado) setSugerencia({ clave: claveSugerencia, valor: null });
       });
     return () => {
       cancelado = true;
     };
-  }, [profesorId, fecha, duracionMateria]);
+  }, [claveSugerencia]);
+
+  const claveHorarios =
+    profesorId && fecha && duracionMateria
+      ? `${profesorId}|${fecha}|${duracionMateria}`
+      : null;
+
+  useEffect(() => {
+    if (!claveHorarios) return;
+    const [p, f, d] = claveHorarios.split("|");
+    let cancelado = false;
+    listarHorariosPortal(Number(p), f, Number(d))
+      .then((lista) => {
+        if (!cancelado) setHorariosCarga({ clave: claveHorarios, lista });
+      })
+      .catch(() => {
+        if (!cancelado) setHorariosCarga({ clave: claveHorarios, lista: [] });
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [claveHorarios]);
+
+  const cargandoHorarios = Boolean(claveHorarios && horariosCarga?.clave !== claveHorarios);
+  const horarios = !cargandoHorarios && horariosCarga?.clave === claveHorarios ? horariosCarga.lista : [];
+
+  const primeraFranjaLibre = horarios.length > 0 ? horarios[0] : null;
+  const sugerenciaDesdeBack = sugerencia?.clave === claveSugerencia ? sugerencia.valor : null;
+
+  // Si en la fecha elegida ya hay franjas disponibles, la más próxima es la primera disponible de ese día.
+  // Si en esa fecha no hay disponibilidad (o aún no se eligió fecha), se usa la sugerencia del back.
+  const sugerenciaActual: SugerenciaPortal | null =
+    fecha && primeraFranjaLibre && duracionMateria
+      ? {
+          fecha,
+          horaInicio: primeraFranjaLibre.horaInicio,
+          horaFin: primeraFranjaLibre.horaFin,
+          cuposDisponibles: 5,
+          capacidad: 5,
+        }
+      : sugerenciaDesdeBack;
+
+  const horaValida =
+    Boolean(horaInicio && horarios.some((h) => h.horaInicio === horaInicio));
+
+  const mostrarSugerencia =
+    Boolean(sugerenciaActual && !horaValida && !cargandoHorarios);
+
+  const handleUsarSugerencia = (s: SugerenciaPortal) => {
+    setFecha(s.fecha);
+    setHoraInicio(s.horaInicio);
+  };
 
   // ¿Límite alcanzado?
   const limiteAlcanzado = turnosFuturosCount >= limiteMaximo;
@@ -196,8 +272,11 @@ export function StudentTurnReservation() {
     setTurnoReservadoExitoso(null);
     setMateriaId("");
     setProfesorId("");
+    setFecha("");
     setHoraInicio("");
     setObservaciones("");
+    setHorariosCarga(null);
+    setSugerencia(null);
     recargarTurnosYCatalogo();
   };
 
@@ -448,7 +527,7 @@ export function StudentTurnReservation() {
               required
               disabled={limiteAlcanzado || !materiaId || cargandoProfesores}
               value={profesorId}
-              onChange={(e) => setProfesorId(e.target.value ? Number(e.target.value) : "")}
+              onChange={handleProfesorChange}
               className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-secondary focus:outline-none focus:ring-1 focus:ring-secondary disabled:bg-slate-100 disabled:text-slate-400"
             >
               <option value="">
@@ -466,7 +545,35 @@ export function StudentTurnReservation() {
             </select>
           </div>
 
-          {/* 4. Selector de Fecha */}
+          {/* Componente "Próximo horario libre" */}
+          {mostrarSugerencia && sugerenciaActual && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-tertiary/40 bg-tertiary/5 px-3.5 py-2.5 text-xs text-on-surface">
+              <div className="flex items-center gap-2">
+                <Icon name="bolt" size={18} className="text-tertiary shrink-0" />
+                <p className="font-medium text-slate-800">
+                  Próximo horario libre:{" "}
+                  <strong className="font-bold">
+                    {diaCorto(sugerenciaActual.fecha)} {formatearFecha(sugerenciaActual.fecha)} ·{" "}
+                    {sugerenciaActual.horaInicio} – {sugerenciaActual.horaFin}
+                  </strong>{" "}
+                  <span className="text-on-surface-variant">
+                    ({sugerenciaActual.cuposDisponibles ?? 5} de {sugerenciaActual.capacidad ?? 5} cupos)
+                  </span>
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="min-h-9 font-bold"
+                onClick={() => handleUsarSugerencia(sugerenciaActual)}
+              >
+                Usar este horario
+              </Button>
+            </div>
+          )}
+
+          {/* 4. Selector de Fecha y 5. Selector de Horarios */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label
@@ -480,14 +587,17 @@ export function StudentTurnReservation() {
                 type="date"
                 required
                 min={hoyIso}
+                max={fechaMax}
                 disabled={limiteAlcanzado}
                 value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
+                onChange={handleFechaChange}
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-secondary focus:outline-none focus:ring-1 focus:ring-secondary disabled:bg-slate-100 disabled:text-slate-400"
               />
+              <span className="text-[11px] text-slate-400 mt-1 block">
+                dd/mm/aaaa · de hoy al {formatearFecha(fechaMax)}.
+              </span>
             </div>
 
-            {/* 5. Selector de Horarios libres con cupos */}
             <div>
               <label
                 htmlFor="horario-select"
@@ -498,22 +608,53 @@ export function StudentTurnReservation() {
               <select
                 id="horario-select"
                 required
-                disabled={limiteAlcanzado || !profesorId}
+                disabled={limiteAlcanzado || !profesorId || !fecha || cargandoHorarios || horarios.length === 0}
                 value={horaInicio}
                 onChange={(e) => setHoraInicio(e.target.value)}
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-secondary focus:outline-none focus:ring-1 focus:ring-secondary disabled:bg-slate-100 disabled:text-slate-400"
               >
                 <option value="">
-                  {!profesorId ? "Elegí primero el profesor..." : "Seleccioná una franja horaria..."}
+                  {!profesorId
+                    ? "Primero seleccioná un profesor..."
+                    : !fecha
+                    ? "Elegí una fecha para ver horarios..."
+                    : cargandoHorarios
+                    ? "Cargando horarios disponibles..."
+                    : horarios.length === 0
+                    ? "Sin horarios disponibles este día"
+                    : "Seleccioná una franja horaria..."}
                 </option>
-                {(horariosListos ? horarios : []).map((h) => (
+                {horarios.map((h) => (
                   <option key={h.horaInicio} value={h.horaInicio}>
                     {h.horaInicio} a {h.horaFin} hs
                   </option>
                 ))}
               </select>
+              {cargandoHorarios && (
+                <span className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+                  <Icon name="progress_activity" size={13} className="animate-spin text-secondary" />
+                  Buscando franjas libres...
+                </span>
+              )}
             </div>
           </div>
+
+          {/* Aviso contextual cuando no hay fecha o cuando el día elegido no tiene horarios */}
+          {!fecha && profesorId && materiaId && (
+            <p className="rounded-md border border-dashed border-slate-300 bg-slate-50/70 p-3 text-xs font-medium text-slate-500 text-center">
+              Completá materia, profesor y fecha para ver los horarios libres.
+            </p>
+          )}
+
+          {fecha && !cargandoHorarios && horarios.length === 0 && (
+            <div className="flex items-start gap-2 rounded-md border border-dashed border-amber-300 bg-amber-50/70 p-3 text-xs text-amber-900">
+              <Icon name="event_busy" size={16} className="text-amber-600 shrink-0 mt-0.5" />
+              <p>
+                El profesor no tiene horarios libres el{" "}
+                <strong>{diaCorto(fecha)} {formatearFecha(fecha)}</strong>. Elegí otra fecha en el calendario o usá el próximo horario libre sugerido.
+              </p>
+            </div>
+          )}
 
           {/* 6. Observaciones Opcionales */}
           <div>
@@ -550,7 +691,7 @@ export function StudentTurnReservation() {
               variant="primary"
               size="sm"
               type="submit"
-              disabled={limiteAlcanzado || !materiaId || !profesorId || !horaInicio}
+              disabled={limiteAlcanzado || !materiaId || !profesorId || !fecha || !horaInicio}
               className="gap-1.5 bg-secondary hover:bg-secondary/90 text-white"
             >
               <Icon name="check" size={16} />

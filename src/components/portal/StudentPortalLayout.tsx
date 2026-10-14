@@ -62,9 +62,14 @@ export function StudentPortalLayout({
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 sm:px-6 h-16">
           {/* Logo y Rol */}
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-white shadow-xs">
-              <Icon name="school" size={22} />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo-centro-academico.png"
+              alt="Logo de Centro Académico"
+              width={40}
+              height={40}
+              className="h-10 w-10 shrink-0 rounded-md object-cover"
+            />
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-display font-bold text-base text-slate-900 leading-tight">

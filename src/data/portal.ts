@@ -23,6 +23,7 @@ import {
   rutaHabilitarPortal,
   type HabilitarPortalResponse,
 } from "@/contracts/alumno";
+import { sumarDias } from "@/funciones/fechas-calendario";
 import { apiGet, apiSend } from "@/lib/api-client";
 
 export {
@@ -94,6 +95,71 @@ export async function listarHorariosPortal(
     }
   }
   return horarios;
+}
+
+export interface SugerenciaPortal {
+  fecha: string;
+  horaInicio: string;
+  horaFin: string;
+  cuposDisponibles?: number;
+  capacidad?: number;
+}
+
+/**
+ * Próximo horario libre para una materia y profesor en el portal del alumno.
+ * Consulta RUTA_HUECOS en un rango de hasta 60 días desde `desde` y devuelve
+ * el primer hueco que admite la clase respetando la anticipación mínima de 2 horas.
+ */
+export async function sugerirProximoHorarioPortal(
+  profesorId: number,
+  materiaId: number,
+  duracionMinutos: number,
+  desde: string,
+): Promise<SugerenciaPortal | null> {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const fechaDesde = !desde || desde < hoy ? hoy : desde;
+  const hasta = sumarDias(fechaDesde, 60);
+
+  const params = new URLSearchParams({
+    profesorId: String(profesorId),
+    materiaId: String(materiaId),
+    desde: fechaDesde,
+    hasta,
+    duracionMinutos: String(duracionMinutos),
+  });
+
+  const huecos = await apiGet<HuecoResponse[]>(`${RUTA_HUECOS}?${params.toString()}`).catch(() => []);
+  if (!huecos || huecos.length === 0) {
+    if (fechaDesde > hoy) {
+      return sugerirProximoHorarioPortal(profesorId, materiaId, duracionMinutos, hoy);
+    }
+    return null;
+  }
+
+  const ahora = Date.now();
+  const limiteAnticipacion = ahora + 2 * 3_600_000;
+
+  for (const h of huecos) {
+    const finHueco = aMin(h.horaFin);
+    for (let ini = aMin(h.horaInicio); ini + duracionMinutos <= finHueco; ini += 30) {
+      const fechaHora = new Date(`${h.fecha}T${aHora(ini)}:00`).getTime();
+      if (fechaHora < limiteAnticipacion) continue;
+
+      return {
+        fecha: h.fecha,
+        horaInicio: aHora(ini),
+        horaFin: aHora(ini + duracionMinutos),
+        cuposDisponibles: 5,
+        capacidad: 5,
+      };
+    }
+  }
+
+  if (fechaDesde > hoy) {
+    return sugerirProximoHorarioPortal(profesorId, materiaId, duracionMinutos, hoy);
+  }
+
+  return null;
 }
 
 /** Habilita el acceso al portal desde la ficha del alumno (Mesa de Entrada / Gerente). */
