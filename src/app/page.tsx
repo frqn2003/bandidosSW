@@ -6,64 +6,13 @@ import KineticGrid from "@/components/ui/kinetic-grid";
 import BlurText from "@/components/ui/blur-text";
 import RadialSocialMenu from "@/components/ui/radial-social-menu";
 import SparkleBurst from "@/components/ui/sparkle-burst";
-import VerticalMarqueeDemo from "@/components/ui/marquee-03";
-import CircularCarousel from "@/components/ui/circular-carousel";
-import { Users, Award, GraduationCap, BookOpen, ArrowRight, Star } from "lucide-react";
+import ExperienciasAlumnos from "@/components/ui/experiencias-alumnos";
+import MateriasMasPedidas from "@/components/ui/materias-mas-pedidas";
+import FooterLanding from "@/components/ui/footer-landing";
+import UbicacionSede from "@/components/ui/ubicacion-sede";
+import { Users, Award, GraduationCap, BookOpen } from "lucide-react";
 import { gsap, useGSAP } from "@/lib/gsap";
-
 import { cn } from "@/lib/utils";
-
-const items = [
-  {
-    src: '/Informatica.png',
-    alt: 'Informatica',
-    title: 'Informatica',
-    subtitle: 'Machine Learning & Algoritmos',
-    link: '/login'
-  },
-  {
-    src: '/Economia.png',
-    alt: 'Economia',
-    title: 'Economia',
-    subtitle: 'Economia y Finanzas',
-    link: '/login'
-  },
-  {
-    src: '/Contabilidad.png',
-    alt: 'Contabilidad',
-    title: 'Contabilidad',
-    subtitle: 'Contabilidad y Finanzas',
-    link: '/login'
-  },
-  {
-    src: '/FisicaUniversitaria.png',
-    alt: 'Fisica Universitaria',
-    title: 'Fisica Universitaria',
-    subtitle: 'Ciencias Exactas & Nivelación',
-    link: '/login'
-  },
-  {
-    src: '/Literatura.png',
-    alt: 'Literatura',
-    title: 'Literatura',
-    subtitle: 'Humanidades',
-    link: '/login'
-  },
-  {
-    src: '/Quimica.png',
-    alt: 'Quimica',
-    title: 'Quimica',
-    subtitle: 'Quimica y Procesos Industriales',
-    link: '/login'
-  },
-  {
-    src: '/Derecho Procesal Civil.png',
-    alt: 'Derecho Procesal Civil',
-    title: 'Derecho Procesal Civil',
-    subtitle: 'Derecho Procesal Civil',
-    link: '/login'
-  }
-];
 
 interface MetricItem {
   id: string;
@@ -453,8 +402,8 @@ const PALETTES = {
     buttonBg: "#0047FF",
     buttonHoverGlow: "shadow-blue-500/50",
     buttonBorder: "border-[#4B91FF]",
-    nodeRgb: "75, 145, 255",
-    lineRgb: "60, 130, 255",
+    nodeRgb: "253, 239, 138",
+    lineRgb: "253, 239, 138",
   },
   B: {
     id: "B" as const,
@@ -488,19 +437,7 @@ const PALETTES = {
 
 export default function LandingPage() {
   const currentPalette = PALETTES.A;
-  const [activeSubject, setActiveSubject] = useState<{ src: string; alt?: string; title?: string; subtitle?: string; link?: string } | null>(null);
-  const [displayedSubject, setDisplayedSubject] = useState<{ src: string; alt?: string; title?: string; subtitle?: string; link?: string } | null>(null);
-  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isDetailHoveredRef = useRef(false);
   const mainContainerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (activeSubject) {
-      setDisplayedSubject(activeSubject);
-    }
-  }, [activeSubject]);
-
-  const isSubjectVisible = Boolean(activeSubject);
 
   useGSAP(
     () => {
@@ -608,131 +545,12 @@ export default function LandingPage() {
         ease: "power3.out"
       });
 
-      // 6. ScrollTrigger: Entrada Cinematográfica 3D del Carrusel y Sección de Materias
-      const tlMaterias = gsap.timeline({
-        scrollTrigger: {
-          trigger: "#materias-destacadas",
-          start: "top 78%",
-          toggleActions: "play none none none"
-        }
-      });
 
-      tlMaterias
-        .from(".materias-header-reveal", {
-          opacity: 0,
-          y: 45,
-          scale: 0.95,
-          duration: 0.9,
-          ease: "power3.out"
-        })
-        .from(
-          ".materias-carousel-wrapper",
-          {
-            opacity: 0,
-            y: 110,
-            scale: 0.82,
-            rotateX: 20,
-            duration: 1.4,
-            ease: "power3.out"
-          },
-          "-=0.6"
-        );
 
-      // 5. Animación GSAP orquestada para la sección de Comunidad Académica
-      const tlComunidad = gsap.timeline({
-        scrollTrigger: {
-          trigger: "#testimonios",
-          start: "top 78%",
-          toggleActions: "play none none none"
-        }
-      });
 
-      tlComunidad
-        .from(".comunidad-badge", {
-          opacity: 0,
-          y: -20,
-          scale: 0.85,
-          duration: 0.6,
-          ease: "back.out(1.6)"
-        })
-        .from(
-          ".comunidad-title",
-          {
-            opacity: 0,
-            y: 30,
-            duration: 0.8,
-            ease: "power3.out"
-          },
-          "-=0.3"
-        )
-        .from(
-          ".comunidad-desc",
-          {
-            opacity: 0,
-            y: 20,
-            duration: 0.7,
-            ease: "power3.out"
-          },
-          "-=0.5"
-        )
-        .from(
-          ".comunidad-stats",
-          {
-            opacity: 0,
-            y: 20,
-            scale: 0.95,
-            duration: 0.7,
-            ease: "back.out(1.2)"
-          },
-          "-=0.4"
-        )
-        .from(
-          ".comunidad-marquee-col",
-          {
-            opacity: 0,
-            y: 70,
-            scale: 0.96,
-            duration: 1,
-            stagger: 0.15,
-            ease: "power3.out"
-          },
-          "-=0.4"
-        );
-
-      // Flotación continua orgánica de orbes ambientales
-      gsap.to(".comunidad-orb-1", {
-        y: "+=35",
-        x: "+=20",
-        duration: 7,
-        repeat: -1,
-        yoyo: true,
-        ease: "sine.inOut"
-      });
-      gsap.to(".comunidad-orb-2", {
-        y: "-=30",
-        x: "-=25",
-        duration: 8.5,
-        repeat: -1,
-        yoyo: true,
-        ease: "sine.inOut"
-      });
     },
     { scope: mainContainerRef }
   );
-
-  const handleActiveItemChange = (item: { src: string; alt?: string; title?: string; subtitle?: string; link?: string } | null) => {
-    if (item) {
-      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-      setActiveSubject(item);
-    } else {
-      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-      hideTimeoutRef.current = setTimeout(() => {
-        if (!isDetailHoveredRef.current) {
-          setActiveSubject(null);
-        }
-      }, 1000);
-    }
-  };
 
   return (
     <KineticGrid nodeColorRgb={currentPalette.nodeRgb} lineColorRgb={currentPalette.lineRgb}>
@@ -757,9 +575,9 @@ export default function LandingPage() {
             {/* Fondo deslizante de acento */}
             <span
               className="absolute inset-0 w-0 transition-all duration-300 ease-out group-hover:w-full"
-              style={{ backgroundColor: currentPalette.accentCyan }}
+              style={{ backgroundColor: "#fdef8a" }}
             />
-            <span className="relative z-10 transition-colors duration-300 group-hover:text-white">
+            <span className="relative z-10 transition-colors duration-300 group-hover:text-slate-950">
               Iniciar sesión
             </span>
           </Link>
@@ -770,9 +588,9 @@ export default function LandingPage() {
             {/* Fondo deslizante de acento */}
             <span
               className="absolute inset-0 w-0 transition-all duration-300 ease-out group-hover:w-full"
-              style={{ backgroundColor: currentPalette.accentCyan }}
+              style={{ backgroundColor: "#fdef8a" }}
             />
-            <span className="relative z-10 transition-colors duration-300 group-hover:text-white">
+            <span className="relative z-10 transition-colors duration-300 group-hover:text-slate-950">
               Registrarme
             </span>
           </Link>
@@ -991,8 +809,8 @@ export default function LandingPage() {
               <span>Matrícula 100% bonificada ciclo 2026</span>
               <span className="text-white/40 text-sm select-none">✦</span>
               <span className="flex items-center gap-2.5">
-                <span className="px-2 py-0.5 rounded-full bg-white text-black text-[11px] sm:text-xs font-black uppercase tracking-wider">3 CUOTAS</span>
-                <span>sin interés en todos los cursos</span>
+                <span className="px-2 py-0.5 rounded-full bg-white text-black text-[11px] sm:text-xs font-black uppercase tracking-wider">PROMO AMIGOS</span>
+                <span>15% OFF cursando con un compañero</span>
               </span>
               <span className="text-white/40 text-sm select-none">✦</span>
               <span>Inscripciones abiertas · Cupos limitados</span>
@@ -1009,8 +827,8 @@ export default function LandingPage() {
               <span>Matrícula 100% bonificada ciclo 2026</span>
               <span className="text-white/40 text-sm select-none">✦</span>
               <span className="flex items-center gap-2.5">
-                <span className="px-2 py-0.5 rounded-full bg-white text-black text-[11px] sm:text-xs font-black uppercase tracking-wider">3 CUOTAS</span>
-                <span>sin interés en todos los cursos</span>
+                <span className="px-2 py-0.5 rounded-full bg-white text-black text-[11px] sm:text-xs font-black uppercase tracking-wider">PROMO AMIGOS</span>
+                <span>15% OFF cursando con un compañero</span>
               </span>
               <span className="text-white/40 text-sm select-none">✦</span>
               <span>Inscripciones abiertas · Cupos limitados</span>
@@ -1019,230 +837,17 @@ export default function LandingPage() {
           </div>
         </aside>
 
-        {/* ── Sección Blanca: Materias ── */}
-        <section
-          id="materias-destacadas"
-          className="relative w-full bg-white text-slate-900 pt-16 sm:pt-20 pb-20 px-6 md:px-12 lg:px-20 min-h-screen scroll-mt-6 overflow-hidden flex items-center justify-center"
-        >
-          {/* ── Iluminación tenue y ondas curvas laterales (Izquierda de la pantalla) ── */}
-          <div
-            aria-hidden="true"
-            className={cn(
-              "pointer-events-none absolute -left-10 sm:-left-16 top-1/2 -translate-y-1/2 w-[280px] sm:w-[420px] lg:w-[500px] h-[520px] sm:h-[680px] flex items-center justify-center transition-all duration-700 ease-out z-0",
-              isSubjectVisible
-                ? "opacity-100 translate-x-0 scale-100"
-                : "opacity-0 -translate-x-20 sm:-translate-x-32 scale-90"
-            )}
-          >
-            {/* Resplandor difuso suave de fondo */}
-            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500/20 via-sky-400/10 to-transparent blur-3xl" />
-            
-            {/* Ondas curvas concéntricas iluminadas hacia adentro */}
-            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[220px] sm:w-[320px] lg:w-[400px] h-[460px] sm:h-[600px] rounded-r-full border-r-2 border-blue-400/35 shadow-[0_0_25px_rgba(59,130,246,0.25)]" />
-            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[160px] sm:w-[240px] lg:w-[300px] h-[360px] sm:h-[480px] rounded-r-full border-r border-sky-400/30 shadow-[0_0_20px_rgba(56,189,248,0.2)]" />
-            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[100px] sm:w-[160px] lg:w-[200px] h-[260px] sm:h-[360px] rounded-r-full border-r border-blue-300/25" />
-          </div>
+        {/* ── Sección: Las materias más pedidas este ciclo ── */}
+        <MateriasMasPedidas />
 
-          {/* ── Iluminación tenue y ondas curvas laterales (Derecha de la pantalla) ── */}
-          <div
-            aria-hidden="true"
-            className={cn(
-              "pointer-events-none absolute -right-10 sm:-right-16 top-1/2 -translate-y-1/2 w-[280px] sm:w-[420px] lg:w-[500px] h-[520px] sm:h-[680px] flex items-center justify-center transition-all duration-700 ease-out z-0",
-              isSubjectVisible
-                ? "opacity-100 translate-x-0 scale-100"
-                : "opacity-0 translate-x-20 sm:translate-x-32 scale-90"
-            )}
-          >
-            {/* Resplandor difuso suave de fondo */}
-            <div className="absolute inset-0 rounded-full bg-gradient-to-l from-blue-500/20 via-sky-400/10 to-transparent blur-3xl" />
-            
-            {/* Ondas curvas concéntricas iluminadas hacia adentro */}
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[220px] sm:w-[320px] lg:w-[400px] h-[460px] sm:h-[600px] rounded-l-full border-l-2 border-blue-400/35 shadow-[0_0_25px_rgba(59,130,246,0.25)]" />
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[160px] sm:w-[240px] lg:w-[300px] h-[360px] sm:h-[480px] rounded-l-full border-l border-sky-400/30 shadow-[0_0_20px_rgba(56,189,248,0.2)]" />
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[100px] sm:w-[160px] lg:w-[200px] h-[260px] sm:h-[360px] rounded-l-full border-l border-blue-300/25" />
-          </div>
+        {/* ── Sección de Experiencias de Alumnos: Historias Reales con Hojas de Examen Físico ── */}
+        <ExperienciasAlumnos />
 
-          {/* Contenedor con Carrusel Cilíndrico Circular 3D */}
-          <div className="relative z-10 w-full max-w-7xl mx-auto flex flex-col items-center">
-            {/* Título centrado con animación BlurText y revelado ScrollTrigger */}
-            <div className="materias-header-reveal w-full flex justify-center text-center pt-6 sm:pt-10 mb-15">
-              <h2 id="materias-destacadas-title" className="inline-block">
-                <BlurText
-                  text="¡Las materias más pedidas!"
-                  delay={180}
-                  animateBy="words"
-                  direction="top"
-                  className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 justify-center text-center drop-shadow-sm"
-                />
-              </h2>
-            </div>
+        {/* ── Sección: Dónde estamos ── */}
+        <UbicacionSede />
 
-            <div className="materias-carousel-wrapper -mt-14 sm:-mt-24 md:-mt-32 relative w-full h-[560px] [transform-style:preserve-3d] will-change-transform">
-              <CircularCarousel
-                items={items}
-                preset="cylinder"
-                intro="rise"
-                cardWidth={220}
-                aspectRatio={1}
-                speed={14}
-                captions={false}
-                gap={25}
-                tilt={-5}
-                curve={1}
-                perspective={2500}
-                autoplay="drift"
-                interval={3}
-                direction="left"
-                momentum={0.6}
-                snap
-                pauseOnHover
-                focusOnClick
-                draggable
-                parallax={0.3}
-                stretch={0.5}
-                fadeColor="#ffffff"
-                depthFade={false}
-                onActiveItemChange={handleActiveItemChange}
-              />
-            </div>
-
-            {/* Tarjeta de información interactiva al detener una materia con BlurText y botón Ver más */}
-            <div
-              className="relative w-full flex justify-center items-center min-h-[96px] -mt-6 sm:-mt-10 mb-4 z-20"
-              onMouseEnter={() => {
-                isDetailHoveredRef.current = true;
-                if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-              }}
-              onMouseLeave={() => {
-                isDetailHoveredRef.current = false;
-                if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-                hideTimeoutRef.current = setTimeout(() => {
-                  setActiveSubject(null);
-                }, 400);
-              }}
-            >
-              {/* Contenedor relativo que alberga la tarjeta */}
-              <div className="relative inline-flex items-center justify-center">
-
-                {displayedSubject && (
-                  <div
-                    key={displayedSubject.title}
-                    className={cn(
-                      "flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-8 px-6 py-4 sm:px-8 sm:py-3.5 rounded-3xl sm:rounded-full bg-white/95 backdrop-blur-xl border border-black shadow-[0_20px_50px_rgba(0,0,0,0.08),0_4px_16px_rgba(0,0,0,0.04)] transition-all duration-500 ease-out",
-                      isSubjectVisible
-                        ? "opacity-100 scale-100 translate-y-0 pointer-events-auto"
-                        : "opacity-0 scale-95 translate-y-2 pointer-events-none"
-                    )}
-                  >
-                    <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
-                      {displayedSubject.subtitle && (
-                        <span className="inline-flex items-center px-3 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold uppercase tracking-wider bg-blue-50 text-blue-600 border border-blue-200/80 mb-1">
-                          {displayedSubject.subtitle}
-                        </span>
-                      )}
-                      <h3
-                        className="inline-block text-xl sm:text-2xl font-extrabold text-black tracking-tight"
-                        style={{ fontFamily: "var(--font-poppins), sans-serif" }}
-                      >
-                        <BlurText
-                          text={displayedSubject.title || "Materia"}
-                          delay={40}
-                          stepDuration={0.16}
-                          animateBy="words"
-                          direction="top"
-                          className="text-xl sm:text-2xl font-extrabold text-black tracking-tight"
-                        />
-                      </h3>
-                    </div>
-
-                    <Link
-                      href="/login"
-                      style={{ backgroundColor: currentPalette.buttonBg }}
-                      className="group inline-flex items-center gap-2 px-6 py-2.5 rounded-full text-white text-xs sm:text-sm font-bold shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 shrink-0"
-                    >
-                      <span>Ver más</span>
-                      <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── Sección de Comunidad Académica: Testimonios con Marquee y Acentos Universitarios ── */}
-        <section
-          id="testimonios"
-          className="relative w-full bg-[#060b1e] text-white py-24 sm:py-28 px-6 md:px-12 lg:px-20 border-t border-blue-900/30 overflow-hidden scroll-mt-6"
-        >
-          {/* Resplandores ambientales atmosféricos en tonos azul zafiro y cian */}
-          <div
-            aria-hidden="true"
-            className="comunidad-orb-1 pointer-events-none absolute -left-48 top-1/4 w-[500px] h-[500px] rounded-full bg-blue-600/15 blur-[120px] will-change-transform"
-          />
-          <div
-            aria-hidden="true"
-            className="comunidad-orb-2 pointer-events-none absolute -right-48 bottom-1/4 w-[500px] h-[500px] rounded-full bg-sky-500/10 blur-[130px] will-change-transform"
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-72 bg-gradient-to-b from-blue-600/10 via-indigo-600/5 to-transparent blur-3xl"
-          />
-
-          <div className="relative z-10 max-w-7xl mx-auto flex flex-col gap-12 sm:gap-14">
-            {/* Cabecera con revelado GSAP orquestado */}
-            <div className="text-center max-w-3xl mx-auto flex flex-col items-center">
-              <div className="comunidad-badge inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase bg-blue-500/15 text-blue-300 border border-blue-400/30 shadow-[0_0_20px_rgba(59,130,246,0.18)] mb-4">
-                <GraduationCap className="w-4 h-4 text-blue-400" />
-                <span>Comunidad Académica</span>
-              </div>
-
-              <h2
-                className="comunidad-title text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white leading-tight"
-                style={{ fontFamily: "var(--font-poppins), sans-serif" }}
-              >
-                Voces reales de{" "}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-sky-300 to-indigo-200">
-                  nuestros estudiantes
-                </span>
-              </h2>
-
-              <p className="comunidad-desc text-slate-300 text-base sm:text-lg mt-4 max-w-2xl mx-auto font-normal leading-relaxed">
-                Experiencias de alumnos universitarios que superaron materias complejas, promocionaron sus cursadas y alcanzaron sus objetivos con Nexo Académico.
-              </p>
-
-              {/* Barra de métricas de confianza y validación comunitaria */}
-              <div className="comunidad-stats flex flex-wrap items-center justify-center gap-4 sm:gap-8 mt-7 pt-6 border-t border-white/10 w-full max-w-xl text-xs sm:text-sm text-slate-300">
-                <div className="flex items-center gap-2 bg-white/[0.04] px-3.5 py-1.5 rounded-full border border-white/10">
-                  <div className="flex text-amber-400 text-xs">
-                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                  </div>
-                  <span className="font-bold text-white">4.9/5</span>
-                  <span className="text-slate-400 text-[11px]">Satisfacción</span>
-                </div>
-
-                <div className="flex items-center gap-2 bg-white/[0.04] px-3.5 py-1.5 rounded-full border border-white/10">
-                  <span className="font-bold text-blue-400 text-sm">+1.500</span>
-                  <span className="text-slate-300 text-[11px]">Alumnos</span>
-                </div>
-
-                <div className="flex items-center gap-2 bg-white/[0.04] px-3.5 py-1.5 rounded-full border border-white/10">
-                  <span className="font-bold text-emerald-400 text-sm">96%</span>
-                  <span className="text-slate-300 text-[11px]">Aprobados</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Marquee vertical de 3 columnas de testimonios */}
-            <div className="comunidad-marquee-wrapper relative w-full">
-              <VerticalMarqueeDemo />
-            </div>
-          </div>
-        </section>
+        {/* ── Footer Institucional de Nexo Académico ── */}
+        <FooterLanding />
 
         {/* Menú Radial Circular con LiveOrb permanente en la Esquina Inferior Derecha */}
         <div className="fixed bottom-8 right-8 z-50">

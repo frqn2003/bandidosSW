@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { MessageCircle, LogIn, BookOpen, Award, Star, ArrowUp, X } from "lucide-react";
+import { MessageCircle, LogIn, BookOpen, Award, Star, ArrowUp, X, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import LiveOrb from "@/components/ui/live-orb";
 
@@ -76,6 +76,11 @@ export default function RadialSocialMenu({ className }: RadialSocialMenuProps) {
       accentColor: "hover:border-white/60 hover:shadow-white/20",
     },
     {
+      label: "Dónde estamos",
+      href: "#ubicacion",
+      icon: <MapPin className="w-5 h-5 text-white" />,
+    },
+    {
       icon: <ArrowUp className="w-5 h-5 text-white" />,
       label: "Subir al Inicio",
       href: "#inicio",
@@ -124,7 +129,7 @@ export default function RadialSocialMenu({ className }: RadialSocialMenuProps) {
     if (typeof window !== "undefined" && window.scrollY < 200) {
       startTimer = setTimeout(() => {
         if (window.scrollY < 200) {
-          triggerBubble("Podés desplazarte hacia abajo para explorar", 5000);
+          triggerBubble("¡Hola! Deslizá hacia abajo para conocer Nexo Académico", 5000);
         }
       }, 4000);
     }
@@ -144,10 +149,13 @@ export default function RadialSocialMenu({ className }: RadialSocialMenuProps) {
     };
   }, []);
 
-  // Al llegar a la sección de materias o volver al inicio tras haber navegado
+  // Al llegar a la sección de materias, testimonios o volver al inicio tras haber navegado
   useEffect(() => {
     const materiasTarget = document.getElementById("materias-destacadas");
+    const testimoniosTarget = document.getElementById("testimonios");
     const inicioTarget = document.getElementById("inicio");
+    let testimoniosTimer: NodeJS.Timeout | null = null;
+    let otroTimer: NodeJS.Timeout | null = null;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -157,11 +165,31 @@ export default function RadialSocialMenu({ className }: RadialSocialMenuProps) {
               hasLeftHeroRef.current = true;
               if (materiasTimerRef.current) clearTimeout(materiasTimerRef.current);
               materiasTimerRef.current = setTimeout(() => {
-                triggerBubble("Apoyá el cursor sobre una materia para ver detalles", 5000);
+                triggerBubble("Seguí bajando: estas son las materias más pedidas del ciclo", 5000);
               }, 3000);
             } else {
               if (materiasTimerRef.current) clearTimeout(materiasTimerRef.current);
               setShowSpeechBubble(false);
+            }
+          } else if (entry.target.id === "por-que-elegirnos" || entry.target.id === "ubicacion") {
+            if (otroTimer) clearTimeout(otroTimer);
+            if (entry.isIntersecting) {
+              const msg =
+                entry.target.id === "ubicacion"
+                  ? "¡Te esperamos! Mirá cómo llegar a la sede"
+                  : "Mirá nuestros resultados en números";
+              otroTimer = setTimeout(() => {
+                triggerBubble(msg, 5000);
+              }, 1500);
+            }
+          } else if (entry.target.id === "testimonios") {
+            if (entry.isIntersecting) {
+              if (testimoniosTimer) clearTimeout(testimoniosTimer);
+              testimoniosTimer = setTimeout(() => {
+                triggerBubble("¡Seguí scrolleando para conocer más historias!", 5500);
+              }, 1200);
+            } else {
+              if (testimoniosTimer) clearTimeout(testimoniosTimer);
             }
           } else if (entry.target.id === "inicio") {
             if (!entry.isIntersecting) {
@@ -169,7 +197,7 @@ export default function RadialSocialMenu({ className }: RadialSocialMenuProps) {
               hasLeftHeroRef.current = true;
             } else if (hasLeftHeroRef.current && window.scrollY < 150) {
               // Solo vuelve a disparar si el usuario navegó hacia abajo y regresó después
-              triggerBubble("Podés desplazarte hacia abajo para explorar", 4000);
+              triggerBubble("¡Bienvenido de vuelta! Seguí explorando hacia abajo", 4000);
             }
           }
         }
@@ -180,11 +208,18 @@ export default function RadialSocialMenu({ className }: RadialSocialMenuProps) {
     );
 
     if (materiasTarget) observer.observe(materiasTarget);
+    if (testimoniosTarget) observer.observe(testimoniosTarget);
     if (inicioTarget) observer.observe(inicioTarget);
+    const porQueTarget = document.getElementById("por-que-elegirnos");
+    const ubicacionTarget = document.getElementById("ubicacion");
+    if (porQueTarget) observer.observe(porQueTarget);
+    if (ubicacionTarget) observer.observe(ubicacionTarget);
 
     return () => {
       observer.disconnect();
       if (materiasTimerRef.current) clearTimeout(materiasTimerRef.current);
+      if (testimoniosTimer) clearTimeout(testimoniosTimer);
+      if (otroTimer) clearTimeout(otroTimer);
     };
   }, []);
 
@@ -286,9 +321,9 @@ export default function RadialSocialMenu({ className }: RadialSocialMenuProps) {
             if (materiasTimerRef.current) clearTimeout(materiasTimerRef.current);
             setShowSpeechBubble(false);
           }}
-          className="absolute bottom-full right-0 mb-4 z-30 w-56 sm:w-64 px-4 py-3 rounded-2xl bg-white/85 backdrop-blur-md border border-slate-200/80 shadow-2xl shadow-slate-900/15 text-xs sm:text-sm cursor-pointer animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-300 hover:scale-[1.02] transition-transform select-none"
+          className="absolute bottom-full right-0 mb-4 z-30 w-56 sm:w-64 px-4 py-3 rounded-2xl bg-[#fffdf6] border-2 border-[#101012] shadow-[0_10px_28px_rgba(0,0,0,0.35)] text-xs sm:text-sm cursor-pointer animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-300 hover:scale-[1.02] transition-transform select-none"
         >
-          <p className="leading-snug text-slate-950 font-normal">
+          <p className="leading-snug text-[#1b1a17] font-semibold">
             {bubbleMessage}
           </p>
           {/* Pico triangular limpio sin superposición interna de transparencias */}
@@ -303,9 +338,9 @@ export default function RadialSocialMenu({ className }: RadialSocialMenuProps) {
             >
               <path
                 d="M0 0 L7 7 L14 0"
-                fill="rgba(255, 255, 255, 0.85)"
-                stroke="rgba(226, 232, 240, 0.8)"
-                strokeWidth="1"
+                fill="#fffdf6"
+                stroke="#101012"
+                strokeWidth="2"
               />
             </svg>
           </div>
@@ -321,7 +356,7 @@ export default function RadialSocialMenu({ className }: RadialSocialMenuProps) {
           setIsOpen(!isOpen);
         }}
         aria-label="Abrir menú de navegación y accesos"
-        className="relative z-20 flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-900/70 backdrop-blur-2xl shadow-2xl border border-white/30 text-white transition-all duration-300 hover:scale-105 hover:shadow-blue-500/40 focus:outline-none cursor-pointer overflow-visible group"
+        className="relative z-20 flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#101012] shadow-2xl border-2 border-[#fdef8a]/70 text-white transition-all duration-300 hover:scale-105 hover:border-[#fdef8a] focus-visible:ring-4 focus-visible:ring-[#fdef8a]/60 focus:outline-none cursor-pointer overflow-visible group"
       >
         {isOpen ? (
           <div className="flex items-center justify-center w-12 h-12 rounded-full bg-white/15 backdrop-blur-md border border-white/25">
@@ -346,10 +381,10 @@ export default function RadialSocialMenu({ className }: RadialSocialMenuProps) {
         {/* Guía circular interactiva con mayor visibilidad y glow */}
         <div
           className={cn(
-            "absolute rounded-full border-2 border-dashed transition-all duration-300 pointer-events-none bg-white/[0.03] backdrop-blur-[1px]",
+            "absolute rounded-full border-2 border-dashed transition-all duration-300 pointer-events-none bg-[#101012]/40",
             isDragging
-              ? "border-blue-400/80 shadow-[0_0_25px_rgba(59,130,246,0.35)] scale-105 bg-blue-500/[0.05]"
-              : "border-white/50 shadow-[0_0_18px_rgba(255,255,255,0.15)]"
+              ? "border-[#fdef8a] shadow-[0_0_25px_rgba(253,239,138,0.35)] scale-105"
+              : "border-[#fdef8a]/50 shadow-[0_0_18px_rgba(253,239,138,0.12)]"
           )}
           style={{
             width: `${radius * 2}px`,
@@ -379,8 +414,8 @@ export default function RadialSocialMenu({ className }: RadialSocialMenuProps) {
                 rel={item.isExternal ? "noopener noreferrer" : undefined}
                 aria-label={item.label}
                 className={cn(
-                  "group/sat relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-slate-900/80 backdrop-blur-xl border border-white/20 shadow-xl text-white transition-all duration-300 hover:scale-125 hover:bg-slate-800/90 active:scale-95",
-                  item.accentColor
+                  "group/sat relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#101012] border border-[#fdef8a]/40 shadow-xl text-white transition-all duration-300 hover:scale-125 hover:bg-[#1f1f24] active:scale-95",
+                  "hover:border-[#fdef8a] hover:shadow-[0_0_16px_rgba(253,239,138,0.35)]"
                 )}
               >
                 {item.icon}
@@ -388,7 +423,7 @@ export default function RadialSocialMenu({ className }: RadialSocialMenuProps) {
                 {/* Tooltip flotante al hacer Hover (oculto durante arrastre para evitar interferencia visual) */}
                 <span
                   className={cn(
-                    "absolute bottom-full mb-2.5 hidden sm:block opacity-0 group-hover/sat:opacity-100 pointer-events-none transition-all duration-200 transform translate-y-1 group-hover/sat:translate-y-0 px-2.5 py-1 rounded-lg text-[11px] font-semibold tracking-wide whitespace-nowrap bg-slate-950/90 text-white border border-white/20 shadow-2xl backdrop-blur-md",
+                    "absolute bottom-full mb-2.5 hidden sm:block opacity-0 group-hover/sat:opacity-100 pointer-events-none transition-all duration-200 transform translate-y-1 group-hover/sat:translate-y-0 px-2.5 py-1 rounded-lg text-[11px] font-bold tracking-wide whitespace-nowrap bg-[#fdef8a] text-[#101012] shadow-2xl",
                     isDragging && "hidden opacity-0"
                   )}
                 >
