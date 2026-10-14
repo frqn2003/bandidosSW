@@ -18,7 +18,7 @@ import { apiGet, apiSend } from "@/lib/api-client";
 import { RUTA_AGENDA, type AgendaDiaResponse, type BloqueHorarioResponse } from "@/contracts/calendario";
 import { listarProfesoresActivos } from "@/data/calendario";
 import { listarMaterias } from "@/data/materias";
-import { sumarDias } from "@/funciones/fechas-calendario";
+import { sumarDias, lunesDe } from "@/funciones/fechas-calendario";
 import type {
   TurnoCalendario,
   ProfesorCalendario,
@@ -41,6 +41,12 @@ const PALETA_COLORES = [
   "#c026d3", // fucsia
 ];
 
+export function obtenerFechaHoy(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+  }).format(new Date());
+}
+
 export interface UseCalendarOptions {
   vistaInicial?: VistaCalendario;
   fechaInicial?: string; // "yyyy-mm-dd"
@@ -52,7 +58,7 @@ export function useCalendar(options: UseCalendarOptions = {}) {
   // ─── 1. Estado principal ────────────────────────────────────────────────
   const [vista, setVista] = useState<VistaCalendario>(options.vistaInicial ?? "semana");
   const [fechaSeleccionada, setFechaSeleccionada] = useState<string>(
-    options.fechaInicial ?? "2026-09-28"
+    () => options.fechaInicial || obtenerFechaHoy()
   );
 
   const [filtros, setFiltros] = useState<FiltrosCalendario>({
@@ -77,11 +83,7 @@ export function useCalendar(options: UseCalendarOptions = {}) {
 
   // Lunes de la semana que contiene `fechaSeleccionada`
   const fechaLunesSemana = useMemo(() => {
-    const d = new Date(`${fechaSeleccionada}T00:00:00`);
-    const day = d.getDay(); // 0 es domingo
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(d.setDate(diff));
-    return monday.toISOString().split("T")[0];
+    return lunesDe(fechaSeleccionada);
   }, [fechaSeleccionada]);
 
   // Carga de catálogo de profesores y materias activas
@@ -171,8 +173,8 @@ export function useCalendar(options: UseCalendarOptions = {}) {
             err && typeof err === "object" && "mensaje" in err
               ? String((err as { mensaje: string }).mensaje)
               : err instanceof Error
-              ? err.message
-              : "Error al cargar los turnos.";
+                ? err.message
+                : "Error al cargar los turnos.";
           setError(mensaje);
         }
       });
@@ -258,20 +260,16 @@ export function useCalendar(options: UseCalendarOptions = {}) {
   // ─── 5. Helpers de Fechas y Rangos ──────────────────────────────────────
   const diasSemana = useMemo(() => {
     const lista: { fecha: string; nombreDia: string; numeroDia: number; esHoy: boolean }[] = [];
-    const base = new Date(`${fechaLunesSemana}T00:00:00`);
     const nombres = ["LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
-    const hoyStr = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/Argentina/Buenos_Aires",
-    }).format(new Date());
+    const hoyStr = obtenerFechaHoy();
 
     for (let i = 0; i < 6; i++) {
-      const current = new Date(base);
-      current.setDate(base.getDate() + i);
-      const iso = current.toISOString().split("T")[0];
+      const iso = sumarDias(fechaLunesSemana, i);
+      const [, , d] = iso.split("-").map(Number);
       lista.push({
         fecha: iso,
         nombreDia: nombres[i],
-        numeroDia: current.getDate(),
+        numeroDia: d,
         esHoy: iso === hoyStr,
       });
     }
@@ -346,9 +344,7 @@ export function useCalendar(options: UseCalendarOptions = {}) {
     const primerDiaSemana = primerDia.getDay(); // 0 domingo, 1 lunes...
     const offsetInicio = primerDiaSemana === 0 ? 6 : primerDiaSemana - 1;
 
-    const hoyStr = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/Argentina/Buenos_Aires",
-    }).format(new Date());
+    const hoyStr = obtenerFechaHoy();
 
     const lista: DiaResumenMes[] = [];
 
@@ -410,10 +406,7 @@ export function useCalendar(options: UseCalendarOptions = {}) {
 
   // ─── 8. Navegación temporal ─────────────────────────────────────────────
   const irAHoy = useCallback(() => {
-    const hoyStr = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/Argentina/Buenos_Aires",
-    }).format(new Date());
-    setFechaSeleccionada(hoyStr);
+    setFechaSeleccionada(obtenerFechaHoy());
   }, []);
 
   const anterior = useCallback(() => {
