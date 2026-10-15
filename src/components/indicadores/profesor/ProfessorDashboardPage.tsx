@@ -101,14 +101,27 @@ export function ProfessorDashboardPage() {
 
   // Carga inicial al montar si es profesor
   useEffect(() => {
-    if (esProfesor) {
-      void cargarIndicadores(desde, hasta, materiaId);
-    }
+    if (!esProfesor) return;
+    let activo = true;
+    void Promise.resolve().then(() => {
+      if (activo) {
+        void cargarIndicadores(desde, hasta, materiaId);
+      }
+    });
+    return () => {
+      activo = false;
+    };
   }, [esProfesor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Manejador del botón "Actualizar"
   const handleActualizar = () => {
     void cargarIndicadores(desde, hasta, materiaId);
+  };
+
+  // Recálculo automático al cambiar la materia
+  const handleCambioMateria = (nuevaMateriaId: number | undefined) => {
+    setMateriaId(nuevaMateriaId);
+    void cargarIndicadores(desde, hasta, nuevaMateriaId);
   };
 
   // Restablecer filtros
@@ -161,22 +174,24 @@ export function ProfessorDashboardPage() {
   const sinDatos = datos?.sinDatos || (!datos?.clasesDictadas && !datos?.alumnosAtendidos && !datos?.horasDictadas);
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-surface print:block print:bg-white print:min-h-0">
       {/* Barra de navegación global */}
-      <Sidebar />
+      <div className="print:hidden">
+        <Sidebar />
+      </div>
 
       {/* Contenido principal del dashboard */}
-      <div className="flex flex-1 flex-col overflow-y-auto">
-        <main className="flex-1 p-6 sm:p-8 max-w-7xl w-full mx-auto space-y-6">
+      <main className="flex-1 px-6 py-6 lg:px-8 print:p-0 print:m-0 print:max-w-none print:w-full">
+        <div className="mx-auto flex max-w-6xl flex-col gap-5 print:max-w-none print:w-full print:m-0 print:gap-4">
           {/* ── ENCABEZADO PRINCIPAL ── */}
-          <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5">
-            <div className="flex items-center gap-3.5">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+          <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-outline-variant pb-5 print:hidden">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-primary-container/30 text-primary">
                 <Icon name="insights" size={24} />
               </span>
               <div>
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  <h1 className="font-display text-2xl font-bold tracking-tight text-slate-900">
+                  <h1 className="font-display text-2xl font-bold tracking-tight text-on-surface">
                     Indicadores de actividad
                   </h1>
                   <StatusBadge
@@ -185,7 +200,7 @@ export function ProfessorDashboardPage() {
                     label="Solo lectura"
                   />
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-sm font-medium text-on-surface-variant mt-0.5">
                   Métricas de turnos, asistencias y horas dictadas. Información personal sin datos de pagos.
                 </p>
               </div>
@@ -193,29 +208,29 @@ export function ProfessorDashboardPage() {
           </header>
 
           {/* ── SELECTOR DE SECCIÓN (Actividad Docente vs Rendición de Cobranzas) ── */}
-          <div className="flex items-center gap-2 border-b border-slate-200 pb-1">
+          <div className="flex items-center gap-2 border-b border-outline-variant pb-1">
             <button
               type="button"
               onClick={() => setSeccionActiva("actividad")}
-              className={`inline-flex items-center gap-2 border-b-2 px-3 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+              className={`inline-flex items-center gap-2 border-b-2 px-3.5 py-2 text-sm font-semibold transition-colors cursor-pointer ${
                 seccionActiva === "actividad"
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-on-surface-variant hover:text-on-surface"
               }`}
             >
-              <Icon name="insights" size={16} />
+              <Icon name="insights" size={18} />
               Actividad y Asistencia
             </button>
             <button
               type="button"
               onClick={() => setSeccionActiva("rendicion")}
-              className={`inline-flex items-center gap-2 border-b-2 px-3 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+              className={`inline-flex items-center gap-2 border-b-2 px-3.5 py-2 text-sm font-semibold transition-colors cursor-pointer ${
                 seccionActiva === "rendicion"
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-on-surface-variant hover:text-on-surface"
               }`}
             >
-              <Icon name="receipt_long" size={16} />
+              <Icon name="receipt_long" size={18} />
               Rendición de Cobranzas
             </button>
           </div>
@@ -243,7 +258,7 @@ export function ProfessorDashboardPage() {
                   setHasta(val);
                   if (errorPeriodo) setErrorPeriodo(null);
                 }}
-                onCambioMateria={setMateriaId}
+                onCambioMateria={handleCambioMateria}
                 onActualizar={handleActualizar}
                 onLimpiar={handleLimpiar}
               />
@@ -312,8 +327,8 @@ export function ProfessorDashboardPage() {
               ) : null}
             </>
           )}
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

@@ -1,0 +1,197 @@
+================================================================================
+PROYECTO: NEXO ACADÉMICO — PLATAFORMA DE GESTIÓN EDUCATIVA
+INFORME DE DISEÑO Y DESARROLLO: LANDING PAGE INSTITUCIONAL (HU-LAN-01)
+Presentación para la Cátedra de Ingeniería de Software / Diseño UI/UX
+================================================================================
+
+Ruta de la pantalla: /
+Módulo: Portal Público / Landing & Onboarding
+Estado actual: Implementada, interactiva y con preparación para Backend
+Rol del equipo: Diseño UI/UX y Prototipado Frontend de Alta Fidelidad en Next.js
+
+
+--------------------------------------------------------------------------------
+1. INTRODUCCIÓN Y CONCEPTO: ¿QUÉ LE QUISE TRANSMITIR AL VISITANTE?
+--------------------------------------------------------------------------------
+
+Profe, cuando encaré el diseño de esta landing page, el desafío principal fue 
+evitar que pareciera "otra plantilla web genérica de educación". Quería que 
+cualquier persona que entrara (ya sea un alumno que busca apoyo universitario, 
+un chico de secundario o sus padres) sintiera dos cosas en simultáneo:
+
+  1. Modernidad e innovación tecnológica: a través de animaciones fluidas a 
+     60-120 FPS, microinteracciones, profundidad 3D y un canvas reactivo al 
+     cursor.
+  2. Cercanía y calidez de la vida académica real: utilizando una metáfora 
+     táctil que une carpetas manila de legajo, notas adhesivas (Post-its), 
+     cinta adhesiva, estampas de goma y hojas de examen reales con 
+     calificaciones manuscritas.
+
+La página no es solo un escaparate visual: está pensada de punta a punta con un 
+embudo de conversión claro que guía al usuario desde la curiosidad inicial 
+hacia el registro, el inicio de sesión o la consulta directa por WhatsApp.
+
+
+--------------------------------------------------------------------------------
+2. RECORRIDO DE LA PÁGINA: CÓMO ESTÁ ESTRUCTURADA HOY
+--------------------------------------------------------------------------------
+
+La landing page se despliega verticalmente en una secuencia narrativa fluida 
+compuesta por 7 bloques principales y un elemento de navegación global:
+
+  1. Header Institucional:
+     Logotipo oficial de Nexo Académico, isotipo con enlace a la raíz y botones 
+     de acceso rápido ("Iniciar sesión" y "Registrarme") con microinteracción 
+     de relleno deslizante azul eléctrico (#0047FF).
+
+  2. Hero Interactivo (#inicio):
+     - Fondo de partículas y líneas en Canvas 2D (KineticGrid), optimizado con 
+       Offscreen Canvas y batching de trazos para que reaccione al puntero del 
+       ratón sin consumir CPU ni provocar caídas de frames.
+     - Título principal animado mediante BlurText con desenfoque progresivo por 
+       palabra.
+     - Composición fotográfica en tarjetas Glassmorphism con efecto pop-out: 
+       un estudiante de nivel inicial/medio y una estudiante universitaria, 
+       representando el alcance multigeneracional del centro. Ambos tienen una 
+       flotación continua desfasada orquestada con GSAP.
+
+  3. Sección Táctil: "¿Por qué elegirnos?" (#por-que-elegirnos):
+     - Transición visual lograda mediante la estética de una carpeta manila 
+       física (#F2E4CB), con solapas escalonadas y rótulos en tipografía 
+       manuscrita (Caveat).
+     - Dos documentos asoman por detrás de la carpeta con un desplazamiento 
+       reactivo al scroll (ScrollTrigger scrub): un examen con nota "10/10 ★" 
+       y una ficha de legajo kraft con el sello "Ciclo 2026 · Acta N° 84".
+     - Tarjeta con la foto de las instalaciones de la institución, montada en 
+       perspectiva 3D con un haz de luz diagonal periódico.
+     - Grilla de 4 indicadores clave diseñados como Post-its de colores pastel 
+       con cinta adhesiva translúcida, animación en cascada, impacto de estampa 
+       de goma ("slam") y explosión física de partículas SparkleBurst.
+
+  4. Cinta Ticker de Promociones y Beneficios:
+     Una franja horizontal oscura con scroll continuo infinito a 60 FPS que 
+     presenta beneficios comerciales (20% OFF en primera materia, matrícula 
+     bonificada, promo amigos y cupos limitados). Se pausa automáticamente 
+     al pasar el mouse para facilitar la lectura.
+
+  5. Las Materias Más Pedidas (#materias-destacadas):
+     En lugar de una grilla fría de cursos, organizamos las materias más 
+     demandadas (Análisis Matemático, Algoritmos, Física, etc.) en tarjetas con 
+     estética de fichas académicas con rotación orgánica, indicando puesto de 
+     demanda, porcentaje de aprobación histórica y alumnos cursando actualmente.
+
+  6. Experiencias Reales de Alumnos (#testimonios):
+     Acá dimos un salto de calidad en UX: en vez de colocar testimonios en 
+     tarjetas abstractas, diseñamos hojas de examen físico cuadriculado donde 
+     se ve el contraste real del alumno: su nota del primer parcial (por 
+     ejemplo, un 3 o un 2) versus su nota final tras pasar por el centro (un 
+     9 o un 10), con el tiempo de preparación, su foto y su testimonio con 
+     frases clave resaltadas.
+
+  7. Dónde Estamos — Sede Salta:
+     Para dar respaldo institucional y confianza física, sumamos la sección de 
+     la sede (Caseros 468, Salta). Incluye un script que evalúa la hora local 
+     del usuario para mostrar si la sede está "Abierta ahora" o cerrada, 
+     horarios semanales, botón con feedback para copiar la dirección y accesos 
+     directos a Google Maps, teléfono y WhatsApp.
+
+  8. Footer Institucional:
+     Cierre de página de alto impacto con un Wordmark gigante ("Nexo 
+     Académico") cuyas letras emergen escalonadamente desde abajo con GSAP al 
+     llegar al final de la página, acompañado de navegación secundaria, sedes y 
+     copyright.
+
+  * Elemento Global — Menú Radial Orbital Flotante:
+    Ubicado en la esquina inferior derecha, ofrece un selector orbital táctil 
+    con física de arrastre (Drag-to-Spin), inercia de giro, LiveOrb 3D y 6 
+    accesos rápidos directos (WhatsApp, Iniciar sesión, Materias, ¿Por qué 
+    elegirnos?, Experiencias y Subir al inicio).
+
+
+--------------------------------------------------------------------------------
+3. DETALLE DE LAS DECISIONES TÉCNICAS Y DE DISEÑO
+--------------------------------------------------------------------------------
+
+A) SISTEMA DE DISEÑO Y TIPOGRAFÍAS
+- Base Material Design 3 con paleta institucional:
+  * Azul primario profundo: #00236f (confianza, solidez académica).
+  * Azul vibrante / eléctrico: #0047FF / #0058be (energía, tecnología y focos 
+    de atención).
+  * Cartulina manila y tonos cálidos: #F2E4CB, #E5D4B6 (cercanía, textura de 
+    papelería).
+- Tipografías combinadas con intención:
+  * Poppins: geométrica y moderna para los títulos y encabezados principales.
+  * Inter: máxima legibilidad en párrafos, datos y microtextos.
+  * Caveat: fuente manuscrita aplicada a mano en las pestañas, notas y post-its 
+    para simular las anotaciones de un profesor o preceptor.
+
+B) ANIMACIONES CINEMÁTICAS CON GSAP (SRC/LIB/GSAP.TS)
+- Centralizamos GSAP y ScrollTrigger con SSR-safety utilizando el hook oficial 
+  useGSAP.
+- Las animaciones pesadas se ejecutan fuera del ciclo de renderizado de React 
+  mediante refs, evitando re-renders innecesarios.
+- El conteo numérico de las estadísticas se sincroniza con timelines nativos 
+  de GSAP (power2.out), encadenando el movimiento de la tarjeta, el impacto 
+  físico de estampa y la lluvia de confeti.
+
+C) PERFORMANCE Y ESTABILIDAD EN NEXT.JS
+- En el canvas KineticGrid reemplazamos cientos de llamadas individuales de 
+  dibujo por path batching (reduciendo de 1.400 llamadas a solo 2 draw calls 
+  por fotograma), garantizando 60 a 120 FPS estables.
+- Para evitar errores de hidratación (Hydration Mismatch) provocados por 
+  números de punto flotante en Server-Side Rendering (SSR), estandarizamos el 
+  uso de .toFixed(2) y supresión controlada en elementos con cálculo dinámico 
+  de cliente.
+
+
+--------------------------------------------------------------------------------
+4. ARQUITECTURA DE DATOS Y PREPARACIÓN PARA BACKEND
+--------------------------------------------------------------------------------
+
+Profe, siguiendo las pautas de arquitectura del equipo y las reglas del 
+proyecto, la interfaz no tiene datos "sueltos":
+
+  - Cada componente consume interfaces TypeScript bien definidas (MetricItem, 
+    MateriaItem, ExperienciaEstudiante, etc.).
+  - Todos los datos mockeados utilizan claves primarias numéricas (id: 1, 2, 3), 
+    que es exactamente el formato que nos entregará la base de datos SQL.
+  - Dejé señalizado cada punto de integración con comentarios estandarizados 
+    `// BACKEND:`, indicando la ruta del endpoint REST que el equipo de back 
+    deberá conectar (por ejemplo: `// BACKEND: Reemplazar con GET /api/sede` o 
+    `// BACKEND: GET /api/testimonios/aprobados`).
+  - De esta manera, cuando el backend tenga listas las APIs, la integración 
+    será directa y no requerirá reescribir ni desarmar la estructura visual.
+
+
+--------------------------------------------------------------------------------
+5. ACCESIBILIDAD Y RESPONSIVIDAD (CRITERIOS DE CALIDAD)
+--------------------------------------------------------------------------------
+
+  [x] Adaptabilidad total: probada en resoluciones móviles desde 360px de 
+      ancho, tablets, notebooks y monitores de escritorio (Full HD y 2K).
+  [x] Accesibilidad (a11y): todas las imágenes institucionales y retratos de 
+      alumnos cuentan con etiquetas `alt` descriptivas.
+  [x] Contraste cromático: validado en los post-its y carpetas usando tonos de 
+      texto oscuros (stone-900 / stone-800) sobre fondos pastel (#FEF08A, 
+      #BAE6FD, etc.) para cumplir con las pautas WCAG.
+  [x] Movimiento reducido: las animaciones respetan la directiva del sistema 
+      operativo `prefers-reduced-motion` para usuarios con sensibilidad al 
+      movimiento.
+  [x] Verificación de código: TypeScript compila limpio (`tsc --noEmit`) y 
+      ESLint no arroja errores ni advertencias en la página.
+
+
+--------------------------------------------------------------------------------
+6. BALANCE Y REFLEXIÓN FINAL
+--------------------------------------------------------------------------------
+
+En resumen, la landing page hoy no es solo un prototipo estático, sino una 
+experiencia web completa, interactiva y técnicamente sólida. Logramos fusionar 
+la seriedad institucional de un centro académico con una identidad visual 
+memorable basada en la metáfora del papel y el legajo escolar, dejando el 
+terreno completamente preparado para la conexión con el backend en la próxima 
+etapa del sprint.
+
+================================================================================
+Nexo Académico · Trabajo Práctico de Ingeniería de Software · Ciclo 2026
+================================================================================

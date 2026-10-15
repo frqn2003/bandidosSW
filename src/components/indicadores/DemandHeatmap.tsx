@@ -9,7 +9,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
@@ -48,6 +48,8 @@ const OPCIONES_HORARIOS = [
   "22:00",
 ];
 
+const emptySubscribe = () => () => {};
+
 export function DemandHeatmap({
   periodo,
   materias,
@@ -61,14 +63,8 @@ export function DemandHeatmap({
   const [localHoraHasta, setLocalHoraHasta] = useState<string>("21:00");
 
   const [cargando, setCargando] = useState(false);
-  const [errorLocal, setErrorLocal] = useState<string | null>(null);
+  const [errorApi, setErrorApi] = useState<string | null>(null);
   const [mapaData, setMapaData] = useState<MapaCalorResponse | null>(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   // Estado para Tooltip flotante interactivo
   const [tooltip, setTooltip] = useState<{
     materia: string;
@@ -79,37 +75,56 @@ export function DemandHeatmap({
     posicionAbajo?: boolean;
   } | null>(null);
 
-  // Validación de rango horario local
-  const horaInvalida = useMemo(() => {
-    return localHoraHasta <= localHoraDesde;
+  const isMounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
+
+  // Validación de rango horario local derivada (evita cascading renders)
+  const errorHorario = useMemo(() => {
+    if (localHoraHasta <= localHoraDesde) {
+      return "La hora hasta debe ser posterior a la hora desde.";
+    }
+    return null;
   }, [localHoraDesde, localHoraHasta]);
 
-  // Carga de datos local exclusiva
-  const cargarMapa = useCallback(async () => {
-    if (horaInvalida) {
-      setErrorLocal("La hora hasta debe ser posterior a la hora desde.");
-      return;
-    }
-    setCargando(true);
-    setErrorLocal(null);
+  const horaInvalida = Boolean(errorHorario);
+  const errorAMostrar = errorHorario || errorApi;
 
-    try {
-      // BACKEND: GET /api/indicadores/mapa-calor?...
-      const res = await consultarMapaCalor({
-        desde: periodo.desde,
-        hasta: periodo.hasta,
-        materiaId: localMateriaId !== "Todas" ? localMateriaId : undefined,
-        profesorId: localProfesorId !== "Todos" ? localProfesorId : undefined,
-        nivel: nivelGlobal && nivelGlobal !== "Todos" ? nivelGlobal : undefined,
-        horaDesde: localHoraDesde || undefined,
-        horaHasta: localHoraHasta || undefined,
-      });
-      setMapaData(res);
-    } catch {
-      setErrorLocal("No se pudieron cargar los datos del mapa de calor.");
-    } finally {
-      setCargando(false);
-    }
+  // Carga de datos local exclusiva ante cambios de filtros con debounce
+  useEffect(() => {
+    if (errorHorario) return;
+    let activo = true;
+
+    const timer = setTimeout(async () => {
+      setCargando(true);
+      setErrorApi(null);
+
+      try {
+        const res = await consultarMapaCalor({
+          desde: periodo.desde,
+          hasta: periodo.hasta,
+          materiaId: localMateriaId !== "Todas" ? localMateriaId : undefined,
+          profesorId: localProfesorId !== "Todos" ? localProfesorId : undefined,
+          nivel: nivelGlobal && nivelGlobal !== "Todos" ? nivelGlobal : undefined,
+          horaDesde: localHoraDesde || undefined,
+          horaHasta: localHoraHasta || undefined,
+        });
+        if (activo) {
+          setMapaData(res);
+        }
+      } catch {
+        if (activo) {
+          setErrorApi("No se pudieron cargar los datos del mapa de calor.");
+        }
+      } finally {
+        if (activo) {
+          setCargando(false);
+        }
+      }
+    }, 150);
+
+    return () => {
+      activo = false;
+      clearTimeout(timer);
+    };
   }, [
     periodo.desde,
     periodo.hasta,
@@ -118,12 +133,8 @@ export function DemandHeatmap({
     nivelGlobal,
     localHoraDesde,
     localHoraHasta,
-    horaInvalida,
+    errorHorario,
   ]);
-
-  useEffect(() => {
-    cargarMapa();
-  }, [cargarMapa]);
 
   // Generar lista de horas según filtro local
   const horasColumnas = useMemo(() => {
@@ -201,7 +212,7 @@ export function DemandHeatmap({
     setLocalProfesorId("Todos");
     setLocalHoraDesde("08:00");
     setLocalHoraHasta("21:00");
-    setErrorLocal(null);
+    setErrorApi(null);
   };
 
   const totalTurnosMapa = useMemo(() => {
@@ -372,10 +383,10 @@ export function DemandHeatmap({
           </div>
         </div>
 
-        {errorLocal && (
+        {errorAMostrar && (
           <p className="mt-2 text-xs font-semibold text-red-600 flex items-center gap-1">
             <Icon name="error" size={14} />
-            {errorLocal}
+            {errorAMostrar}
           </p>
         )}
       </div>
@@ -492,7 +503,7 @@ export function DemandHeatmap({
       </div>
 
       {/* ── TOOLTIP FLOTANTE INTERACTIVO (PORTAL A BODY PARA EVITAR LAYOUT SHIFT / REBOTE) ── */}
-      {mounted &&
+      {isMounted &&
         tooltip &&
         createPortal(
           <div

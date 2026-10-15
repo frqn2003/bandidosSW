@@ -67,88 +67,88 @@ export function ProfessorKPIGrid({
   };
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {/* 1. Clases Dictadas */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs flex flex-col justify-between">
+      <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-5 shadow-xs flex flex-col justify-between transition-all hover:border-outline">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+          <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
             Clases Dictadas
           </span>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-            <Icon name="school" size={17} />
+          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <Icon name="school" size={20} />
           </div>
         </div>
-        <div className="mt-2.5">
-          <div className="text-2xl font-bold text-slate-900 tracking-tight tabular-nums">
+        <div className="mt-3">
+          <div className="text-2xl sm:text-[26px] font-bold text-on-surface tracking-tight tabular-nums">
             {clasesDictadas}
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-400">
+          <p className="mt-1 text-xs text-on-surface-variant">
             Turnos con estado &quot;Asistió&quot;
           </p>
         </div>
       </div>
 
       {/* 2. Alumnos Atendidos */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs flex flex-col justify-between">
+      <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-5 shadow-xs flex flex-col justify-between transition-all hover:border-outline">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+          <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
             Alumnos Atendidos
           </span>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
-            <Icon name="groups" size={17} />
+          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-indigo-50 text-indigo-700">
+            <Icon name="groups" size={20} />
           </div>
         </div>
-        <div className="mt-2.5">
-          <div className="text-2xl font-bold text-slate-900 tracking-tight tabular-nums">
+        <div className="mt-3">
+          <div className="text-2xl sm:text-[26px] font-bold text-on-surface tracking-tight tabular-nums">
             {alumnosAtendidos}
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-400">
+          <p className="mt-1 text-xs text-on-surface-variant">
             Alumnos distintos atendidos
           </p>
         </div>
       </div>
 
       {/* 3. Horas Dictadas */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs flex flex-col justify-between">
+      <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-5 shadow-xs flex flex-col justify-between transition-all hover:border-outline">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+          <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
             Horas Dictadas
           </span>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
-            <Icon name="schedule" size={17} />
+          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-sky-50 text-sky-700">
+            <Icon name="schedule" size={20} />
           </div>
         </div>
-        <div className="mt-2.5">
-          <div className="text-2xl font-bold text-slate-900 tracking-tight tabular-nums">
+        <div className="mt-3">
+          <div className="text-2xl sm:text-[26px] font-bold text-on-surface tracking-tight tabular-nums">
             {formatoHoras(horasDictadas)}
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-400">
+          <p className="mt-1 text-xs text-on-surface-variant">
             Suma de duración de clases
           </p>
         </div>
       </div>
 
       {/* 4. % de Asistencia */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs flex flex-col justify-between">
+      <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-5 shadow-xs flex flex-col justify-between transition-all hover:border-outline">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+          <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
             % Asistencia
           </span>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
-            <Icon name="check_circle" size={17} />
+          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
+            <Icon name="check_circle" size={20} />
           </div>
         </div>
-        <div className="mt-2.5">
+        <div className="mt-3">
           <div
-            className={`text-2xl font-bold tracking-tight tabular-nums ${
+            className={`text-2xl sm:text-[26px] font-bold tracking-tight tabular-nums ${
               textoAsistencia === "—"
-                ? "text-slate-400"
+                ? "text-on-surface-variant"
                 : "text-emerald-700"
             }`}
           >
             {textoAsistencia}
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-400">
+          <p className="mt-1 text-xs text-on-surface-variant">
             {denominadorAsistencia === 0
               ? "Sin turnos dictados/ausentes"
               : `Sobre ${denominadorAsistencia} clases`}
@@ -157,26 +157,26 @@ export function ProfessorKPIGrid({
       </div>
 
       {/* 5. % de Cancelaciones */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs flex flex-col justify-between">
+      <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-5 shadow-xs flex flex-col justify-between transition-all hover:border-outline">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+          <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
             % Cancelaciones
           </span>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
-            <Icon name="event_busy" size={17} />
+          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-amber-50 text-amber-700">
+            <Icon name="event_busy" size={20} />
           </div>
         </div>
-        <div className="mt-2.5">
+        <div className="mt-3">
           <div
-            className={`text-2xl font-bold tracking-tight tabular-nums ${
+            className={`text-2xl sm:text-[26px] font-bold tracking-tight tabular-nums ${
               textoCancelaciones === "—"
-                ? "text-slate-400"
+                ? "text-on-surface-variant"
                 : "text-amber-700"
             }`}
           >
             {textoCancelaciones}
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-400">
+          <p className="mt-1 text-xs text-on-surface-variant">
             {totalTurnos === 0
               ? "Sin turnos registrados"
               : `Sobre ${totalTurnos} turnos`}
@@ -185,26 +185,26 @@ export function ProfessorKPIGrid({
       </div>
 
       {/* 6. % de Ocupación */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs flex flex-col justify-between">
+      <div className="rounded-md border border-outline-variant bg-surface-container-lowest p-5 shadow-xs flex flex-col justify-between transition-all hover:border-outline">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+          <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
             % Ocupación
           </span>
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
-            <Icon name="pie_chart" size={17} />
+          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-violet-50 text-violet-700">
+            <Icon name="pie_chart" size={20} />
           </div>
         </div>
-        <div className="mt-2.5">
+        <div className="mt-3">
           <div
-            className={`text-2xl font-bold tracking-tight tabular-nums ${
+            className={`text-2xl sm:text-[26px] font-bold tracking-tight tabular-nums ${
               textoOcupacion === "—"
-                ? "text-slate-400"
+                ? "text-on-surface-variant"
                 : "text-violet-700"
             }`}
           >
             {textoOcupacion}
           </div>
-          <p className="mt-0.5 text-[11px] text-slate-400">
+          <p className="mt-1 text-xs text-on-surface-variant">
             {horasDisponibles === 0
               ? "Sin disponibilidad ofertada"
               : `${horasDisponibles} h disponibles`}

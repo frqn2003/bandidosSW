@@ -47,6 +47,13 @@ const COLORES_DONA = [
   "#f59e0b", // Amber
 ];
 
+/** "aaaa-mm-dd" → "dd/mm/aaaa" */
+const aFechaCorta = (iso: string) => {
+  const [, m, d] = iso.slice(0, 10).split("-");
+  const y = iso.slice(0, 4);
+  return `${d}/${m}/${y}`;
+};
+
 export function ProfessorChartsAndTables({
   clasesPorSemana,
   clasesPorMateria,
@@ -67,22 +74,22 @@ export function ProfessorChartsAndTables({
       {/* ── FILA SUPERIOR: 2 GRÁFICOS ANALÍTICOS (BARRAS Y DONA) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         {/* 1. Gráfico de Barras: Clases dictadas por semana (7 columnas en lg) */}
-        <div className="lg:col-span-7 flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="lg:col-span-7 flex flex-col rounded-md border border-outline-variant bg-surface-container-lowest p-5 shadow-xs">
+          <div className="flex items-center justify-between border-b border-outline-variant/60 pb-3">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-                <Icon name="bar_chart" size={18} />
+              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <Icon name="bar_chart" size={20} />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-900">
+                <h3 className="text-base font-bold text-on-surface">
                   Clases Dictadas por Semana
                 </h3>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-xs text-on-surface-variant">
                   Evolución cronológica de turnos en estado &quot;Asistió&quot;
                 </p>
               </div>
             </div>
-            <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">
+            <span className="text-xs font-semibold text-on-surface-variant bg-surface-container-low px-2.5 py-1 rounded-sm border border-outline-variant">
               {clasesPorSemana.reduce((sum, s) => sum + s.cantidad, 0)} clases totales
             </span>
           </div>
@@ -118,8 +125,8 @@ export function ProfessorChartsAndTables({
                         return (
                           <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-md text-xs">
                             <p className="font-bold text-slate-900">{data.etiquetaSemana}</p>
-                            <p className="text-slate-500 text-[11px]">
-                              {data.fechaInicio} al {data.fechaFin}
+                            <p className="text-on-surface-variant text-[11px]">
+                              {aFechaCorta(data.fechaInicio)} al {aFechaCorta(data.fechaFin)}
                             </p>
                             <p className="mt-1 font-semibold text-blue-600">
                               {data.cantidad} {data.cantidad === 1 ? "clase dictada" : "clases dictadas"}
@@ -143,17 +150,17 @@ export function ProfessorChartsAndTables({
         </div>
 
         {/* 2. Gráfico de Torta / Dona: Distribución de clases por materia (5 columnas en lg) */}
-        <div className="lg:col-span-5 flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="lg:col-span-5 flex flex-col rounded-md border border-outline-variant bg-surface-container-lowest p-5 shadow-xs">
+          <div className="flex items-center justify-between border-b border-outline-variant/60 pb-3">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
-                <Icon name="donut_large" size={18} />
+              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-indigo-50 text-indigo-700">
+                <Icon name="donut_large" size={20} />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-900">
+                <h3 className="text-base font-bold text-on-surface">
                   Distribución por Materia
                 </h3>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-xs text-on-surface-variant">
                   Proporción de clases impartidas por asignatura
                 </p>
               </div>
@@ -222,42 +229,42 @@ export function ProfessorChartsAndTables({
       </div>
 
       {/* ── FILA INFERIOR: TABLA TOP 5 ALUMNOS CON MÁS AUSENCIAS ── */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/80 px-5 py-3.5">
+      <div className="rounded-md border border-outline-variant bg-surface-container-lowest shadow-xs overflow-hidden">
+        <div className="flex items-center justify-between border-b border-outline-variant/60 bg-surface-container-low px-5 py-3.5">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-red-100 text-red-600">
-              <Icon name="person_off" size={16} />
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-error-container/30 text-error">
+              <Icon name="person_off" size={20} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">
+              <h3 className="text-base font-bold text-on-surface">
                 Alumnos con más ausencias (Top 5)
               </h3>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-xs text-on-surface-variant">
                 Estudiantes con mayor cantidad de inasistencias en clases del docente
               </p>
             </div>
           </div>
-          <span className="text-xs font-semibold text-slate-500">
+          <span className="text-xs font-semibold text-on-surface-variant bg-surface-container px-2.5 py-1 rounded-sm border border-outline-variant">
             Top {alumnosConMasAusencias.length} en orden descendente
           </span>
         </div>
 
         {alumnosConMasAusencias.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center text-slate-500">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-2">
-              <Icon name="check_circle" size={20} />
+          <div className="flex flex-col items-center justify-center py-12 text-center text-on-surface-variant">
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 mb-2">
+              <Icon name="check_circle" size={24} />
             </div>
-            <p className="text-xs font-bold text-slate-800">
+            <p className="text-sm font-bold text-on-surface">
               ¡Sin ausencias registradas!
             </p>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-xs text-on-surface-variant mt-0.5">
               Todos los alumnos registraron asistencia perfecta en el período consultado.
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-600">
-              <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <table className="w-full text-left text-sm text-on-surface">
+              <thead className="border-b border-outline-variant bg-surface-container-low text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                 <tr>
                   <th scope="col" className="w-12 px-4 py-3 text-center">#</th>
                   <th scope="col" className="px-4 py-3">Alumno</th>
@@ -265,22 +272,22 @@ export function ProfessorChartsAndTables({
                   <th scope="col" className="px-4 py-3 text-right">Nivel de Ausentismo</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-outline-variant/60">
                 {alumnosConMasAusencias.map((alumno, index) => {
                   const maxAusencias = Math.max(...alumnosConMasAusencias.map((a) => a.ausencias), 1);
                   const porcentajeRelativo = Math.min((alumno.ausencias / maxAusencias) * 100, 100);
 
                   return (
-                    <tr key={alumno.alumnoId} className="hover:bg-slate-50/60 transition-colors">
+                    <tr key={alumno.alumnoId} className="hover:bg-surface-container-low/60 transition-colors">
                       {/* Puesto en el Ranking */}
                       <td className="px-4 py-3 text-center whitespace-nowrap">
                         <span
-                          className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold ${
+                          className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
                             index === 0
                               ? "bg-red-100 text-red-700 font-extrabold"
                               : index === 1
                               ? "bg-orange-100 text-orange-700"
-                              : "bg-slate-100 text-slate-600"
+                              : "bg-surface-container text-on-surface-variant"
                           }`}
                         >
                           {index + 1}
@@ -290,11 +297,11 @@ export function ProfessorChartsAndTables({
                       {/* Datos del Alumno */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700 text-xs">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-primary text-xs">
                             {alumno.alumno.split(",")[0]?.[0] ?? "A"}
                             {alumno.alumno.split(",")[1]?.trim()?.[0] ?? ""}
                           </div>
-                          <span className="font-bold text-slate-900 text-xs">
+                          <span className="font-bold text-on-surface text-sm">
                             {alumno.alumno}
                           </span>
                         </div>
