@@ -56,9 +56,9 @@ export function StudentPortalLayout({
 
   // ─── PORTAL DEL ALUMNO: Navegación limitada y contenido ─────────────────────
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-800">
-      {/* Header Institucional Superior */}
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white shadow-xs">
+    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-800 print:bg-white">
+      {/* Header Institucional Superior (oculto en impresión/PDF) */}
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white shadow-xs print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 sm:px-6 h-16">
           {/* Logo y Rol */}
           <div className="flex items-center gap-3">
@@ -160,7 +160,7 @@ export function StudentPortalLayout({
       </header>
 
       {/* Contenido Principal */}
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 py-6">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 py-6 print:p-0 print:max-w-none">
         {children}
       </main>
     </div>
