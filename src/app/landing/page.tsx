@@ -581,19 +581,6 @@ export default function LandingPage() {
               Iniciar sesión
             </span>
           </Link>
-          <Link
-            href="/login"
-            className="group relative overflow-hidden px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-semibold tracking-wide border border-white/80 text-white bg-transparent backdrop-blur-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"
-          >
-            {/* Fondo deslizante de acento */}
-            <span
-              className="absolute inset-0 w-0 transition-all duration-300 ease-out group-hover:w-full"
-              style={{ backgroundColor: "#fdef8a" }}
-            />
-            <span className="relative z-10 transition-colors duration-300 group-hover:text-slate-950">
-              Registrarme
-            </span>
-          </Link>
         </div>
 
         <div id="inicio" className="relative flex min-h-screen items-center justify-center px-6 md:px-12 lg:px-20 py-16">
