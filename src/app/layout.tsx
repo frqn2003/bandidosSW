@@ -59,6 +59,7 @@ export default function RootLayout({
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
         />
+        <link rel="icon" href="/LogoNegro.png" type="image/png" sizes="any" />
       </head>
       <body suppressHydrationWarning className="min-h-full flex flex-col bg-surface text-on-surface">
         {/* La sesión (HU-SIS-01) envuelve toda la app: el login, las

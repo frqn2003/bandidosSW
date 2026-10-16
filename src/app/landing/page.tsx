@@ -590,6 +590,9 @@ export default function LandingPage() {
               className="absolute inset-0 w-0 transition-all duration-300 ease-out group-hover:w-full"
               style={{ backgroundColor: "#fdef8a" }}
             />
+            <span className="relative z-10 transition-colors duration-300 group-hover:text-slate-950">
+              Registrarme
+            </span>
           </Link>
         </div>
 
