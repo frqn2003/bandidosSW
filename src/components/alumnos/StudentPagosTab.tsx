@@ -6,19 +6,25 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { useToast } from "@/components/ui/Toast";
+import { useSesion } from "@/funciones/sesion";
 import { PaymentHistoryTab } from "@/components/pagos/PaymentHistoryTab";
 import { ReceiptView } from "@/components/pagos/ReceiptView";
+import { AnnulPaymentModal } from "@/components/pagos/AnnulPaymentModal";
 import {
   listarPagos,
   listarClasesPendientes,
+  anularPago,
   formatearImporte,
   type PagoResponse,
   type ClasePendientePagoResponse,
 } from "@/data/pagos";
+import { obtenerCajaDelDia } from "@/data/caja";
+import { mensajeDeError } from "@/lib/api-client";
 import type { StudentUI } from "@/modules/alumnos/types";
 
 interface StudentPagosTabProps {
@@ -26,31 +32,60 @@ interface StudentPagosTabProps {
 }
 
 export function StudentPagosTab({ student }: StudentPagosTabProps) {
+  const { sesion } = useSesion();
+  const { showToast } = useToast();
+  const rol = sesion?.usuario.rol.nombre;
+  const puedeAnular = rol === "Gerente" || rol === "Mesa de Entrada";
+
   const [pagos, setPagos] = useState<PagoResponse[]>([]);
   const [clasesPendientes, setClasesPendientes] = useState<ClasePendientePagoResponse[]>([]);
   const [cargando, setCargando] = useState(true);
   const [receiptSeleccionado, setReceiptSeleccionado] = useState<PagoResponse | null>(null);
+  const [pagoParaAnular, setPagoParaAnular] = useState<PagoResponse | null>(null);
 
-  useEffect(() => {
-    let cancelado = false;
-
+  const recargar = useCallback(() => {
     Promise.all([
       listarPagos({ alumnoId: student.id }).catch(() => []),
       listarClasesPendientes(student.id).catch(() => []),
     ])
       .then(([pagosRes, pendientesRes]) => {
-        if (cancelado) return;
         setPagos(pagosRes);
         setClasesPendientes(pendientesRes);
       })
       .finally(() => {
-        if (!cancelado) setCargando(false);
+        setCargando(false);
       });
-
-    return () => {
-      cancelado = true;
-    };
   }, [student.id]);
+
+  useEffect(() => {
+    recargar();
+  }, [recargar]);
+
+  const handleSolicitarAnulacion = async (pago: PagoResponse) => {
+    try {
+      const caja = await obtenerCajaDelDia(pago.fechaPago);
+      if (caja.cerrada) {
+        showToast("error", "No se permite anular pagos de una caja cerrada.");
+        return;
+      }
+      setPagoParaAnular(pago);
+    } catch {
+      setPagoParaAnular(pago);
+    }
+  };
+
+  const handleConfirmarAnulacion = async (motivo: string) => {
+    if (!pagoParaAnular) return;
+    try {
+      await anularPago(pagoParaAnular.id, { motivo });
+      showToast("success", `Pago ${pagoParaAnular.comprobante} anulado con éxito.`);
+      setPagoParaAnular(null);
+      recargar();
+    } catch (err) {
+      showToast("error", mensajeDeError(err));
+      recargar();
+    }
+  };
 
   // Cálculo de deuda
   const tieneDeudaFixture = Boolean(student.hasPendingDebt || student.deudaPendiente);
@@ -170,6 +205,7 @@ export function StudentPagosTab({ student }: StudentPagosTabProps) {
           history={pagos}
           selectedStudentName={`${student.nombre} ${student.apellido}`}
           onSelectReceipt={(receipt) => setReceiptSeleccionado(receipt)}
+          onAnularPago={puedeAnular ? handleSolicitarAnulacion : undefined}
         />
       </div>
 
@@ -186,6 +222,15 @@ export function StudentPagosTab({ student }: StudentPagosTabProps) {
             onVolver={() => setReceiptSeleccionado(null)}
           />
         </Modal>
+      )}
+
+      {/* Modal de Anulación de Pago */}
+      {pagoParaAnular && (
+        <AnnulPaymentModal
+          pago={pagoParaAnular}
+          onClose={() => setPagoParaAnular(null)}
+          onConfirmar={handleConfirmarAnulacion}
+        />
       )}
     </div>
   );
