@@ -38,7 +38,7 @@ export default function CambiarContrasenaPage() {
 
   // Sin sesión no hay nada que cambiar.
   useEffect(() => {
-    if (!cargando && !sesion) router.replace("/");
+    if (!cargando && !sesion) router.replace("/login");
   }, [cargando, sesion, router]);
 
   const guardar = async (e: React.FormEvent) => {

@@ -32,7 +32,7 @@ export function RequiereSesion({ children }: { children: ReactNode }) {
   // La redirección va en un efecto porque router.replace() durante el render
   // es un efecto secundario. El estado no se toca acá.
   useEffect(() => {
-    if (!cargando && !sesion) router.replace("/");
+    if (!cargando && !sesion) router.replace("/login");
   }, [cargando, sesion, router]);
 
   // Mientras se resuelve la sesión guardada: sin esto se vería un parpadeo de

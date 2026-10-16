@@ -112,7 +112,7 @@ export function SesionProvider({ children }: { children: ReactNode }) {
     } finally {
       setSesion(null);
       setSegundosParaExpirar(null);
-      router.replace("/");
+      router.replace("/login");
     }
   }, [router]);
 
@@ -152,7 +152,7 @@ export function SesionProvider({ children }: { children: ReactNode }) {
         // BACKEND: la sesión real la corta el server; cualquier endpoint
         // devuelve NO_AUTENTICADO (401) y el front redirige igual que acá.
         void apiLogout();
-        router.replace("/");
+        router.replace("/login");
         return;
       }
       setSegundosParaExpirar(restanteMs <= avisoMs ? Math.ceil(restanteMs / 1000) : null);
