@@ -14,9 +14,10 @@ import { hoyAR } from "@/contracts/alumno";
 import { formatearFecha } from "@/funciones/formato";
 import { useSesion } from "@/funciones/sesion";
 import { useToast } from "@/components/ui/Toast";
-import { obtenerCajaDelDia, cerrarCaja, reabrirCaja } from "@/data/caja";
+import { obtenerCajaDelDia, cerrarCaja, reabrirCaja, listarHistorialCierres } from "@/data/caja";
 import { mensajeDeError } from "@/lib/api-client";
-import type { CajaDelDiaResponse } from "@/contracts/caja";
+import type { CajaDelDiaResponse, CierreCajaResponse } from "@/contracts/caja";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { CloseCashRegisterModal } from "./CloseCashRegisterModal";
 import { ReopenCashRegisterModal } from "./ReopenCashRegisterModal";
 
@@ -31,9 +32,23 @@ export function DailyCashRegister() {
   const [cargando, setCargando] = useState<boolean>(true);
   const [errorFechaFutura, setErrorFechaFutura] = useState<boolean>(false);
 
+  // Historial de Cierres
+  const [historialCierres, setHistorialCierres] = useState<CierreCajaResponse[]>([]);
+  const [cargandoHistorial, setCargandoHistorial] = useState<boolean>(true);
+
   // Modales
   const [modalCerrarOpen, setModalCerrarOpen] = useState(false);
   const [modalReabrirOpen, setModalReabrirOpen] = useState(false);
+
+  const cargarHistorial = useCallback(() => {
+    setCargandoHistorial(true);
+    listarHistorialCierres()
+      .then((data) => setHistorialCierres(data))
+      .catch((err) => {
+        console.error("Error al cargar historial de cierres:", err);
+      })
+      .finally(() => setCargandoHistorial(false));
+  }, []);
 
   const cargarCaja = useCallback((fecha: string) => {
     if (fecha > fechaHoy) {
@@ -55,6 +70,10 @@ export function DailyCashRegister() {
   useEffect(() => {
     cargarCaja(fechaSeleccionada);
   }, [fechaSeleccionada, cargarCaja]);
+
+  useEffect(() => {
+    cargarHistorial();
+  }, [cargarHistorial]);
 
   const handleCambioFecha = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nuevaFecha = e.target.value;
@@ -78,6 +97,7 @@ export function DailyCashRegister() {
       showToast("success", `Caja del día ${formatearFecha(fechaSeleccionada)} cerrada exitosamente.`);
       setModalCerrarOpen(false);
       cargarCaja(fechaSeleccionada);
+      cargarHistorial();
     } catch (err) {
       // OBSERVACIONES_REQUERIDAS, CAJA_YA_CERRADA, FECHA_FUTURA: el back manda el mensaje.
       showToast("error", mensajeDeError(err));
@@ -92,6 +112,7 @@ export function DailyCashRegister() {
       showToast("success", `Caja reabierta exitosamente.`);
       setModalReabrirOpen(false);
       cargarCaja(fechaSeleccionada);
+      cargarHistorial();
     } catch (err) {
       showToast("error", mensajeDeError(err));
       cargarCaja(fechaSeleccionada);
@@ -447,6 +468,137 @@ export function DailyCashRegister() {
           )}
         </>
       )}
+
+      {/* Sección: Historial de Cierres de Caja */}
+      <section
+        aria-labelledby="titulo-historial-cierres"
+        className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs flex flex-col gap-4"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+              <Icon name="history" size={20} />
+            </div>
+            <div>
+              <h2 id="titulo-historial-cierres" className="text-sm font-bold text-slate-900">
+                Historial de Cierres de Caja
+              </h2>
+              <p className="text-xs text-slate-500">
+                Registro histórico ordenado por fecha descendente
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-semibold text-slate-500">
+            {historialCierres.length} {historialCierres.length === 1 ? "cierre registrado" : "cierres registrados"}
+          </span>
+        </div>
+
+        {cargandoHistorial ? (
+          <div className="py-8 text-center text-xs text-slate-500 animate-pulse">
+            Cargando historial de cierres…
+          </div>
+        ) : historialCierres.length === 0 ? (
+          <div className="py-8 text-center text-xs text-slate-400">
+            No se registran cierres de caja previos en el sistema.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-700">
+              <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                <tr>
+                  <th scope="col" className="px-4 py-3">Fecha</th>
+                  <th scope="col" className="px-3 py-3">Usuario</th>
+                  <th scope="col" className="px-3 py-3 text-right">Total Registrado</th>
+                  <th scope="col" className="px-3 py-3 text-right">Diferencia</th>
+                  <th scope="col" className="px-3 py-3 text-center">Estado</th>
+                  <th scope="col" className="px-3 py-3">Observaciones</th>
+                  <th scope="col" className="px-4 py-3 text-center">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {historialCierres.map((c) => {
+                  const tieneDiferencia = Math.abs(c.diferencia) > 0.001;
+                  const esSobrante = c.diferencia > 0;
+
+                  return (
+                    <tr
+                      key={c.id}
+                      className={`hover:bg-slate-50/60 transition-colors ${
+                        c.fecha === fechaSeleccionada ? "bg-blue-50/40" : ""
+                      }`}
+                    >
+                      <td className="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap">
+                        <span className="flex items-center gap-1.5">
+                          <Icon name="event" size={14} className="text-slate-400" />
+                          {formatearFecha(c.fecha)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 font-medium text-slate-800">
+                        <div>
+                          <span>
+                            {c.cerradoPor.apellido}, {c.cerradoPor.nombre}
+                          </span>
+                          {c.estado === "Reabierta" && c.reabiertoPor && (
+                            <span className="block text-[10px] text-amber-700 font-medium">
+                              Reabierto por: {c.reabiertoPor.apellido}, {c.reabiertoPor.nombre}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-right font-bold text-slate-900 tabular-nums whitespace-nowrap">
+                        {formatoMoneda(c.totalRegistrado)}
+                      </td>
+                      <td className="px-3 py-3 text-right font-semibold tabular-nums whitespace-nowrap">
+                        {!tieneDiferencia ? (
+                          <span className="text-slate-500">$ 0,00</span>
+                        ) : esSobrante ? (
+                          <span className="text-emerald-700 font-bold">
+                            +{formatoMoneda(c.diferencia)}
+                            <span className="block text-[10px] font-medium text-emerald-600">Sobrante</span>
+                          </span>
+                        ) : (
+                          <span className="text-red-700 font-bold">
+                            {formatoMoneda(c.diferencia)}
+                            <span className="block text-[10px] font-medium text-red-600">Faltante</span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-center whitespace-nowrap">
+                        <div className="inline-flex justify-center">
+                          <StatusBadge
+                            variant={c.estado === "Cerrada" ? "neutral" : "warning"}
+                            label={c.estado}
+                            icon={c.estado === "Cerrada" ? "lock" : "lock_open"}
+                          />
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-slate-600 max-w-xs truncate" title={c.observaciones || c.motivoReapertura || ""}>
+                        {c.observaciones || c.motivoReapertura || (
+                          <span className="text-slate-400 italic">Sin observaciones</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFechaSeleccionada(c.fecha);
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                          title={`Ver conciliación del ${formatearFecha(c.fecha)}`}
+                        >
+                          <Icon name="visibility" size={14} />
+                          Ver detalle
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       {/* Modal de Cierre de Caja */}
       {modalCerrarOpen && caja && (
