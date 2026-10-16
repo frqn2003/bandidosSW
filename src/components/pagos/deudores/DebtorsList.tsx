@@ -48,7 +48,6 @@ export function DebtorsList() {
 
   // Cargar deudores con los filtros aplicados
   const cargarDeudores = useCallback(() => {
-    setCargando(true);
     listarDeudores({
       busqueda: busqueda.trim() || undefined,
       antiguedad: antiguedad === "todas" ? undefined : antiguedad,
@@ -74,26 +73,36 @@ export function DebtorsList() {
     }).format(val);
 
   const badgeSemaforo = (semaforo: SemaforoDeuda, dias: number) => {
+    const textoDias = `${dias} ${dias === 1 ? "día" : "días"}`;
     switch (semaforo) {
       case "amarillo":
         return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200">
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200"
+            title="Antigüedad: 0 a 30 días"
+          >
             <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-            0–30 días ({dias}d)
+            {textoDias}
           </span>
         );
       case "naranja":
         return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-0.5 text-xs font-semibold text-orange-800 border border-orange-200">
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-2.5 py-0.5 text-xs font-semibold text-orange-800 border border-orange-200"
+            title="Antigüedad: 31 a 60 días"
+          >
             <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-            31–60 días ({dias}d)
+            {textoDias}
           </span>
         );
       case "rojo":
         return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-800 border border-red-200">
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-800 border border-red-200"
+            title="Antigüedad: Más de 60 días"
+          >
             <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-            &gt;60 días ({dias}d)
+            {textoDias}
           </span>
         );
     }
@@ -211,7 +220,10 @@ export function DebtorsList() {
             </button>
             <button
               type="button"
-              onClick={cargarDeudores}
+              onClick={() => {
+                setCargando(true);
+                cargarDeudores();
+              }}
               className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1 font-semibold text-white shadow-2xs hover:bg-blue-700 transition-colors cursor-pointer"
             >
               <Icon name="refresh" size={14} />
@@ -245,11 +257,12 @@ export function DebtorsList() {
             <table className="w-full text-left text-xs text-slate-600">
               <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <tr>
-                  <th scope="col" className="px-4 py-3">Alumno</th>
-                  <th scope="col" className="px-3 py-3 text-center">Clases Impagas</th>
-                  <th scope="col" className="px-3 py-3">Clase más antigua</th>
-                  <th scope="col" className="px-3 py-3">Antigüedad</th>
-                  <th scope="col" className="px-3 py-3 text-right">Monto Adeudado</th>
+                  <th scope="col" className="px-4 py-3">Alumno (Apellido y Nombre)</th>
+                  <th scope="col" className="px-3 py-3 text-center">N° de legajo</th>
+                  <th scope="col" className="px-3 py-3 text-center">Cantidad de clases adeudadas</th>
+                  <th scope="col" className="px-3 py-3 text-right">Monto adeudado</th>
+                  <th scope="col" className="px-3 py-3">Fecha de la clase impaga más antigua</th>
+                  <th scope="col" className="px-3 py-3 text-center">Días de antigüedad</th>
                   <th scope="col" className="px-4 py-3 text-right">Acción</th>
                 </tr>
               </thead>
@@ -264,9 +277,17 @@ export function DebtorsList() {
                       <div className="font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
                         {deudor.alumno.apellido}, {deudor.alumno.nombre}
                       </div>
-                      <div className="text-[11px] text-slate-400 font-mono">
-                        {deudor.alumno.legajo} · DNI {deudor.alumno.dni}
-                      </div>
+                      {deudor.alumno.dni && (
+                        <div className="text-[11px] text-slate-400">
+                          DNI {deudor.alumno.dni}
+                        </div>
+                      )}
+                    </td>
+
+                    <td className="px-3 py-3 text-center">
+                      <span className="font-mono text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                        {deudor.alumno.legajo}
+                      </span>
                     </td>
 
                     <td className="px-3 py-3 text-center">
@@ -275,16 +296,16 @@ export function DebtorsList() {
                       </span>
                     </td>
 
-                    <td className="px-3 py-3 font-medium text-slate-700">
+                    <td className="px-3 py-3 text-right font-mono text-sm font-bold text-slate-900">
+                      {formatoMoneda(deudor.montoAdeudado)}
+                    </td>
+
+                    <td className="px-3 py-3 font-medium text-slate-700 whitespace-nowrap">
                       {formatearFecha(deudor.fechaClaseMasAntigua)}
                     </td>
 
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-3 text-center">
                       {badgeSemaforo(deudor.semaforo, deudor.diasAntiguedad)}
-                    </td>
-
-                    <td className="px-3 py-3 text-right font-mono text-sm font-bold text-slate-900">
-                      {formatoMoneda(deudor.montoAdeudado)}
                     </td>
 
                     <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
@@ -305,13 +326,13 @@ export function DebtorsList() {
               {/* Totalizador General de Deuda al pie de la tabla */}
               <tfoot className="border-t-2 border-slate-300 bg-slate-100/80 font-semibold text-slate-900">
                 <tr>
-                  <td colSpan={4} className="px-4 py-3 text-xs uppercase tracking-wider font-bold">
+                  <td colSpan={3} className="px-4 py-3 text-xs uppercase tracking-wider font-bold">
                     Total General de Deuda Filtrada
                   </td>
                   <td className="px-3 py-3 text-right font-mono text-base font-extrabold text-red-700">
                     {formatoMoneda(data.totalGeneral)}
                   </td>
-                  <td className="px-4 py-3" />
+                  <td colSpan={3} className="px-4 py-3" />
                 </tr>
               </tfoot>
             </table>
