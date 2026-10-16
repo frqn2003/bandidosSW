@@ -1469,8 +1469,8 @@ AS $function$
   FROM turno t
   JOIN materia m ON m.id = t.materia_id
   WHERE fn_ts_servidor_a_art(t.created_at)::date <= p_fecha
-    AND NOT (t.estado = 'Cancelado'
-             AND COALESCE(t.fecha_cancelacion::date, p_fecha) <= p_fecha)
+    AND t.fecha <= p_fecha
+    AND fn_turno_cobrable(t.estado)
     AND NOT EXISTS (
           SELECT 1
           FROM pago_turno pt

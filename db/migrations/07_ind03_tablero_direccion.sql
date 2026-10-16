@@ -19,8 +19,8 @@
 -- alumnos (regla de HU-IND-01). Nivel sí aplica (por nivel educativo del alumno).
 --
 -- Una sola fuente de verdad para las cifras:
---   * Deuda  = misma definición de PAG-02 (clases Reservado/Asistió/Ausente sin
---              pago vigente, sin importar la fecha).
+--   * Deuda  = misma definición de PAG-02 (clases Asistió/Ausente con
+--              fn_turno_cobrable sin pago vigente).
 --   * Ingresos = pagos VIGENTES por fecha de pago, igual que cierre de caja y
 --              rendición.
 --   * Ocupación = fn_ocupacion (la misma del calendario y de IND-02).
@@ -67,10 +67,9 @@ $function$;
 -- ---------------------------------------------------------
 -- 2. Deuda pendiente a una fecha
 -- ---------------------------------------------------------
--- Clases Reservado/Asistió/Ausente (no canceladas a esa fecha) creadas hasta
--- esa fecha y sin pago vigente a esa fecha. Un pago cuenta si su fecha_pago es
--- <= la fecha y no estaba anulado todavía. Para hoy coincide con la suma de
--- vw_deuda_clase.
+-- Clases Asistió/Ausente (fn_turno_cobrable) dictadas hasta esa fecha y sin pago
+-- vigente a esa fecha. Un pago cuenta si su fecha_pago es <= la fecha y no
+-- estaba anulado todavía. Para hoy coincide con la suma de vw_deuda_clase.
 CREATE OR REPLACE FUNCTION public.fn_deuda_al(
   p_fecha       date,
   p_materia_id  integer       DEFAULT NULL,
@@ -85,8 +84,8 @@ AS $function$
   FROM turno t
   JOIN materia m ON m.id = t.materia_id
   WHERE fn_ts_servidor_a_art(t.created_at)::date <= p_fecha
-    AND NOT (t.estado = 'Cancelado'
-             AND COALESCE(t.fecha_cancelacion::date, p_fecha) <= p_fecha)
+    AND t.fecha <= p_fecha
+    AND fn_turno_cobrable(t.estado)
     AND NOT EXISTS (
           SELECT 1
           FROM pago_turno pt
