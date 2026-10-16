@@ -382,12 +382,16 @@ function ReservaContent() {
     } catch (e) {
       setConfirmarOpen(false);
       const codigo = e instanceof ApiError ? e.codigo : null;
-      if (codigo === "SIN_CUPO") {
-        // Concurrencia: otro operador tomó el último cupo. Se recargan las franjas.
+      if (codigo === "SIN_CUPO" || codigo === "PROFESOR_CON_TURNO_SUPERPUESTO") {
+        // Concurrencia: otro operador tomó el último cupo o el profesor ya tiene otra clase. Se recargan las franjas.
         setHora(null);
         setRecargaFranjas((n) => n + 1);
-        setErrorRemoto("El horario ya no está disponible. Actualizamos la lista: elegí otro horario.");
-        showToast("error", "El horario ya no está disponible.");
+        const msg =
+          codigo === "PROFESOR_CON_TURNO_SUPERPUESTO"
+            ? "El profesor ya tiene otra clase en ese horario. Actualizamos la lista: elegí otro horario."
+            : "El horario ya no está disponible. Actualizamos la lista: elegí otro horario.";
+        setErrorRemoto(msg);
+        showToast("error", mensajeDeError(e));
       } else if (codigo === "ANTICIPACION_INSUFICIENTE" || codigo === "FUERA_DE_DISPONIBILIDAD") {
         setHora(null);
         setRecargaFranjas((n) => n + 1);

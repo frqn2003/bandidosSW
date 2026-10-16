@@ -238,15 +238,29 @@ export async function crearReserva(
         );
       }
 
-      // 7. Cupo del profesor con bloqueo FOR UPDATE
-      const ocupados = await repo.contarOcupadosBloqueando(
+      // 7. Cupo y no-superposición del profesor con bloqueo FOR UPDATE
+      const superpuestos = await repo.turnosSuperpuestosProfesor(
         input.profesorId,
         input.fecha,
         input.horaInicio,
         horaFin,
         client,
       );
-      if (ocupados >= pm.capacidad_maxima) {
+
+      const conflictoHorario = superpuestos.find(
+        (t) =>
+          t.horaInicio.slice(0, 5) !== input.horaInicio.slice(0, 5) ||
+          t.horaFin.slice(0, 5) !== horaFin.slice(0, 5) ||
+          t.materiaId !== input.materiaId,
+      );
+      if (conflictoHorario) {
+        throw new ConflictError(
+          "PROFESOR_CON_TURNO_SUPERPUESTO",
+          "El profesor ya tiene otra clase programada en ese horario.",
+        );
+      }
+
+      if (superpuestos.length >= pm.capacidad_maxima) {
         throw new ConflictError("SIN_CUPO", "No quedan lugares en ese horario.");
       }
 
@@ -378,7 +392,7 @@ export async function reprogramar(
       );
     }
 
-    const ocupados = await repo.contarOcupadosBloqueando(
+    const superpuestos = await repo.turnosSuperpuestosProfesor(
       profesorId,
       input.fecha,
       input.horaInicio,
@@ -386,7 +400,21 @@ export async function reprogramar(
       client,
       id,
     );
-    if (ocupados >= pm.capacidad_maxima) {
+
+    const conflictoHorario = superpuestos.find(
+      (t) =>
+        t.horaInicio.slice(0, 5) !== input.horaInicio.slice(0, 5) ||
+        t.horaFin.slice(0, 5) !== horaFin.slice(0, 5) ||
+        t.materiaId !== actual.materia_id,
+    );
+    if (conflictoHorario) {
+      throw new ConflictError(
+        "PROFESOR_CON_TURNO_SUPERPUESTO",
+        "El profesor ya tiene otra clase programada en ese horario.",
+      );
+    }
+
+    if (superpuestos.length >= pm.capacidad_maxima) {
       throw new ConflictError("SIN_CUPO", "No quedan lugares en ese horario.");
     }
 

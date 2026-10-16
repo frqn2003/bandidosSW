@@ -103,7 +103,8 @@ export type ProfesorDeMateria = ProfesorOpcion & {
 export type MotivoFranja =
   | "SIN_CUPO"
   | "ANTICIPACION_INSUFICIENTE"
-  | "ALUMNO_CON_TURNO_SUPERPUESTO";
+  | "ALUMNO_CON_TURNO_SUPERPUESTO"
+  | "PROFESOR_CON_TURNO_SUPERPUESTO";
 
 export type FranjaTurnoResponse = {
   /** "HH:MM" */
@@ -190,6 +191,7 @@ function calcularFranjas(
   duracion: number,
   turnosAlumno: Pick<TurnoResponse, "fecha" | "horaInicio" | "horaFin">[],
   ahora: number,
+  materiaId?: number,
 ): FranjaTurnoResponse[] {
   const reservados = agenda.turnos.filter((t) => t.estado === "Reservado");
   const delAlumno = turnosAlumno.filter((t) => t.fecha === fecha);
@@ -204,16 +206,28 @@ function calcularFranjas(
       // Las franjas que ya empezaron no se ofrecen.
       if (inicio <= ahora) continue;
 
-      const usados = reservados.filter((t) =>
+      const superpuestosProfesor = reservados.filter((t) =>
         seSuperponen(ini, fin, aMin(t.horaInicio), aMin(t.horaFin)),
+      );
+
+      const profesorConConflicto = superpuestosProfesor.some((t) =>
+        aMin(t.horaInicio) !== ini ||
+        aMin(t.horaFin) !== fin ||
+        (materiaId !== undefined && t.materia?.id !== undefined && t.materia.id !== materiaId),
+      );
+
+      const usados = superpuestosProfesor.filter((t) =>
+        aMin(t.horaInicio) === ini && aMin(t.horaFin) === fin,
       ).length;
-      const cuposDisponibles = Math.max(0, capacidad - usados);
+
+      const cuposDisponibles = profesorConConflicto ? 0 : Math.max(0, capacidad - usados);
       const alumnoOcupado = delAlumno.some((t) =>
         seSuperponen(ini, fin, aMin(t.horaInicio), aMin(t.horaFin)),
       );
 
       let motivo: MotivoFranja | null = null;
       if (inicio < limiteAnticipacion) motivo = "ANTICIPACION_INSUFICIENTE";
+      else if (profesorConConflicto) motivo = "PROFESOR_CON_TURNO_SUPERPUESTO";
       else if (cuposDisponibles === 0) motivo = "SIN_CUPO";
       else if (alumnoOcupado) motivo = "ALUMNO_CON_TURNO_SUPERPUESTO";
 
@@ -304,7 +318,7 @@ export async function listarFranjas(q: FranjasQuery): Promise<FranjaTurnoRespons
     q.alumnoId ? turnosReservadosDelAlumno(q.alumnoId, q.fecha, q.fecha) : Promise.resolve([]),
   ]);
   if (!pm) return [];
-  return calcularFranjas(q.fecha, agenda, pm.capacidad, pm.duracion, turnosAlumno, Date.now());
+  return calcularFranjas(q.fecha, agenda, pm.capacidad, pm.duracion, turnosAlumno, Date.now(), q.materiaId);
 }
 
 function diaSemanaISO(fechaISO: string): number {
@@ -358,8 +372,19 @@ export async function sugerirProximaFranja(
         const inicio = inicioDe(fechaActual, ini);
         if (inicio < limite) continue;
 
-        const usados = reservadosDelDia.filter((t) =>
+        const superpuestosProfesor = reservadosDelDia.filter((t) =>
           seSuperponen(ini, fin, aMin(t.horaInicio), aMin(t.horaFin)),
+        );
+
+        const profesorConConflicto = superpuestosProfesor.some((t) =>
+          aMin(t.horaInicio) !== ini ||
+          aMin(t.horaFin) !== fin ||
+          (t.materia?.id !== undefined && t.materia.id !== q.materiaId),
+        );
+        if (profesorConConflicto) continue;
+
+        const usados = superpuestosProfesor.filter((t) =>
+          aMin(t.horaInicio) === ini && aMin(t.horaFin) === fin,
         ).length;
         const cuposDisponibles = Math.max(0, pm.capacidad - usados);
         if (cuposDisponibles === 0) continue;
@@ -402,6 +427,7 @@ export async function reservarTurno(body: CrearTurnoBody): Promise<TurnoResponse
 /** Mensajes del front para los códigos que la pantalla trata aparte. */
 export const MENSAJES_ERROR: Partial<Record<ErrorTurno, string>> = {
   SIN_CUPO: "El horario ya no está disponible.",
+  PROFESOR_CON_TURNO_SUPERPUESTO: "El profesor ya tiene otra clase programada en ese horario.",
 };
 
 // OPCIONAL: envío del comprobante por email (deseable de la HU). Si no se
