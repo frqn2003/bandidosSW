@@ -4,8 +4,8 @@
 -- Requiere 03a. Solo lectura: vistas y funciones, ninguna tabla nueva.
 --
 -- DEFINICIÓN DE DEUDA (única fuente de verdad; la usa también HU-IND-03):
---   toda clase Reservado, Asistió o Ausente SIN pago vigente, sin importar la
---   fecha (fn_turno_cobrable). Las Canceladas nunca generan deuda.
+--   toda clase Asistió o Ausente SIN pago vigente, sin importar la
+--   fecha (fn_turno_cobrable). Las Reservadas y Canceladas nunca generan deuda.
 --   Es la misma regla con la que se permite cobrar.
 --   turno.pagado == "tiene pago vigente" (lo garantiza el trigger
 --   fn_turno_proteger_pagado), por eso se usa pagado = false.
@@ -134,8 +134,7 @@ $function$;
 -- ---------------------------------------------------------
 -- Movimientos en orden cronológico (más viejo primero):
 --   * Clase  → cargo = valor de la clase congelado. Son cargo (suman al saldo)
---              las clases Reservado, Asistió y Ausente (fn_turno_cobrable), la
---              misma regla de vw_deuda_clase, sin importar la fecha. Las
+--              las clases Asistió y Ausente (fn_turno_cobrable). Las
 --              Canceladas se muestran pero no suman.
 --   * Pago   → crédito = monto, con su comprobante y medio(s) de pago.
 --              Estados: Vigente (suma) y Anulado (se muestra, no suma).
@@ -171,7 +170,7 @@ AS $function$
            t.estado::text               AS est,
            t.valor_clase_congelado::numeric AS cg,
            0::numeric                   AS cr,
-           (t.estado <> 'Cancelado') AS afecta
+           fn_turno_cobrable(t.estado)  AS afecta
     FROM turno t
     JOIN materia  m ON m.id = t.materia_id
     JOIN profesor p ON p.id = t.profesor_id

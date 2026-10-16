@@ -13,15 +13,15 @@ type Ejecutor = Pool | PoolClient;
 
 /**
  * Consulta las clases pendientes de cobro de un alumno:
- * turnos cuya fecha y hora de inicio ya transcurrieron en Argentina,
- * que no están Cancelados y que no han sido pagados.
+ * turnos dictados (estado Asistió o Ausente) cuya fecha y hora de inicio ya transcurrieron,
+ * y que no han sido pagados.
  */
 export async function listarClasesPendientes(
   alumnoId?: number,
   ejecutor: Ejecutor = pool,
 ): Promise<ClasePendientePagoRow[]> {
   const params: unknown[] = [];
-  let where = `WHERE t.estado <> 'Cancelado'
+  let where = `WHERE t.estado IN ('Asistió', 'Ausente')
     AND t.pagado = false
     AND (t.fecha + t.hora_inicio) <= (now() AT TIME ZONE 'America/Argentina/Buenos_Aires')`;
 

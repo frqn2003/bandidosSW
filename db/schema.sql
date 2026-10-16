@@ -1616,7 +1616,7 @@ AS $function$
            t.estado::text               AS est,
            t.valor_clase_congelado::numeric AS cg,
            0::numeric                   AS cr,
-           (t.estado <> 'Cancelado') AS afecta
+           fn_turno_cobrable(t.estado)  AS afecta
     FROM turno t
     JOIN materia  m ON m.id = t.materia_id
     JOIN profesor p ON p.id = t.profesor_id
@@ -2300,6 +2300,8 @@ BEGIN
     RAISE EXCEPTION 'El pago % ya está anulado y no admite cambios.', OLD.comprobante;
   END IF;
 
+  -- `comprobante` no se compara: es GENERATED (NEW llega NULL en BEFORE UPDATE)
+  -- y Postgres ya impide modificarlo.
   IF NEW.estado <> 'Anulado'
      OR NEW.alumno_id     IS DISTINCT FROM OLD.alumno_id
      OR NEW.monto         IS DISTINCT FROM OLD.monto
@@ -2743,7 +2745,7 @@ CREATE OR REPLACE FUNCTION public.fn_turno_cobrable(p_estado estado_turno)
  LANGUAGE sql
  IMMUTABLE
 AS $function$
-  SELECT p_estado IN ('Reservado', 'Asistió', 'Ausente');
+  SELECT p_estado IN ('Asistió', 'Ausente');
 $function$
 ;
 
@@ -4404,14 +4406,14 @@ CREATE OR REPLACE FUNCTION public.tstz_dist(timestamp with time zone, timestamp 
 AS '$libdir/btree_gist', $function$tstz_dist$function$
 ;
 
-CREATE OR REPLACE FUNCTION public.unaccent(text)
+CREATE OR REPLACE FUNCTION public.unaccent(regdictionary, text)
  RETURNS text
  LANGUAGE c
  STABLE PARALLEL SAFE STRICT
 AS '$libdir/unaccent', $function$unaccent_dict$function$
 ;
 
-CREATE OR REPLACE FUNCTION public.unaccent(regdictionary, text)
+CREATE OR REPLACE FUNCTION public.unaccent(text)
  RETURNS text
  LANGUAGE c
  STABLE PARALLEL SAFE STRICT

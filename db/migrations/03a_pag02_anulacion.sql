@@ -82,16 +82,15 @@ $function$;
 -- ---------------------------------------------------------
 -- REGLA ÚNICA de "clase cobrable / que genera deuda" (la usan la validación del
 -- cobro, vw_deuda_clase y fn_estado_cuenta):
---   * Reservado, Asistió y Ausente → sí, sin importar la fecha.
---   * Cancelado                    → nunca.
--- Lo que sigue impago de esas clases es la deuda. No se exige asistencia
--- registrada ni que la clase ya haya empezado.
+--   * Asistió y Ausente            → sí (clases dictadas o inasistencias computadas).
+--   * Reservado y Cancelado        → nunca (no generan deuda).
+-- Lo que sigue impago de esas clases dictadas es la deuda.
 CREATE OR REPLACE FUNCTION public.fn_turno_cobrable(p_estado estado_turno)
  RETURNS boolean
  LANGUAGE sql
  IMMUTABLE
 AS $function$
-  SELECT p_estado IN ('Reservado', 'Asistió', 'Ausente');
+  SELECT p_estado IN ('Asistió', 'Ausente');
 $function$;
 
 CREATE OR REPLACE FUNCTION public.fn_pago_turno_validar()

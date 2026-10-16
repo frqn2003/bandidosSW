@@ -6,10 +6,8 @@
 // Reglas de negocio del módulo (las aplica el back; el front no las duplica):
 //  · Solo acceden Gerente y Mesa de Entrada. El Profesor no (→ ACCESO_DENEGADO).
 //  · Qué es una clase adeudada: la define la base (`vw_deuda_clase` / `fn_turno_cobrable`):
-//    turno no pagado en estado 'Reservado', 'Asistió' o 'Ausente'. Los 'Cancelado' no generan
-//    deuda. NOTA: el criterio de la HU habla solo de 'Asistió' y 'Ausente'; hoy la base también
-//    cuenta 'Reservado' (se siguió la base). Si el equipo lo corrige en la base, el contrato
-//    no cambia: solo cambia el rango de `estado` en las filas.
+//    turno no pagado en estado 'Asistió' o 'Ausente'. Los 'Reservado' y 'Cancelado' no generan
+//    deuda ni cargos. Cumple el criterio de la HU.
 //  · Deudores: solo alumnos con deuda > 0, por monto adeudado descendente.
 //  · Antigüedad = días desde la clase impaga más antigua. Semáforo: hasta 30 amarillo,
 //    31–60 naranja, más de 60 rojo (lo calcula el back).
