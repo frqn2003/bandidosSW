@@ -171,6 +171,7 @@ export type TurnoResponse = {
 export type ErrorTurno =
   | "SIN_CUPO"                      // 409, cupo completo del profesor en esa franja
   | "ALUMNO_CON_TURNO_SUPERPUESTO"  // 409, el alumno ya tiene clase en ese horario
+  | "PROFESOR_CON_TURNO_SUPERPUESTO" // 409, el profesor ya tiene otra clase en ese horario
   | "FUERA_DE_DISPONIBILIDAD"       // 422, fuera de agenda del profesor
   | "FECHA_BLOQUEADA"               // 422, la fecha cae en un bloqueo vigente (HU-CAL-03): no admite reservas ni modificaciones
   | "ANTICIPACION_INSUFICIENTE"     // 422, menos de 2 horas de anticipación

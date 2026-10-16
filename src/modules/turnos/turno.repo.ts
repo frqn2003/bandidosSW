@@ -238,19 +238,26 @@ export async function bloqueoVigente(
   return filas[0] ?? null;
 }
 
-export async function contarOcupadosBloqueando(
+export type TurnoSuperpuestoProfesor = {
+  id: number;
+  horaInicio: string;
+  horaFin: string;
+  materiaId: number;
+};
+
+export async function turnosSuperpuestosProfesor(
   profesorId: number,
   fecha: string,
   horaInicio: string,
   horaFin: string,
   client: PoolClient,
   excluirTurnoId?: number,
-): Promise<number> {
+): Promise<TurnoSuperpuestoProfesor[]> {
   // Lock del profesor para serializar reservas concurrentes
   await client.query("SELECT id FROM profesor WHERE id = $1 FOR UPDATE", [profesorId]);
 
   let sql = `
-    SELECT count(*)::text AS total
+    SELECT id, hora_inicio::text AS "horaInicio", hora_fin::text AS "horaFin", materia_id AS "materiaId"
     FROM turno
     WHERE profesor_id = $1
       AND fecha = $2::date
@@ -265,8 +272,27 @@ export async function contarOcupadosBloqueando(
     sql += ` AND id <> $${params.length}`;
   }
 
-  const { rows } = await client.query<{ total: string }>(sql, params);
-  return Number(rows[0]?.total ?? 0);
+  const { rows } = await client.query<TurnoSuperpuestoProfesor>(sql, params);
+  return rows;
+}
+
+export async function contarOcupadosBloqueando(
+  profesorId: number,
+  fecha: string,
+  horaInicio: string,
+  horaFin: string,
+  client: PoolClient,
+  excluirTurnoId?: number,
+): Promise<number> {
+  const superpuestos = await turnosSuperpuestosProfesor(
+    profesorId,
+    fecha,
+    horaInicio,
+    horaFin,
+    client,
+    excluirTurnoId,
+  );
+  return superpuestos.length;
 }
 
 export async function buscarEstadoEntidades(

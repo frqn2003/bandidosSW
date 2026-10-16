@@ -16,6 +16,7 @@ const MOTIVO_TEXTO: Record<MotivoFranja, string> = {
   SIN_CUPO: "Sin cupo",
   ANTICIPACION_INSUFICIENTE: `Menos de ${ANTICIPACION_MINIMA_HORAS} h de anticipación`,
   ALUMNO_CON_TURNO_SUPERPUESTO: "El alumno ya tiene un turno",
+  PROFESOR_CON_TURNO_SUPERPUESTO: "Profesor con clase en curso",
 };
 
 interface FranjasHorariasProps {
